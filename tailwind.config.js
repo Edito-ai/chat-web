@@ -1,7 +1,7 @@
 /** Same monochrome tokens as the Edito editor, so chat-web feels like the same product. */
 /** @type {import('tailwindcss').Config} */
-export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
+module.exports = {
+  content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
@@ -21,7 +21,7 @@ export default {
         display: ['28px', { lineHeight: '1.2' }],
       },
       fontFamily: {
-        sans: ['Inter Variable', 'Inter', 'Noto Sans Devanagari', 'SF Pro Display', 'Segoe UI', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-inter)', 'Inter Variable', 'Inter', 'Noto Sans Devanagari', 'SF Pro Display', 'Segoe UI', 'system-ui', 'sans-serif'],
       },
       boxShadow: { ring: 'inset 0 0 0 1px rgb(255 255 255 / 0.12)' },
     },

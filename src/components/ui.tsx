@@ -1,9 +1,11 @@
+'use client'
+
 import clsx from 'clsx'
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { AlertCircle, ChevronRight, RefreshCw, type LucideIcon } from 'lucide-react'
 import { friendlyError } from '@/lib/friendlyError'
 import { useT } from '@/i18n'
-import logoUrl from '@/assets/broll-logo.png'
+const logoUrl = '/broll-logo.png'
 
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon: LucideIcon

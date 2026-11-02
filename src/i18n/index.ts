@@ -9,7 +9,8 @@ export type Locale = 'en' | 'hi'
 const KEY = 'edito.chat-web.locale'
 const tables: Record<Locale, Record<MessageKey, string>> = { en, hi }
 
-function initial(): Locale {
+/** Browser-only: stored choice, else the browser language. Never call during server render. */
+export function detectLocale(): Locale {
   try {
     const saved = localStorage.getItem(KEY)
     if (saved === 'en' || saved === 'hi') return saved
@@ -20,7 +21,8 @@ function initial(): Locale {
 }
 
 export const useLocale = create<{ locale: Locale; setLocale: (l: Locale) => void }>((set) => ({
-  locale: initial(),
+  // Always 'en' at creation so server HTML and the first client render match; LocaleSync applies detectLocale().
+  locale: 'en',
   setLocale: (locale) => {
     try {
       localStorage.setItem(KEY, locale)
