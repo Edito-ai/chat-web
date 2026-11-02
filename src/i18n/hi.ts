@@ -71,6 +71,7 @@ export const hi: Record<MessageKey, string> = {
   'chat.dropHint': 'वीडियो जोड़ने के लिए यहाँ छोड़ें',
   'nav.aria': 'चैट इतिहास',
   'nav.recent': 'हाल की',
+  'nav.account': 'अकाउंट मेन्यू',
   'nav.group.today': 'आज',
   'nav.group.yesterday': 'कल',
   'nav.group.week': 'पिछले 7 दिन',

@@ -6,6 +6,8 @@ import { PanelLeftClose, SquarePen } from 'lucide-react'
 import { useLocale, useT, type MessageKey } from '@/i18n'
 import { Button, IconButton, Logo } from '@/components/ui'
 import { groupHistory, type HistoryItem } from './history'
+import { ProfileMenu } from './ProfileMenu'
+import type { ProfileUser } from './profile'
 
 /** "14:05" for today's rows, "3 Oct" for older ones. */
 function stamp(t: number, now: number, locale: string): string {
@@ -45,10 +47,13 @@ export interface SidebarProps {
   onOpen: (jobId: string) => void
   onRetry: () => void
   onClose: () => void
+  /** The signed-in person, shown at the foot of the rail with a Sign out menu. */
+  user: ProfileUser | null
+  onSignOut: () => void
 }
 
 /** Left rail: brand, New chat, and the user's recent chats grouped by day. Arrow-free: plain buttons in tab order. */
-export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, now, disabled, onNew, onOpen, onRetry, onClose }: SidebarProps) {
+export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, now, disabled, onNew, onOpen, onRetry, onClose, user, onSignOut }: SidebarProps) {
   const { t } = useT()
   const locale = useLocale((s) => s.locale)
   const router = useRouter()
@@ -133,6 +138,8 @@ export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, no
           ))
         )}
       </nav>
+
+      {signedIn && user ? <ProfileMenu user={user} onSignOut={onSignOut} /> : null}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import clsx from 'clsx'
 import { useRouter } from 'next/navigation'
-import { LogOut, Menu, PanelLeftOpen, SquarePen, X } from 'lucide-react'
+import { Menu, PanelLeftOpen, SquarePen, X } from 'lucide-react'
 import { useT, useLocale, type MessageKey } from '@/i18n'
 import { Button, IconButton, InlineError, Logo } from '@/components/ui'
 import { useAuth } from '@/auth/authStore'
@@ -68,7 +68,11 @@ export function ChatScreen() {
   const history = useChat((s) => s.history)
   const historyState = useChat((s) => s.historyState)
   const currentJobId = useChat((s) => s.jobId)
-  const userName = useAuth((s) => s.user?.name ?? s.user?.email ?? '')
+  const user = useAuth((s) => s.user)
+  const signOut = () => {
+    useChat.getState().reset()
+    useAuth.getState().logout()
+  }
   const authStatus = useAuth((s) => s.status)
   const router = useRouter()
   const signedIn = authStatus === 'authenticated'
@@ -172,6 +176,8 @@ export function ChatScreen() {
       onOpen={open}
       onRetry={() => void loadHistory()}
       onClose={() => (drawer ? setDrawer(false) : setCollapsedPersist(true))}
+      user={user ? { name: user.name, email: user.email } : null}
+      onSignOut={signOut}
     />
   )
 
@@ -255,18 +261,7 @@ export function ChatScreen() {
             <option value="en">EN</option>
             <option value="hi">हिं</option>
           </select>
-          {signedIn ? (
-            <IconButton
-              data-testid="chat-sign-out"
-              icon={LogOut}
-              aria-label={`${t('auth.signOut')}${userName ? ` (${userName})` : ''}`}
-              title={t('auth.signOut')}
-              onClick={() => {
-                useChat.getState().reset()
-                useAuth.getState().logout()
-              }}
-            />
-          ) : authStatus === 'unauthenticated' ? (
+          {signedIn ? null : authStatus === 'unauthenticated' ? (
             <>
               <Button data-testid="chat-login" variant="ghost" onClick={() => router.push('/login')}>
                 {t('auth.loginShort')}

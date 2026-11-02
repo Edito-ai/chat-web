@@ -70,6 +70,7 @@ export const en = {
   'chat.dropHint': 'Drop videos to add them',
   'nav.aria': 'Chat history',
   'nav.recent': 'Recent',
+  'nav.account': 'Account menu',
   'nav.group.today': 'Today',
   'nav.group.yesterday': 'Yesterday',
   'nav.group.week': 'Previous 7 days',
