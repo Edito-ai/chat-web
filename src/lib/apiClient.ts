@@ -72,13 +72,13 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
   return parseOrThrow(res)
 }
 
-type Opts = { signal?: AbortSignal }
+type Opts = { signal?: AbortSignal; headers?: Record<string, string> }
 const json = (body: unknown) => (body === undefined ? undefined : JSON.stringify(body))
 
 export const apiClient = {
-  get: (path: string, opts?: Opts) => request(path, { signal: opts?.signal }),
+  get: (path: string, opts?: Opts) => request(path, { signal: opts?.signal, headers: opts?.headers }),
   post: (path: string, body?: unknown, opts?: Opts) =>
-    request(path, { method: 'POST', body: json(body), signal: opts?.signal }),
+    request(path, { method: 'POST', body: json(body), signal: opts?.signal, headers: opts?.headers }),
   delete: (path: string, opts?: Opts) => request(path, { method: 'DELETE', signal: opts?.signal }),
   upload: (path: string, formData: FormData, opts?: Opts) =>
     request(path, { method: 'POST', body: formData, signal: opts?.signal }),

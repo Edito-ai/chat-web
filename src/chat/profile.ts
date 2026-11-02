@@ -3,6 +3,8 @@
 export interface ProfileUser {
   name: string | null
   email: string
+  /** Mirrors /auth/me isAdmin; only shows the Admin entry. */
+  isAdmin?: boolean
 }
 
 /** What to call the person: their name, else the part of the email before the @. */

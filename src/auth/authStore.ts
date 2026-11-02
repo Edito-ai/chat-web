@@ -9,6 +9,8 @@ export interface AuthUser {
   email: string
   name: string | null
   emailVerifiedAt?: string | null
+  /** From /auth/me; only decides whether the Admin entry shows, the backend re-checks every admin route. */
+  isAdmin?: boolean
 }
 
 type Status = 'restoring' | 'authenticated' | 'unauthenticated'
