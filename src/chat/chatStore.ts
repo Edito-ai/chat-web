@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useAuth } from '@/auth/authStore'
 import { ApiError } from '@/lib/apiClient'
-import { getChatApi } from './chatApi'
+import { getChatApi, toSnapshot } from './chatApi'
 import { createChatProject, deleteAsset, uploadVideo } from './chatUploads'
 import { looksLikeVideo, probeVideo, type VideoProbe } from './probe'
 import { shapeFor } from './projectShape'
@@ -10,6 +10,7 @@ import {
   activeAssistant, applySnapshot, capMessages, finishLocally, isTerminal, lastCompleted, newAssistant,
 } from './chatState'
 import type { ChatJobSnapshot, ChatMessage } from './chatTypes'
+import { getHistoryApi, rebuildMessages, toHistoryItem, type HistoryItem } from './history'
 
 /** Time between polls; a failing poll backs off (x2 per miss) up to MAX_BACKOFF_MS. */
 export const POLL_MS = 2000
@@ -48,6 +49,13 @@ interface ChatState {
   actionError: unknown
   /** Set when polling gave up on this job; Retry resumes it. */
   pollLostJobId: string | null
+  /** Sidebar: the user's recent chats (not persisted). */
+  history: HistoryItem[]
+  historyState: 'idle' | 'loading' | 'ready' | 'error'
+  /** The job id open in the screen (also what the sidebar highlights). */
+  loadHistory: () => Promise<void>
+  /** Opens a past chat: rebuilds its messages from the job's turns and resumes polling if it is still running. */
+  openJob: (jobId: string) => Promise<void>
 
   attach: (files: File[]) => Promise<void>
   removeAttachment: (id: string) => void
@@ -138,7 +146,10 @@ async function pollJob(jobId: string): Promise<void> {
       misses = 0
       useChat.setState((s) => ({ messages: applySnapshot(s.messages, snap) }))
       absorb(snap)
-      if (isTerminal(snap.status)) break
+      if (isTerminal(snap.status)) {
+        void useChat.getState().loadHistory()
+        break
+      }
     } catch (e) {
       if (ctl.signal.aborted) return
       // The server answered "no such job / not yours": retrying cannot help.
@@ -175,6 +186,40 @@ export const useChat = create<ChatState>()(
       busy: false,
       actionError: null,
       pollLostJobId: null,
+      history: [],
+      historyState: 'idle',
+
+      loadHistory: async () => {
+        if (!currentUserId()) return
+        set({ historyState: get().history.length > 0 ? 'ready' : 'loading' })
+        try {
+          const rows = await getHistoryApi().list(50)
+          set({ history: rows.map(toHistoryItem).filter((h) => h.title !== ''), historyState: 'ready' })
+        } catch {
+          set({ historyState: 'error' })
+        }
+      },
+
+      openJob: async (jobId) => {
+        if (get().busy) return
+        set({ busy: true, actionError: null })
+        try {
+          const wire = await getHistoryApi().get(jobId)
+          stopPolling()
+          abortUploads()
+          const messages = rebuildMessages(wire)
+          const snap = toSnapshot(wire)
+          set({
+            ...EMPTY_CHAT, messages, jobId: wire.id, projectId: wire.projectId ?? null, userId: currentUserId(),
+            canFollowUp: snap.canFollowUp, videoIds: snap.videoIds,
+          })
+          if (!isTerminal(snap.status)) void pollJob(wire.id)
+        } catch (e) {
+          set({ actionError: e })
+        } finally {
+          set({ busy: false })
+        }
+      },
 
       attach: async (picked) => {
         const files = picked.filter(looksLikeVideo)
@@ -259,6 +304,7 @@ export const useChat = create<ChatState>()(
           }))
           absorb(snap)
           if (!isTerminal(snap.status)) void pollJob(snap.jobId)
+          void get().loadHistory()
         } catch (e) {
           set({ actionError: e })
         } finally {
@@ -328,7 +374,7 @@ export const useChat = create<ChatState>()(
       reset: () => {
         stopPolling()
         abortUploads()
-        set({ ...EMPTY_CHAT, userId: null, busy: false })
+        set({ ...EMPTY_CHAT, userId: null, busy: false, history: [], historyState: 'idle' })
       },
 
       clearActionError: () => set({ actionError: null }),

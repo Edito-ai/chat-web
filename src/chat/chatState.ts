@@ -41,7 +41,17 @@ export function applySnapshot(messages: readonly ChatMessage[], snap: ChatJobSna
     if (m.role !== 'assistant' || m.jobId !== snap.jobId || m.turn !== snap.turn || isTerminal(m.status)) return m
     const progress =
       snap.progress === null ? m.progress : Math.max(m.progress ?? 0, Math.min(1, Math.max(0, snap.progress)))
-    const base = { ...m, stage: snap.stage ?? m.stage, message: snap.message ?? m.message, reply: snap.reply ?? m.reply }
+    const terminal = isTerminal(snap.status)
+    const base = {
+      ...m,
+      stage: snap.stage ?? m.stage,
+      message: snap.message ?? m.message,
+      reply: snap.reply ?? m.reply,
+      timings: snap.stageTimings && snap.stageTimings.length > 0 ? snap.stageTimings : m.timings,
+      startedAt: snap.startedAt ?? m.startedAt ?? null,
+      finishedAt: terminal ? (snap.updatedAt ?? m.finishedAt ?? null) : null,
+      durationSec: snap.durationSec ?? m.durationSec ?? null,
+    }
     if (snap.status === 'complete') {
       return snap.result
         ? { ...base, status: 'complete', progress: 1, result: snap.result, error: null }

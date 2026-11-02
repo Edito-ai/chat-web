@@ -1,5 +1,12 @@
 /** Shapes shared by the chat-edit store, its API adapters and the screen. */
 
+/** One step entry the backend recorded for the current turn (`at` is epoch ms). */
+export interface StageEvent {
+  state: string
+  stage: string | null
+  at: number
+}
+
 export type ChatJobStatus = 'queued' | 'running' | 'complete' | 'failed' | 'cancelled'
 
 /** What a finished job hands back. */
@@ -32,6 +39,14 @@ export interface ChatJobSnapshot {
   videoIds: string[]
   /** A follow-up may be sent now. */
   canFollowUp: boolean
+  /** Real step-entry times of the current turn (older backends send none). */
+  stageTimings?: StageEvent[]
+  /** Epoch ms the turn began: first recorded step, else the job's creation for turn 1. */
+  startedAt?: number | null
+  /** Epoch ms of the job's last write (the finish time once terminal). */
+  updatedAt?: number | null
+  /** Server-measured length of the finished turn, in seconds. */
+  durationSec?: number | null
 }
 
 export interface CreateChatJobInput {
@@ -72,6 +87,11 @@ export interface ChatAssistantMessage {
   reply: string | null
   result: ChatJobResult | null
   error: string | null
+  /** Real step-entry times of this turn, when the backend reported them. */
+  timings?: StageEvent[]
+  startedAt?: number | null
+  finishedAt?: number | null
+  durationSec?: number | null
 }
 
 export type ChatMessage = ChatUserMessage | ChatAssistantMessage

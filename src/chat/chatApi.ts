@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/apiClient'
-import type { ChatApi, ChatJobSnapshot, ChatJobStatus } from './chatTypes'
+import type { ChatApi, ChatJobSnapshot, ChatJobStatus, StageEvent } from './chatTypes'
 
 /** The adapter the chat store talks to: the real `/chat/*` backend. Tests inject their own via `setChatApi`. */
 
@@ -17,6 +17,17 @@ export interface ChatJobWire {
   downloadFilename?: string | null
   error?: string | null
   canFollowUp?: boolean
+  projectId?: string
+  title?: string | null
+  stageTimings?: { state: string; stage?: string | null; at: string }[]
+  turns?: { turn: number; prompt: string; kind?: string; reply?: string | null; state: string; durationSec?: number | null }[]
+  createdAt?: string
+  updatedAt?: string
+}
+
+const ms = (iso: string | undefined | null): number | null => {
+  const t = iso ? Date.parse(iso) : NaN
+  return Number.isFinite(t) ? t : null
 }
 
 const TERMINAL: Record<string, ChatJobStatus> = { complete: 'complete', failed: 'failed', cancelled: 'cancelled' }
@@ -41,6 +52,12 @@ export function toSnapshot(w: ChatJobWire): ChatJobSnapshot {
     reply: w.reply ?? null,
     videoIds: w.videoIds ?? [],
     canFollowUp: w.canFollowUp ?? false,
+    stageTimings: (w.stageTimings ?? [])
+      .map((e) => ({ state: e.state, stage: e.stage ?? null, at: ms(e.at) }))
+      .filter((e): e is StageEvent => e.at !== null),
+    startedAt: ms(w.stageTimings?.[0]?.at) ?? ((w.turn ?? 1) === 1 ? ms(w.createdAt) : null),
+    updatedAt: ms(w.updatedAt),
+    durationSec: w.turns?.find((t) => t.turn === (w.turn ?? 1))?.durationSec ?? null,
   }
 }
 
