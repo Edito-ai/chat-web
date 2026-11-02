@@ -13,7 +13,6 @@ export const metadata: Metadata = {
   applicationName: SITE_NAME,
   openGraph: { type: 'website', siteName: SITE_NAME, title: TITLE, description: SITE_DESCRIPTION, url: '/' },
   twitter: { card: 'summary_large_image', title: TITLE, description: SITE_DESCRIPTION },
-  alternates: { canonical: '/' },
 }
 
 export const viewport: Viewport = {

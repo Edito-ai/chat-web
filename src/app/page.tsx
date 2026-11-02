@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, Captions, Clapperboard, Download, Palette, Scissors, Send, Upload } from 'lucide-react'
 import { Logo } from '@/components/ui'
@@ -15,6 +16,8 @@ const features = [
   { icon: Palette, title: 'Colour grade', body: 'A consistent look across your clips, from "cinematic" to "bright and clean".' },
   { icon: Scissors, title: 'Cuts', body: 'Dead air and fumbles trimmed so the video keeps moving.' },
 ]
+
+export const metadata: Metadata = { alternates: { canonical: '/' } }
 
 const jsonLd = {
   '@context': 'https://schema.org',
