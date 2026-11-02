@@ -176,7 +176,7 @@ export function ChatScreen() {
       onOpen={open}
       onRetry={() => void loadHistory()}
       onClose={() => (drawer ? setDrawer(false) : setCollapsedPersist(true))}
-      user={user ? { name: user.name, email: user.email } : null}
+      user={user ? { name: user.name, email: user.email, isAdmin: user.isAdmin === true } : null}
       onSignOut={signOut}
     />
   )
