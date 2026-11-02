@@ -8,6 +8,7 @@
   html, body { height: 100%; margin: 0; }
   body {
     font-family: theme('fontFamily.sans');
+    font-feature-settings: 'cv11', 'ss03', 'calt';
     background-color: theme('colors.surface.0');
     color: theme('colors.ink.1');
     -webkit-font-smoothing: antialiased;
@@ -15,11 +16,11 @@
   }
   ::selection { background: rgba(255, 255, 255, 0.16); color: #fff; }
   :is(button, a[href], summary, select, textarea, input, [tabindex]:not([tabindex='-1'])):focus-visible {
-    outline: 2px solid rgba(255, 255, 255, 0.6);
+    outline: 2px solid rgb(165 174 255 / 0.85);
     outline-offset: 2px;
   }
-  :lang(hi) :is(.text-caption, .text-label, .text-body) { line-height: 1.75; }
-  :lang(hi) :is(.text-title, .text-heading, .text-display) { line-height: 1.55; }
+  :lang(hi) :is(.text-caption, .text-label, .text-body, .text-prose) { line-height: 1.75; }
+  :lang(hi) :is(.text-title, .text-heading, .text-display, .text-hero) { line-height: 1.5; letter-spacing: 0; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
