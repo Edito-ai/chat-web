@@ -73,6 +73,40 @@ answers `/chat` with 200 and a "restoring session" shell, and the browser then r
 (`localStorage`, `navigator`) is read only after mount (`useSession`, `LocaleSync`), so server HTML and the first client
 render match.
 
+## Account menu (sidebar footer)
+
+The footer circle opens a menu: plan badge (`GET /billing/entitlement`: Free, Pro · Weekly, Pro · Monthly, Trial with end date),
+Usage, Plan & billing, Pricing / Upgrade, Help & support, Legal, Language (EN / हिं), Open the editor and Admin (both only when
+`NEXT_PUBLIC_EDITOR_URL` is set; Admin also needs `isAdmin` from `/auth/me`), Sign out. Code is in `src/account/`.
+
+Endpoints: `GET /billing/{entitlement,subscription,token-usage,free-credit,weekly-pass,weekly-pass/pricing}`,
+`POST /billing/{checkout-session,trial/checkout-session,subscription/cancel,weekly-pass/order,weekly-pass/{id}/sync}`,
+`GET /legal`, `GET /legal/{slug}`, `POST /support/tickets`.
+
+Monthly prices ($50 Creator, $100 Studio) are constants in `src/account/lib/plans.ts`: the backend does not serve them
+(`tiers.py`), the editor hard-codes the same numbers. The Weekly Pass price comes from the backend. Cancel is immediate
+on the backend (`cancel_subscription_now` sets status `canceled`), and the confirm step says so.
+
+### Payments returning to chat-web
+
+Checkout opens in a new tab. The URL the backend returns is built from its `APP_BASE_URL` setting
+(`cashfree_client.hosted_checkout_url` -> `{APP_BASE_URL}/checkout?...` for Cashfree, `payment_result_url` ->
+`{APP_BASE_URL}/payment/result` as the return URL; Razorpay returns its own hosted page). `APP_BASE_URL` is the editor web
+app's origin (also used for password-reset links), and `/checkout` and `/payment/result` are pages of the editor, not of
+chat-web. So with no change, payment works end to end but happens in the editor origin: the tab opens on the editor's
+`/checkout`, and returns to the editor's `/payment/result`. Closing that tab and pressing Refresh in Plan & billing (or
+reopening the menu) picks up the new plan. To make payments return to chat-web instead, all of these are needed:
+
+1. chat-web must implement `/checkout` (launch the Cashfree JS SDK with `kind`, `session`, `mode`) and `/payment/result`
+   (poll `GET /billing/payment-status?kind&id`). Not built.
+2. Backend `APP_BASE_URL` set to the chat-web origin (this also moves password-reset links; there is no separate setting).
+3. Backend `CORS_ORIGIN` to include the chat-web origin (it is a single value in production), and the same origin
+   whitelisted in the Cashfree / Razorpay dashboard for return and checkout domains.
+4. Set `NEXT_PUBLIC_API_BASE_URL` to the backend as already required.
+
+Dev preview fixtures for the menu and every dialog: `/dev/preview?s=acct-free|acct-weekly|acct-trial|acct-exceeded|acct-cancelend|acct-failed`
+with `&open=usage|billing|help|legal` (money calls in fixtures throw; nothing reaches a backend).
+
 ## Possible improvement (not built)
 
 Move the refresh token into an `HttpOnly; Secure; SameSite` cookie set by the backend, and let Next middleware gate
@@ -87,5 +121,6 @@ src/auth/    login / signup / code screen and the session store
 src/chat/    chat store, state reducer, API adapter, upload path, probe, ChatScreen, tests
 src/lib/     apiClient (bearer + one refresh retry), friendlyError, env
 src/i18n/    en / hi strings and the tiny useT hook
-src/components/ui.tsx  Button, IconButton, Logo, InlineError
+src/components/ui.tsx  Button, IconButton, Logo, InlineError; Dialog.tsx modal with focus trap
+src/account/ account menu: services/, lib/, components/ (dialogs), store, __tests__/
 ```

@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/auth/authStore'
+import { setAccountApi } from '@/account/accountApi'
+import { useAccount, type AccountDialog } from '@/account/accountStore'
+import { accountFixtureApi, isAccountScenario } from './accountFixtures'
 import { setChatApi } from '@/chat/chatApi'
 import { stopPolling, useChat } from '@/chat/chatStore'
 import { ChatScreen } from '@/chat/ChatScreen'
@@ -55,7 +58,7 @@ function seed(s: string) {
 }
 
 /** Seeds the chat store + fake APIs so the logged-in screens can be looked at. Dev only. */
-export function PreviewClient({ scenario }: { scenario: string }) {
+export function PreviewClient({ scenario, open }: { scenario: string; open?: string }) {
   const [ready, setReady] = useState(false)
   useEffect(() => {
     stopPolling()
@@ -66,8 +69,12 @@ export function PreviewClient({ scenario }: { scenario: string }) {
       cancelJob: async () => { throw new Error('preview') },
     })
     setHistoryApi({ list: async () => jobs, get: async () => { throw new Error('preview') } })
-    useAuth.setState({ status: 'authenticated', user: { id: 'preview', email: 'preview@example.com', name: 'Preview' } })
-    useChat.setState({ ...seed(scenario), userId: 'preview', history: [], historyState: 'idle' })
+    const acct = isAccountScenario(scenario)
+    setAccountApi(acct ? accountFixtureApi(scenario) : null)
+    useAccount.getState().reset()
+    useAuth.setState({ status: 'authenticated', user: { id: 'preview', email: 'preview@example.com', name: 'Preview', isAdmin: acct } })
+    useChat.setState({ ...seed(acct ? 'done' : scenario), userId: 'preview', history: [], historyState: 'idle' })
+    if (acct && ['usage', 'billing', 'help', 'legal'].includes(open ?? '')) useAccount.getState().openDialog(open as AccountDialog)
     setReady(true)
     const clean = () => {
       try {
@@ -84,7 +91,9 @@ export function PreviewClient({ scenario }: { scenario: string }) {
       stopPolling()
       setChatApi(null)
       setHistoryApi(null)
+      setAccountApi(null)
+      useAccount.getState().reset()
     }
-  }, [scenario])
+  }, [scenario, open])
   return ready ? <ChatScreen /> : null
 }
