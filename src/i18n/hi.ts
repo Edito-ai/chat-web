@@ -22,6 +22,8 @@ export const hi: Record<MessageKey, string> = {
   'auth.consent': 'मैं नियम और गोपनीयता नीति से सहमत हूँ',
   'auth.login': 'साइन इन',
   'auth.signup': 'खाता बनाएँ',
+  'auth.loginShort': 'लॉगिन',
+  'auth.register': 'रजिस्टर',
   'auth.verify': 'वेरिफ़ाई करके आगे बढ़ें',
   'auth.resend': 'नया कोड भेजें',
   'auth.resent': 'नया कोड भेजा जा रहा है।',

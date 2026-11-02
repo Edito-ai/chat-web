@@ -1,8 +1,6 @@
-import type { Metadata } from 'next'
-import { ChatGate } from '../ChatGate'
+import { redirect } from 'next/navigation'
 
-export const metadata: Metadata = { title: 'Chat', robots: { index: false, follow: false } }
-
+/** The chat lives at `/` now; keep old links working. */
 export default function ChatPage() {
-  return <ChatGate />
+  redirect('/')
 }

@@ -23,7 +23,7 @@ async function fetchLegalVersions(signal: AbortSignal): Promise<LegalVersions | 
   return terms && privacy ? { termsVersion: terms.version, privacyVersion: privacy.version } : null
 }
 
-export function AuthScreen() {
+export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'signup' }) {
   const { t, locale } = useT()
   const setLocale = useLocale((s) => s.setLocale)
   const { login, signup, loginWithCode, requestLoginCode, clearError } = useAuth.getState()
@@ -31,7 +31,7 @@ export function AuthScreen() {
   const error = useAuth((s) => s.error)
   const verificationEmail = useAuth((s) => s.verificationEmail)
 
-  const [mode, setMode] = useState<Mode>('login')
+  const [mode, setMode] = useState<Mode>(initialMode)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

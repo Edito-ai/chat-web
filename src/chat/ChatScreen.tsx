@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import { Download, ExternalLink, FilePlus2, Loader2, LogOut, MessageSquarePlus, Send, Square, X } from 'lucide-react'
 import { useT, useLocale, type MessageKey } from '@/i18n'
 import { Button, IconButton, InlineError, Logo } from '@/components/ui'
@@ -169,6 +170,15 @@ export function ChatScreen() {
   const actionError = useChat((s) => s.actionError)
   const lostJobId = useChat((s) => s.pollLostJobId)
   const userName = useAuth((s) => s.user?.name ?? s.user?.email ?? '')
+  const authStatus = useAuth((s) => s.status)
+  const router = useRouter()
+  const signedIn = authStatus === 'authenticated'
+  /** Everyone sees the chat; doing anything with it needs an account, so send a visitor to log in. */
+  const requireAuth = (): boolean => {
+    if (signedIn) return true
+    if (authStatus !== 'restoring') router.push('/login')
+    return false
+  }
   const { attach, removeAttachment, send, cancel, resume, newChat, clearActionError } = useChat.getState()
   const [text, setText] = useState('')
   const [problem, setProblem] = useState<ChatSendProblem | null>(null)
@@ -182,15 +192,15 @@ export function ChatScreen() {
 
   // Re-attach to a job that was running when the tab was closed.
   useEffect(() => {
-    void resume()
-  }, [resume])
+    if (signedIn) void resume()
+  }, [resume, signedIn])
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end' })
   }, [messages, attachments.length])
 
   const submit = async () => {
-    if (running || busy) return
+    if (running || busy || !requireAuth()) return
     const prompt = text
     const p = await send(prompt)
     setProblem(p)
@@ -207,7 +217,7 @@ export function ChatScreen() {
   const onDrop = (e: DragEvent) => {
     e.preventDefault()
     setDragging(false)
-    if (running) return
+    if (running || !requireAuth()) return
     void attach(Array.from(e.dataTransfer.files))
   }
 
@@ -245,16 +255,27 @@ export function ChatScreen() {
           <option value="en">EN</option>
           <option value="hi">हिं</option>
         </select>
-        <IconButton
-          data-testid="chat-sign-out"
-          icon={LogOut}
-          aria-label={`${t('auth.signOut')}${userName ? ` (${userName})` : ''}`}
-          title={t('auth.signOut')}
-          onClick={() => {
-            useChat.getState().reset()
-            useAuth.getState().logout()
-          }}
-        />
+        {signedIn ? (
+          <IconButton
+            data-testid="chat-sign-out"
+            icon={LogOut}
+            aria-label={`${t('auth.signOut')}${userName ? ` (${userName})` : ''}`}
+            title={t('auth.signOut')}
+            onClick={() => {
+              useChat.getState().reset()
+              useAuth.getState().logout()
+            }}
+          />
+        ) : authStatus === 'unauthenticated' ? (
+          <>
+            <Button data-testid="chat-login" variant="ghost" onClick={() => router.push('/login')}>
+              {t('auth.loginShort')}
+            </Button>
+            <Button data-testid="chat-register" onClick={() => router.push('/register')}>
+              {t('auth.register')}
+            </Button>
+          </>
+        ) : null}
       </header>
 
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
@@ -302,7 +323,7 @@ export function ChatScreen() {
               accept={VIDEO_ACCEPT}
               hidden
               onChange={(e) => {
-                if (e.target.files) void attach(Array.from(e.target.files))
+                if (e.target.files && requireAuth()) void attach(Array.from(e.target.files))
                 e.target.value = ''
               }}
             />
@@ -312,7 +333,7 @@ export function ChatScreen() {
               size="lg"
               aria-label={t('chat.attach')}
               disabled={busy || running}
-              onClick={() => fileRef.current?.click()}
+              onClick={() => (requireAuth() ? fileRef.current?.click() : undefined)}
             />
             <textarea
               data-testid="chat-input"

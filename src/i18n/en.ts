@@ -21,6 +21,8 @@ export const en = {
   'auth.consent': 'I agree to the Terms and the Privacy Policy',
   'auth.login': 'Sign in',
   'auth.signup': 'Create account',
+  'auth.loginShort': 'Login',
+  'auth.register': 'Register',
   'auth.verify': 'Verify and continue',
   'auth.resend': 'Send a new code',
   'auth.resent': 'A new code is on its way.',
