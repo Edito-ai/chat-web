@@ -102,6 +102,13 @@ describe('stage timeline', () => {
     expect(formatElapsed(3_720_000)).toBe('1h 02m')
     expect([0, 4500, 9000, 13_500].map(hintIndex)).toEqual([0, 1, 2, 0])
   })
+  it('keeps a list item with quoted names and brackets as one chip', () => {
+    const r = splitReply('Done. This draft does not include the zoom-blur transition (a straight cut instead) and 3 animated graphics ("big keyword", "underline sweep", "emoji pop") (only plain text graphics can be drawn in chat).')
+    expect(r.notIncluded).toEqual([
+      'the zoom-blur transition (a straight cut instead)',
+      '3 animated graphics ("big keyword", "underline sweep", "emoji pop") (only plain text graphics can be drawn in chat)',
+    ])
+  })
   it('splits "does not include" items out of the reply', () => {
     expect(splitReply('Your video is ready. This draft does not include music, sound effects and some graphics.')).toEqual({
       text: 'Your video is ready.', notIncluded: ['music', 'sound effects', 'some graphics'],
