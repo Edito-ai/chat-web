@@ -52,8 +52,8 @@ const finishedActivity: ActivityEvent[] = [
   act('tool:step:director', 'tool', 'Choosing the moments to keep', 162, 240),
   act('tool:step:captions', 'tool', 'Writing the captions', 240, 285),
   act('tool:step:look', 'tool', 'Grading the colour', 285, 300, { detail: 'Warm, lifted shadows' }),
-  act('say:plan-ready', 'say', 'The plan came together in 6 steps. Next I will put it on the timeline.', 300, 300),
-  act('tool:save', 'tool', 'Putting the edit on the timeline', 301, 312),
+  act('say:plan-ready', 'say', 'The plan came together in 6 steps. Next I will get your video ready.', 300, 300),
+  act('tool:save', 'tool', 'Getting your video ready', 301, 312),
   act('tool:render', 'tool', 'Rendering your video', 313, 1050, { detail: '1080p' }),
   act('say:rendered', 'say', 'The video rendered in 737 s at 1080p. This draft does not include background music.', 1050, 1050),
 ]
@@ -61,7 +61,7 @@ const runningActivity: ActivityEvent[] = [
   act('thought:change', 'thought', 'Working out what to change', 0, 0),
   act('tool:followup', 'tool', 'Applying your change', 1, 9),
   act('say:followup', 'say', 'Applying your change. Made the captions bigger.', 9, 9),
-  act('tool:save', 'tool', 'Putting the edit on the timeline', 10, 15),
+  act('tool:save', 'tool', 'Getting your video ready', 10, 15),
   act('tool:render', 'tool', 'Rendering your video', 16, null, { detail: '1080p' }),
 ]
 

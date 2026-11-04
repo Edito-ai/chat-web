@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, ExternalLink, MinusCircle } from 'lucide-react'
+import { Download, MinusCircle } from 'lucide-react'
 import { useT } from '@/i18n'
-import { EDITOR_URL } from '@/lib/env'
 import { formatElapsed, splitReply } from './activity'
 import type { ChatAssistantMessage } from './chatTypes'
 
@@ -73,17 +72,6 @@ export function ResultCard({ msg }: { msg: ChatAssistantMessage & { result: NonN
           >
             <Download size={15} strokeWidth={2} aria-hidden /> {t('chat.download')}
           </a>
-          {EDITOR_URL && (
-            <a
-              data-testid="chat-open-editor"
-              href={EDITOR_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface-2 px-4 text-body font-semibold text-ink-0 transition-colors hover:bg-surface-4"
-            >
-              <ExternalLink size={15} strokeWidth={1.75} aria-hidden /> {t('chat.openEditor')}
-            </a>
-          )}
         </div>
       </div>
     </div>
