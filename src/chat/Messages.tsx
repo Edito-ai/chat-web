@@ -6,6 +6,8 @@ import { useChat } from './chatStore'
 import { ActivitySummary, LiveActivity } from './ActivityPanel'
 import { ResultCard } from './ResultCard'
 import type { ChatAssistantMessage, ChatMessage } from './chatTypes'
+import { Avatar } from './Avatar'
+import { isTerminal } from './chatState'
 
 function ErrorCard({ msg }: { msg: ChatAssistantMessage }) {
   const { t } = useT()
@@ -84,12 +86,7 @@ export function Bubble({ msg }: { msg: ChatMessage }) {
   }
   return (
     <li data-testid={`chat-message-${msg.id}`} className="flex animate-rise justify-start gap-3">
-      <span
-        aria-hidden
-        className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-line-strong bg-surface-2 font-serif text-[15px] italic leading-none text-ink-0"
-      >
-        E
-      </span>
+      <Avatar working={!isTerminal(msg.status)} />
       <div className="min-w-0 max-w-full flex-1">
         <span className="sr-only">{t('chat.assistant')}: </span>
         <AssistantBody msg={msg} />

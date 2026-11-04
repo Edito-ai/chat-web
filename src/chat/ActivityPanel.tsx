@@ -7,6 +7,10 @@ import { useT, type MessageKey } from '@/i18n'
 import { buildTimeline, formatElapsed, hintIndex, percent, totalElapsedMs, type TimelineStep } from './activity'
 import { knownStage } from './chatState'
 import type { ChatAssistantMessage } from './chatTypes'
+import { buildTranscript } from './buildTranscript'
+import { TranscriptView, useActTitle } from './Transcript'
+import { ToolsFold, toolsUsedLabel } from './ToolsFold'
+import { TID } from './testIds'
 
 /** Re-renders every `everyMs` while `active`; the clock behind the elapsed timers. */
 export function useNow(active: boolean, everyMs = 1000): number {
@@ -103,6 +107,8 @@ export function StepTimeline({ msg, now, showHint }: { msg: ChatAssistantMessage
 export function LiveActivity({ msg }: { msg: ChatAssistantMessage }) {
   const { t } = useT()
   const now = useNow(true)
+  const transcript = buildTranscript(msg, now)
+  if (transcript.source === 'activity') return <TranscriptView data={transcript} />
   const stage = knownStage(msg.stage)
   const pct = percent(msg)
   const total = totalElapsedMs(msg, now)
@@ -164,7 +170,20 @@ export function LiveActivity({ msg }: { msg: ChatAssistantMessage }) {
 /** One line after the turn ended: "Worked for 17m 36s". Expands to the recorded steps when there are any. */
 export function ActivitySummary({ msg }: { msg: ChatAssistantMessage }) {
   const { t } = useT()
+  const titleOf = useActTitle()
   const [open, setOpen] = useState(false)
+  const transcript = buildTranscript(msg, 0)
+  if (transcript.source === 'activity') {
+    const tools = transcript.blocks.flatMap((b) => (b.type === 'tools' ? b.tools : []))
+    if (tools.length === 0) return null
+    const used = toolsUsedLabel(t, tools.length)
+    const title = transcript.totalMs === null ? used : t('chat.tools.usedTime', { used, time: formatElapsed(transcript.totalMs) })
+    return (
+      <div data-testid={TID.summary}>
+        <ToolsFold tools={tools} title={title} titleOf={(tool) => titleOf(tool)} />
+      </div>
+    )
+  }
   const total = totalElapsedMs(msg, 0)
   const time = total === null ? null : formatElapsed(total)
   const hasSteps = (msg.timings?.length ?? 0) > 0
@@ -185,7 +204,7 @@ export function ActivitySummary({ msg }: { msg: ChatAssistantMessage }) {
     </>
   )
   return (
-    <div data-testid="chat-activity-summary" className="w-full max-w-lg">
+    <div data-testid={TID.summary} className="w-full max-w-lg">
       {hasSteps ? (
         <button
           type="button"
