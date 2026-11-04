@@ -104,7 +104,7 @@ export function Composer(p: ComposerProps) {
         onChange={(e) => p.onText(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder={p.placeholder}
-        className="scroll-thin block max-h-44 min-h-[52px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-prose text-ink-0 placeholder:text-ink-4 focus:outline-none focus-visible:outline-none"
+        className="scroll-thin block max-h-44 min-h-[52px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-prose text-ink-0 placeholder:text-ink-4 focus:!outline-none focus-visible:!outline-none"
       />
       <div className="flex items-center justify-between gap-2 px-2 pb-2">
         <div className="flex min-w-0 items-center gap-1">
