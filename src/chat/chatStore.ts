@@ -63,6 +63,8 @@ interface ChatState {
   cancel: () => Promise<void>
   /** Re-attach to a job that was running when the page closed (and refresh the last video's URL). */
   resume: () => Promise<void>
+  /** Opening the app starts an empty chat: stops watching the previous one but never cancels it (it keeps running and stays in the sidebar). */
+  startFresh: () => void
   retryPolling: () => void
   newChat: () => Promise<void>
   /** Signing out: stop everything and drop the transcript. */
@@ -362,6 +364,14 @@ export const useChat = create<ChatState>()(
         const lost = get().pollLostJobId
         set({ actionError: null, pollLostJobId: null })
         if (lost) void pollJob(lost)
+      },
+
+      startFresh: () => {
+        stopPolling()
+        abortUploads()
+        // A video that was uploaded for a message that never got sent would stay orphaned in the project.
+        for (const a of get().attachments) if (a.videoId) void deleteAsset(a.videoId)
+        set({ ...EMPTY_CHAT, userId: currentUserId(), busy: false })
       },
 
       newChat: async () => {

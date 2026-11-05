@@ -10,6 +10,7 @@ import { accountFixtureApi, isAccountScenario } from './accountFixtures'
 import { setChatApi } from '@/chat/chatApi'
 import { stopPolling, useChat } from '@/chat/chatStore'
 import { ChatScreen } from '@/chat/ChatScreen'
+import { markFreshStartDone } from '@/chat/freshStart'
 import { setHistoryApi } from '@/chat/history'
 import type { ChatJobWire } from '@/chat/chatApi'
 import type { ActivityEvent, ChatAssistantMessage, ChatMessage } from '@/chat/chatTypes'
@@ -125,6 +126,7 @@ export function PreviewClient({ scenario, open }: { scenario: string; open?: str
     const credit = CREDIT_SCENARIOS.includes(scenario)
     setAccountApi(acct ? accountFixtureApi(scenario) : credit ? creditApi(scenario) : null)
     useAccount.getState().reset()
+    markFreshStartDone() // the seeded chat is the point of the preview
     useAuth.setState({ status: 'authenticated', user: { id: 'preview', email: 'preview@example.com', name: 'Preview', isAdmin: acct } })
     useChat.setState({ ...seed(acct ? 'done' : credit ? 'empty' : scenario), userId: 'preview', history: [], historyState: 'idle' })
     if (scenario === 'credit-402') {

@@ -12,6 +12,7 @@ import { Composer } from './Composer'
 import { Sidebar } from './Sidebar'
 import { useNow } from './ActivityPanel'
 import { FreeCreditBanner } from './FreeCreditBanner'
+import { takeFreshStart } from './freshStart'
 import { TID } from './testIds'
 import { useAccount } from '@/account/accountStore'
 import { isSubscriptionRequired } from '@/account/lib/freeCredit'
@@ -86,7 +87,7 @@ export function ChatScreen() {
     if (authStatus !== 'restoring') router.push('/login')
     return false
   }
-  const { attach, removeAttachment, send, cancel, resume, newChat, clearActionError, loadHistory, openJob } = useChat.getState()
+  const { attach, removeAttachment, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob } = useChat.getState()
   const [text, setText] = useState('')
   const [problem, setProblem] = useState<ChatSendProblem | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -102,13 +103,13 @@ export function ChatScreen() {
   const hasVideo = lastCompleted(messages) !== null
   const uploading = attachments.some((a) => a.state === 'uploading')
 
-  // Re-attach to a job that was running when the tab was closed, and fill the sidebar.
+  // Opening the app always starts a NEW chat. The previous one (even a job still running) stays in the sidebar:
+  // open it from there. Once per page load, so a re-render or a sign-in later in the session never wipes a chat.
   useEffect(() => {
-    if (signedIn) {
-      void resume()
-      void loadHistory()
-    }
-  }, [resume, loadHistory, signedIn])
+    if (!signedIn) return
+    if (takeFreshStart()) startFresh()
+    void loadHistory()
+  }, [startFresh, loadHistory, signedIn])
 
   // The starter-credit offer: asked once per login, never polled; any failure just hides the banner.
   const loadFreeCredit = useAccount((s) => s.loadFreeCredit)

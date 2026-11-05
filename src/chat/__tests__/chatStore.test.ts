@@ -232,6 +232,31 @@ describe('chat store: polling, cancel, failure', () => {
   })
 })
 
+describe('chat store: opening the app starts a new chat', () => {
+  it('startFresh empties the chat but never cancels a job that is still running', async () => {
+    const api = fakeApi(async (id) => running(id))
+    setChatApi(api)
+    useChat.setState({
+      userId: 'u1',
+      projectId: 'proj-1',
+      jobId: 'job-9',
+      canFollowUp: true,
+      messages: [
+        { id: 'u', role: 'user', text: 'go', attachments: [] },
+        { id: 'a', role: 'assistant', jobId: 'job-9', turn: 1, reply: null, status: 'running', stage: 'editing', progress: 0.5, message: null, result: null, error: null },
+      ],
+    })
+    useChat.getState().startFresh()
+    const s = useChat.getState()
+    expect(s.messages).toEqual([])
+    expect(s.jobId).toBeNull()
+    expect(s.projectId).toBeNull()
+    expect(s.canFollowUp).toBe(false)
+    expect(api.cancelJob).not.toHaveBeenCalled()
+    expect(api.getJob).not.toHaveBeenCalled()
+  })
+})
+
 describe('chat store: resume after reload', () => {
   it('persists the project id and transcript but not attachments or errors', async () => {
     setChatApi(fakeApi(async (id) => running(id)))
