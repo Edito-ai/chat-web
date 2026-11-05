@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'rea
 import clsx from 'clsx'
 import { ArrowUp, Check, FolderOpen, Paperclip, Square, X, AlertCircle } from 'lucide-react'
 import { useT } from '@/i18n'
+import { useTypewriter } from './useTypewriter'
 import { IconButton } from '@/components/ui'
 import type { ChatAttachment } from './chatStore'
 
@@ -53,6 +54,8 @@ export interface ComposerProps {
   onText: (v: string) => void
   textareaRef: RefObject<HTMLTextAreaElement | null>
   placeholder: string
+  /** Example prompts typed out in the empty box while nothing is happening, to invite the person to write one. */
+  hints?: string[]
   attachments: ChatAttachment[]
   onRemoveAttachment: (id: string) => void
   onAttachClick: () => void
@@ -86,6 +89,7 @@ export function Composer(p: ComposerProps) {
       p.onSend()
     }
   }
+  const typed = useTypewriter(p.hints ?? [], p.text === '' && !p.running)
   const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0)
   return (
     <div className="rounded-[1.75rem] border border-white/15 bg-surface-1/75 backdrop-blur-xl shadow-composer transition-[border-color,box-shadow] duration-200 focus-within:border-accent-line focus-within:shadow-[0_0_0_4px_rgb(255_158_140/0.10),0_20px_50px_-20px_rgb(0_0_0/0.9)]">
@@ -123,7 +127,7 @@ export function Composer(p: ComposerProps) {
           rows={1}
           onChange={(e) => p.onText(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={p.placeholder}
+          placeholder={typed || p.placeholder}
           className="scroll-thin block max-h-44 min-h-[40px] min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2.5 text-prose text-ink-0 placeholder:text-ink-4 focus:!outline-none focus-visible:!outline-none"
         />
         {p.running ? (

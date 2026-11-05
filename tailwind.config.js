@@ -48,6 +48,8 @@ module.exports = {
           '100%': { transform: 'translateY(0) scale(1.06,0.92)' },
         },
         orbIdle: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-4%)' } },
+        orbIdle: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-5%)' } },
+        orbShadowIdle: { '0%,100%': { transform: 'scale(1)', opacity: '0.6' }, '50%': { transform: 'scale(0.84)', opacity: '0.38' } },
         orbShadow: { '0%,100%': { transform: 'scale(1)', opacity: '0.7' }, '42%': { transform: 'scale(0.62)', opacity: '0.3' } },
         orbShadowIdle: { '0%,100%': { transform: 'scale(1)', opacity: '0.6' }, '50%': { transform: 'scale(0.86)', opacity: '0.4' } },
         tilePulse: {
@@ -66,6 +68,8 @@ module.exports = {
         blink: 'blink 4.2s ease-in-out infinite',
         'orb-bounce': 'orbBounce 1.5s cubic-bezier(0.45,0.05,0.55,0.95) infinite',
         'orb-idle': 'orbIdle 3.4s ease-in-out infinite',
+        'orb-idle': 'orbIdle 3.6s ease-in-out infinite',
+        'orb-shadow-idle': 'orbShadowIdle 3.6s ease-in-out infinite',
         'orb-shadow': 'orbShadow 1.5s cubic-bezier(0.45,0.05,0.55,0.95) infinite',
         'orb-shadow-idle': 'orbShadowIdle 3.4s ease-in-out infinite',
         'tile-pulse': 'tilePulse 1.8s ease-in-out infinite',

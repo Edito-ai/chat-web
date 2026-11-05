@@ -13,10 +13,12 @@ export interface HistoryItem {
   createdAt: number
   /** Epoch ms of the last change: the time shown. */
   updatedAt: number
+  /** Pinned to the top of the list. */
+  pinned: boolean
 }
 
-export type HistoryGroupId = 'today' | 'yesterday' | 'week' | 'older'
-export const GROUP_ORDER: readonly HistoryGroupId[] = ['today', 'yesterday', 'week', 'older']
+export type HistoryGroupId = 'pinned' | 'today' | 'yesterday' | 'week' | 'older'
+export const GROUP_ORDER: readonly HistoryGroupId[] = ['pinned', 'today', 'yesterday', 'week', 'older']
 
 const MAX_TITLE = 60
 
@@ -43,6 +45,7 @@ export function toHistoryItem(w: ChatJobWire): HistoryItem {
     status: historyStatus(w.state),
     createdAt,
     updatedAt: Number.isFinite(updated) ? updated : createdAt,
+    pinned: w.pinned === true,
   }
 }
 
@@ -63,15 +66,20 @@ export function groupOf(createdAt: number, now: number): HistoryGroupId {
   return createdAt >= week.getTime() ? 'week' : 'older'
 }
 
-/** Newest first, split into Today / Yesterday / Previous 7 days / Older; empty groups are left out. */
+/**
+ * Pinned chats first (in the order the server sent them: newest pin first), then the rest newest first, split into
+ * Today / Yesterday / Previous 7 days / Older. A pinned chat is shown once, in Pinned. Empty groups are left out.
+ */
 export function groupHistory(
   items: readonly HistoryItem[],
   now: number,
 ): { id: HistoryGroupId; items: HistoryItem[] }[] {
-  const sorted = [...items].sort((a, b) => b.createdAt - a.createdAt)
-  return GROUP_ORDER.map((id) => ({ id, items: sorted.filter((i) => groupOf(i.createdAt, now) === id) })).filter(
-    (g) => g.items.length > 0,
-  )
+  const pinned = items.filter((i) => i.pinned)
+  const rest = items.filter((i) => !i.pinned).sort((a, b) => b.createdAt - a.createdAt)
+  return GROUP_ORDER.map((id) => ({
+    id,
+    items: id === 'pinned' ? pinned : rest.filter((i) => groupOf(i.createdAt, now) === id),
+  })).filter((g) => g.items.length > 0)
 }
 
 /**
@@ -127,12 +135,22 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
 export interface HistoryApi {
   list(limit: number, signal?: AbortSignal): Promise<ChatJobWire[]>
   get(jobId: string, signal?: AbortSignal): Promise<ChatJobWire>
+  /** Pin a chat to the top of the list, or unpin it. */
+  pin(jobId: string, pinned: boolean): Promise<void>
+  /** Delete a chat. The videos stay in the library. */
+  remove(jobId: string): Promise<void>
 }
 
 export const httpHistoryApi: HistoryApi = {
   list: async (limit, signal) => (await apiClient.get(`/chat/jobs?limit=${limit}`, { signal })) as ChatJobWire[],
   get: async (jobId, signal) =>
     (await apiClient.get(`/chat/jobs/${encodeURIComponent(jobId)}`, { signal })) as ChatJobWire,
+  pin: async (jobId, pinned) => {
+    await apiClient.put(`/chat/jobs/${encodeURIComponent(jobId)}/pin`, { pinned })
+  },
+  remove: async (jobId) => {
+    await apiClient.delete(`/chat/jobs/${encodeURIComponent(jobId)}`)
+  },
 }
 
 let current: HistoryApi | null = null

@@ -95,7 +95,8 @@ export function ChatScreen() {
     if (authStatus !== 'restoring') router.push('/login')
     return false
   }
-  const { attach, removeAttachment, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob } = useChat.getState()
+  const { attach, removeAttachment, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob, pinChat, deleteChat } =
+    useChat.getState()
   const [text, setText] = useState('')
   const [problem, setProblem] = useState<ChatSendProblem | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -111,6 +112,8 @@ export function ChatScreen() {
   const running = activeAssistant(messages) !== null
   const hasVideo = lastCompleted(messages) !== null
   const uploading = attachments.some((a) => a.state === 'uploading')
+  // While nothing is happening the empty box types example prompts: first the starter ideas, then follow-up changes.
+  const hints = (messages.length === 0 ? EXAMPLES.map((n) => t(`chat.example.${n}.prompt` as MessageKey)) : ([1, 2, 3, 4] as const).map((n) => t(`chat.nudge.${n}` as MessageKey)))
 
   // Opening the app always starts a NEW chat. The previous one (even a job still running) stays in the sidebar:
   // open it from there. Once per page load, so a re-render or a sign-in later in the session never wipes a chat.
@@ -205,6 +208,8 @@ export function ChatScreen() {
       onNew={startNew}
       onOpen={open}
       onRetry={() => void loadHistory()}
+      onPin={(id, pinned) => void pinChat(id, pinned)}
+      onDelete={(id) => void deleteChat(id)}
       onClose={() => (inDrawer ? setDrawer(false) : setCollapsedPersist(true))}
       drawer={inDrawer}
       user={user ? { name: user.name, email: user.email, isAdmin: user.isAdmin === true } : null}
@@ -369,6 +374,7 @@ export function ChatScreen() {
               }}
               textareaRef={textareaRef}
               placeholder={t(hasVideo ? 'chat.composer.placeholderFollowUp' : 'chat.composer.placeholder')}
+              hints={hints}
               attachments={attachments}
               onRemoveAttachment={removeAttachment}
               onAttachClick={() => (requireAuth() ? fileRef.current?.click() : undefined)}

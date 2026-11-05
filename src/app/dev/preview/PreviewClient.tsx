@@ -134,7 +134,14 @@ export function PreviewClient({ scenario, open }: { scenario: string; open?: str
       getJob: () => new Promise(() => undefined),
       cancelJob: async () => { throw new Error('preview') },
     })
-    setHistoryApi({ list: async () => jobs, get: async () => { throw new Error('preview') } })
+    // pin and delete are kept in memory here, so the menu can be tried without an account
+    const preview = [...jobs]
+    setHistoryApi({
+      list: async () => [...preview].sort((a, b) => Number(b.pinned === true) - Number(a.pinned === true)),
+      get: async () => { throw new Error('preview') },
+      pin: async (id, pinned) => { const j = preview.find((x) => x.id === id); if (j) j.pinned = pinned },
+      remove: async (id) => { const i = preview.findIndex((x) => x.id === id); if (i >= 0) preview.splice(i, 1) },
+    })
     const acct = isAccountScenario(scenario)
     const credit = CREDIT_SCENARIOS.includes(scenario)
     setAccountApi(acct ? accountFixtureApi(scenario) : credit ? creditApi(scenario) : null)

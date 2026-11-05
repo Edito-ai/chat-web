@@ -2,7 +2,10 @@
 
 import clsx from 'clsx'
 import { useRouter } from 'next/navigation'
-import { PanelLeftClose, SquarePen, X } from 'lucide-react'
+import { MoreHorizontal, Pin, PinOff, PanelLeftClose, SquarePen, Trash2, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Dialog } from '@/components/Dialog'
 import { useLocale, useT, type MessageKey } from '@/i18n'
 import { Button, IconButton, Logo } from '@/components/ui'
 import { groupHistory, type HistoryItem } from './history'
@@ -34,6 +37,130 @@ function StatusDot({ status }: { status: HistoryItem['status'] }) {
   )
 }
 
+
+/** The "..." menu of one chat row: pin or unpin, and delete (asks first). Rendered in a portal so the list never clips it. */
+function RowMenu({
+  item,
+  onPin,
+  onDelete,
+}: {
+  item: HistoryItem
+  onPin: (jobId: string, pinned: boolean) => void
+  onDelete: (jobId: string) => void
+}) {
+  const { t } = useT()
+  const [open, setOpen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const r = trigger.current?.getBoundingClientRect()
+    if (r) setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) })
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.key !== 'Escape') return
+      if (e instanceof MouseEvent && (panel.current?.contains(e.target as Node) || trigger.current?.contains(e.target as Node))) return
+      setOpen(false)
+      if (e instanceof KeyboardEvent) trigger.current?.focus()
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', close)
+    window.addEventListener('resize', close)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', close)
+      window.removeEventListener('resize', close)
+    }
+  }, [open])
+
+  const itemCls =
+    'flex min-h-[40px] w-full items-center gap-2.5 rounded-lg px-3 text-left text-body transition-colors hover:bg-white/[0.07] focus-visible:bg-white/[0.07]'
+  return (
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        data-testid={`chat-row-menu-${item.jobId}`}
+        aria-label={t('nav.row.menu')}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className={clsx(
+          'grid h-8 w-8 shrink-0 place-items-center rounded-md text-ink-3 transition-opacity hover:bg-white/[0.08] hover:text-ink-0',
+          open ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100',
+        )}
+      >
+        <MoreHorizontal size={16} aria-hidden />
+      </button>
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={panel}
+            role="menu"
+            aria-label={t('nav.row.menu')}
+            style={{ position: 'fixed', top: pos.top, right: pos.right }}
+            className="z-[60] w-52 animate-fade-in rounded-xl border border-white/15 bg-surface-2 p-1 shadow-lift"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              data-testid={`chat-row-pin-${item.jobId}`}
+              className={clsx(itemCls, 'text-ink-1')}
+              onClick={() => {
+                setOpen(false)
+                onPin(item.jobId, !item.pinned)
+              }}
+            >
+              {item.pinned ? <PinOff size={15} aria-hidden /> : <Pin size={15} aria-hidden />}
+              {t(item.pinned ? 'nav.row.unpin' : 'nav.row.pin')}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              data-testid={`chat-row-delete-${item.jobId}`}
+              className={clsx(itemCls, 'text-danger')}
+              onClick={() => {
+                setOpen(false)
+                setConfirming(true)
+              }}
+            >
+              <Trash2 size={15} aria-hidden />
+              {t('nav.row.delete')}
+            </button>
+          </div>,
+          document.body,
+        )}
+      {confirming && (
+        <Dialog title={t('nav.delete.title')} onClose={() => setConfirming(false)} returnFocusTo={`[data-testid="chat-row-menu-${item.jobId}"]`} testId="chat-delete-dialog">
+          <div className="space-y-4 px-5 pb-5 pt-3">
+            <p className="text-body text-ink-2">{t('nav.delete.body')}</p>
+            <p className="truncate rounded-lg bg-white/[0.05] px-3 py-2 text-label text-ink-1">{item.title}</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setConfirming(false)} data-testid="chat-delete-cancel">
+                {t('nav.delete.cancel')}
+              </Button>
+              <Button
+                variant="secondary"
+                className="!border-danger/40 !text-danger hover:!bg-danger-soft"
+                data-testid="chat-delete-confirm"
+                onClick={() => {
+                  setConfirming(false)
+                  onDelete(item.jobId)
+                }}
+              >
+                {t('nav.delete.confirm')}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+    </>
+  )
+}
+
 export interface SidebarProps {
   items: HistoryItem[]
   loadState: 'idle' | 'loading' | 'ready' | 'error'
@@ -46,6 +173,8 @@ export interface SidebarProps {
   onNew: () => void
   onOpen: (jobId: string) => void
   onRetry: () => void
+  onPin: (jobId: string, pinned: boolean) => void
+  onDelete: (jobId: string) => void
   onClose: () => void
   /** Rendered inside the mobile drawer: the close control is an X and touch targets are larger. */
   drawer?: boolean
@@ -55,7 +184,7 @@ export interface SidebarProps {
 }
 
 /** Left rail: brand, New chat, and the user's recent chats grouped by day. Arrow-free: plain buttons in tab order. */
-export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, now, disabled, onNew, onOpen, onRetry, onClose, drawer = false, user, onSignOut }: SidebarProps) {
+export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, now, disabled, onNew, onOpen, onRetry, onPin, onDelete, onClose, drawer = false, user, onSignOut }: SidebarProps) {
   const { t } = useT()
   const locale = useLocale((s) => s.locale)
   const router = useRouter()
@@ -114,7 +243,7 @@ export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, no
                 {g.items.map((item) => {
                   const current = item.jobId === activeJobId
                   return (
-                    <li key={item.jobId}>
+                    <li key={item.jobId} className="group relative flex items-center rounded-lg">
                       <button
                         type="button"
                         data-testid={`chat-history-${item.jobId}`}
@@ -122,16 +251,18 @@ export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, no
                         disabled={disabled}
                         onClick={() => onOpen(item.jobId)}
                         className={clsx(
-                          'flex min-h-[44px] w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors disabled:opacity-50 md:min-h-[36px] md:px-2 md:py-1.5',
+                          'flex min-h-[44px] min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors disabled:opacity-50 md:min-h-[36px] md:px-2 md:py-1.5',
                           current ? 'bg-white/[0.08] text-ink-0' : 'text-ink-1 hover:bg-white/[0.05] hover:text-ink-0',
                         )}
                       >
                         <StatusDot status={item.status} />
                         <span className="min-w-0 flex-1 truncate text-body">{item.title}</span>
+                        {item.pinned && <Pin size={11} aria-label={t('nav.group.pinned')} className="shrink-0 text-ink-4" />}
                         <span className="shrink-0 font-mono text-caption tabular-nums text-ink-4">
                           {stamp(item.updatedAt, now, locale)}
                         </span>
                       </button>
+                      <RowMenu item={item} onPin={onPin} onDelete={onDelete} />
                     </li>
                   )
                 })}

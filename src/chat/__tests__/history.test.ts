@@ -6,7 +6,7 @@ import type { ChatAssistantMessage } from '../chatTypes'
 
 const NOW = new Date(2026, 9, 20, 15, 0, 0).getTime() // 20 Oct 2026 15:00 local
 const at = (daysAgo: number, hour = 10) => new Date(2026, 9, 20 - daysAgo, hour, 0, 0).getTime()
-const item = (id: string, createdAt: number): HistoryItem => ({ jobId: id, title: id, status: 'complete', createdAt, updatedAt: createdAt })
+const item = (id: string, createdAt: number): HistoryItem => ({ jobId: id, title: id, status: 'complete', createdAt, updatedAt: createdAt, pinned: false })
 
 describe('history grouping', () => {
   it('splits into Today / Yesterday / Previous 7 days / Older, newest first, skipping empty groups', () => {

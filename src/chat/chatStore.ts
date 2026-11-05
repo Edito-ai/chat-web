@@ -56,6 +56,10 @@ interface ChatState {
   historyState: 'idle' | 'loading' | 'ready' | 'error'
   /** The job id open in the screen (also what the sidebar highlights). */
   loadHistory: () => Promise<void>
+  /** Pin or unpin a chat in the sidebar (optimistic; undone with an error if the server refuses). */
+  pinChat: (jobId: string, pinned: boolean) => Promise<void>
+  /** Delete a chat: gone from the list at once; if it is the open one the screen starts a fresh chat. */
+  deleteChat: (jobId: string) => Promise<void>
   /** Opens a past chat: rebuilds its messages from the job's turns and resumes polling if it is still running. */
   openJob: (jobId: string) => Promise<void>
 
@@ -204,6 +208,32 @@ export const useChat = create<ChatState>()(
           set({ history: rows.map(toHistoryItem).filter((h) => h.title !== ''), historyState: 'ready' })
         } catch {
           set({ historyState: 'error' })
+        }
+      },
+
+      pinChat: async (jobId, pinned) => {
+        const before = get().history
+        set({ history: before.map((h) => (h.jobId === jobId ? { ...h, pinned } : h)) })
+        try {
+          await getHistoryApi().pin(jobId, pinned)
+          void get().loadHistory() // the server owns the order of pinned chats
+        } catch (e) {
+          set({ history: before, actionError: e })
+        }
+      },
+
+      deleteChat: async (jobId) => {
+        const before = get().history
+        set({ history: before.filter((h) => h.jobId !== jobId) })
+        if (get().jobId === jobId) {
+          stopPolling()
+          abortUploads()
+          set({ ...EMPTY_CHAT })
+        }
+        try {
+          await getHistoryApi().remove(jobId)
+        } catch (e) {
+          set({ history: before, actionError: e })
         }
       },
 

@@ -166,7 +166,7 @@ export function Bubble({ msg, chips = false, onSuggest }: { msg: ChatMessage; ch
     <li data-testid={`chat-message-${msg.id}`} className="flex animate-rise justify-start gap-2.5 sm:gap-3">
       <div className="shrink-0">
         {ORB_ENABLED ? (
-          <Presence active={msg.status === 'queued' || msg.status === 'running'} />
+          <Presence active={msg.status === 'queued' || msg.status === 'running'} idle={chips} />
         ) : (
           <span aria-hidden className="grid h-[52px] w-[52px] place-items-center rounded-xl border border-white/[0.12] bg-gradient-to-br from-[#D8264A]/30 to-[#FF7A5C]/10">
             <LogoMark size={16} />

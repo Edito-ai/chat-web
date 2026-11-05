@@ -21,6 +21,8 @@ export interface ChatJobWire {
   title?: string | null
   stageTimings?: { state: string; stage?: string | null; at: string }[]
   kind?: string
+  /** Pinned to the top of the chat list. */
+  pinned?: boolean
   suggestions?: { id: string; label: string; action: string; prompt?: string | null }[]
   turns?: {
     turn: number
