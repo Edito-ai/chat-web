@@ -105,14 +105,14 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
     if (snap.status === 'complete' && snap.result) {
       return {
         ...a, status: 'complete', result: snap.result, reply: snap.reply ?? a.reply,
-        durationSec: snap.durationSec ?? a.durationSec ?? null, timings: snap.stageTimings,
+        durationSec: snap.durationSec ?? a.durationSec ?? null, timings: snap.stageTimings, activity: snap.activity,
         startedAt: snap.startedAt ?? null, finishedAt: snap.updatedAt ?? null,
       }
     }
     if (snap.status === 'running' || snap.status === 'queued') {
       return {
         ...a, status: snap.status, stage: snap.stage, progress: snap.progress, message: snap.message,
-        timings: snap.stageTimings, startedAt: snap.startedAt ?? null,
+        timings: snap.stageTimings, activity: snap.activity, startedAt: snap.startedAt ?? null,
       }
     }
     return a.status === 'failed' ? { ...a, error: snap.error } : a

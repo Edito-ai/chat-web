@@ -7,6 +7,18 @@ export interface StageEvent {
   at: number
 }
 
+/** One line of the turn's transcript, written by the backend from real pipeline facts (times are epoch ms). */
+export interface ActivityEvent {
+  /** Stable key, e.g. `tool:step:look`, `thought:review`; the fixed ones are translated by id. */
+  id: string
+  kind: 'thought' | 'say' | 'tool'
+  title: string
+  detail: string | null
+  state: 'running' | 'done' | 'failed'
+  at: number
+  endedAt: number | null
+}
+
 export type ChatJobStatus = 'queued' | 'running' | 'complete' | 'failed' | 'cancelled'
 
 /** What a finished job hands back. */
@@ -47,6 +59,8 @@ export interface ChatJobSnapshot {
   updatedAt?: number | null
   /** Server-measured length of the finished turn, in seconds. */
   durationSec?: number | null
+  /** The turn's transcript (thoughts, narration, tool steps); empty from older backends. */
+  activity?: ActivityEvent[]
 }
 
 export interface CreateChatJobInput {
@@ -92,6 +106,8 @@ export interface ChatAssistantMessage {
   startedAt?: number | null
   finishedAt?: number | null
   durationSec?: number | null
+  /** The turn's transcript, when the backend reported one. */
+  activity?: ActivityEvent[]
 }
 
 export type ChatMessage = ChatUserMessage | ChatAssistantMessage

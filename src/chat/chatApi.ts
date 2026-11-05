@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/apiClient'
-import type { ChatApi, ChatJobSnapshot, ChatJobStatus, StageEvent } from './chatTypes'
+import type { ActivityEvent, ChatApi, ChatJobSnapshot, ChatJobStatus, StageEvent } from './chatTypes'
 
 /** The adapter the chat store talks to: the real `/chat/*` backend. Tests inject their own via `setChatApi`. */
 
@@ -21,6 +21,15 @@ export interface ChatJobWire {
   title?: string | null
   stageTimings?: { state: string; stage?: string | null; at: string }[]
   turns?: { turn: number; prompt: string; kind?: string; reply?: string | null; state: string; durationSec?: number | null }[]
+  activity?: {
+    id: string
+    kind: string
+    title: string
+    detail?: string | null
+    state: string
+    at: string
+    endedAt?: string | null
+  }[]
   createdAt?: string
   updatedAt?: string
 }
@@ -28,6 +37,21 @@ export interface ChatJobWire {
 const ms = (iso: string | undefined | null): number | null => {
   const t = iso ? Date.parse(iso) : NaN
   return Number.isFinite(t) ? t : null
+}
+
+/** Wire activity -> events; a malformed or unknown-kind entry is dropped, never an error. */
+export function toActivity(raw: ChatJobWire['activity']): ActivityEvent[] {
+  const out: ActivityEvent[] = []
+  for (const e of raw ?? []) {
+    const at = ms(e?.at)
+    const kind = e?.kind
+    const state = e?.state
+    if (at === null || typeof e.id !== 'string' || typeof e.title !== 'string') continue
+    if (kind !== 'thought' && kind !== 'say' && kind !== 'tool') continue
+    if (state !== 'running' && state !== 'done' && state !== 'failed') continue
+    out.push({ id: e.id, kind, title: e.title, detail: e.detail ?? null, state, at, endedAt: ms(e.endedAt) })
+  }
+  return out
 }
 
 const TERMINAL: Record<string, ChatJobStatus> = { complete: 'complete', failed: 'failed', cancelled: 'cancelled' }
@@ -58,6 +82,7 @@ export function toSnapshot(w: ChatJobWire): ChatJobSnapshot {
     startedAt: ms(w.stageTimings?.[0]?.at) ?? ((w.turn ?? 1) === 1 ? ms(w.createdAt) : null),
     updatedAt: ms(w.updatedAt),
     durationSec: w.turns?.find((t) => t.turn === (w.turn ?? 1))?.durationSec ?? null,
+    activity: toActivity(w.activity),
   }
 }
 

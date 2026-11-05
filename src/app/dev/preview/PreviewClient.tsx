@@ -10,7 +10,7 @@ import { stopPolling, useChat } from '@/chat/chatStore'
 import { ChatScreen } from '@/chat/ChatScreen'
 import { setHistoryApi } from '@/chat/history'
 import type { ChatJobWire } from '@/chat/chatApi'
-import type { ChatAssistantMessage, ChatMessage } from '@/chat/chatTypes'
+import type { ActivityEvent, ChatAssistantMessage, ChatMessage } from '@/chat/chatTypes'
 
 const MIN = 60_000
 const iso = (msAgo: number) => new Date(Date.now() - msAgo).toISOString()
@@ -39,6 +39,32 @@ const asst = (over: Partial<ChatAssistantMessage>): ChatAssistantMessage => ({
 })
 const sample = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
 
+const act = (id: string, kind: ActivityEvent['kind'], title: string, startSec: number, endSec: number | null, over: Partial<ActivityEvent> = {}): ActivityEvent => ({
+  id, kind, title, detail: null, state: endSec === null ? 'running' : 'done', at: t0 + startSec * 1000, endedAt: endSec === null ? null : t0 + endSec * 1000, ...over,
+})
+const finishedActivity: ActivityEvent[] = [
+  act('thought:review', 'thought', 'Reviewing your footage and your request', 0, 0),
+  act('say:reading', 'say', 'I am reading your 2 videos first, then I will plan the edit from your request.', 1, 1),
+  act('tool:understanding:1', 'tool', 'Reading your footage (1/2)', 1, 70),
+  act('tool:understanding:2', 'tool', 'Reading your footage (2/2)', 70, 161),
+  act('say:planning', 'say', 'I have read your 2 videos and I am planning the edit now.', 161, 161),
+  act('thought:plan', 'thought', 'Planning the edit', 162, 162),
+  act('tool:step:director', 'tool', 'Choosing the moments to keep', 162, 240),
+  act('tool:step:captions', 'tool', 'Writing the captions', 240, 285),
+  act('tool:step:look', 'tool', 'Grading the colour', 285, 300, { detail: 'Warm, lifted shadows' }),
+  act('say:plan-ready', 'say', 'The plan came together in 6 steps. Next I will get your video ready.', 300, 300),
+  act('tool:save', 'tool', 'Getting your video ready', 301, 312),
+  act('tool:render', 'tool', 'Rendering your video', 313, 1050, { detail: '1080p' }),
+  act('say:rendered', 'say', 'The video rendered in 737 s at 1080p. This draft does not include background music.', 1050, 1050),
+]
+const runningActivity: ActivityEvent[] = [
+  act('thought:change', 'thought', 'Working out what to change', 0, 0),
+  act('tool:followup', 'tool', 'Applying your change', 1, 9),
+  act('say:followup', 'say', 'Applying your change. Made the captions bigger.', 9, 9),
+  act('tool:save', 'tool', 'Getting your video ready', 10, 15),
+  act('tool:render', 'tool', 'Rendering your video', 16, null, { detail: '1080p' }),
+]
+
 function seed(s: string) {
   const base = { projectId: 'proj', jobId: 'p-run', canFollowUp: false, videoIds: ['v'], attachments: [], busy: false, actionError: null, pollLostJobId: null }
   const prompt = 'Make a punchy 45-second reel with bold captions and fast cuts.'
@@ -47,6 +73,14 @@ function seed(s: string) {
     reply: 'Your video is ready. This draft does not include background music, sound effects and some graphics.',
     result: { videoUrl: sample, downloadUrl: sample, fileName: 'Punchy reel.mp4' },
   })
+  if (s === 'transcript') {
+    const now = Date.now()
+    const follow = asst({
+      id: 'a2', turn: 2, jobId: 'p-run', stage: 'rendering', startedAt: now - 30_000, timings: undefined, progress: 0.7,
+      activity: runningActivity.map((e) => ({ ...e, at: now - 30_000 + (e.at - t0), endedAt: e.endedAt === null ? null : now - 30_000 + (e.endedAt - t0) })),
+    })
+    return { ...base, messages: [user('u1', prompt), { ...done, activity: finishedActivity }, user('u2', 'Make the captions bigger.'), follow] }
+  }
   if (s === 'empty') return { ...base, messages: [], jobId: null, projectId: null }
   if (s === 'done') return { ...base, messages: [user('u1', prompt), done], canFollowUp: true }
   if (s === 'failed')

@@ -96,11 +96,42 @@ export function percent(msg: ChatAssistantMessage): number | null {
   return msg.progress === null ? null : Math.round(Math.min(1, Math.max(0, msg.progress)) * 100)
 }
 
+/** Splits a "a, b and c" list at the commas / "and" that are NOT inside (...) or quotes, so one item such as
+ *  `3 animated graphics ("big keyword", "underline sweep")` stays one chip. */
+function splitTopLevel(list: string): string[] {
+  const out: string[] = []
+  let depth = 0
+  let quote = false
+  let cur = ''
+  for (let i = 0; i < list.length; i++) {
+    const ch = list[i]!
+    if (ch === '"' || ch === '“' || ch === '”') quote = !quote
+    else if (!quote && ch === '(') depth++
+    else if (!quote && ch === ')') depth = Math.max(0, depth - 1)
+    if (depth === 0 && !quote) {
+      if (ch === ',') {
+        out.push(cur)
+        cur = ''
+        continue
+      }
+      if (/\s/.test(ch) && list.slice(i, i + 5).toLowerCase() === ' and ') {
+        out.push(cur)
+        cur = ''
+        i += 4
+        continue
+      }
+    }
+    cur += ch
+  }
+  out.push(cur)
+  return out
+}
+
 /** Splits the backend's reply into the plain sentence and the "does not include ..." items (chips). */
 export function splitReply(reply: string | null): { text: string; notIncluded: string[] } {
   if (!reply) return { text: '', notIncluded: [] }
   const m = /\s*This draft does not include (.+?)\.\s*$/.exec(reply)
   if (!m) return { text: reply, notIncluded: [] }
-  const items = m[1]!.split(/,\s*|\s+and\s+/).map((s) => s.trim()).filter(Boolean)
+  const items = splitTopLevel(m[1]!).map((s) => s.trim()).filter(Boolean)
   return { text: reply.slice(0, m.index).trim(), notIncluded: items }
 }
