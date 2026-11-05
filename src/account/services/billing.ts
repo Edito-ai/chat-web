@@ -41,6 +41,11 @@ export async function fetchFreeCredit(): Promise<FreeCreditStatus> {
   return parseFreeCredit(await apiClient.get('/billing/free-credit'))
 }
 
+/** `POST /billing/free-credit/claim {phone}`: needs a verified email; 400 bad number, 409 number already used. */
+export async function claimFreeCredit(phone: string): Promise<FreeCreditStatus> {
+  return parseFreeCredit(await apiClient.post('/billing/free-credit/claim', { phone }))
+}
+
 /** `POST /billing/checkout-session {tier}`: returns the hosted checkout URL. Real money; only call on a user click. */
 export async function createCheckoutSession(tier: BillingTier): Promise<string> {
   const res = await apiClient.post('/billing/checkout-session', { tier })

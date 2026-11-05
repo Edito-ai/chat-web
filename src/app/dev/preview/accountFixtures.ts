@@ -97,6 +97,7 @@ export function accountFixtureApi(s: AccountScenario): Partial<AccountApi> {
     subscription: async (): Promise<SubscriptionUsage> => ({ subscription: f.subscription, footageHoursUsed: f.footage, footageHoursCap: f.footageCap, promptCountToday: f.prompts, promptSoftCapPerDay: 150 }),
     tokenUsage: async () => f.tokenUsage,
     freeCredit: async () => f.credit,
+    claimFreeCredit: blocked,
     weeklyPricing: async () => ({ currency: 'INR', baseAmount: 1271, gstAmount: 229, totalAmount: 1500, isIndianPricing: true, resolvedCountryCode: 'IN' }),
     weeklyStatus: async () =>
       f.weeklyPass

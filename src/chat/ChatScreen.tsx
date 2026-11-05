@@ -11,6 +11,10 @@ import { Bubble } from './Messages'
 import { Composer } from './Composer'
 import { Sidebar } from './Sidebar'
 import { useNow } from './ActivityPanel'
+import { FreeCreditBanner } from './FreeCreditBanner'
+import { TID } from './testIds'
+import { useAccount } from '@/account/accountStore'
+import { isSubscriptionRequired } from '@/account/lib/freeCredit'
 
 const VIDEO_ACCEPT = 'video/*,.mp4,.mov,.avi,.mkv,.webm,.m4v'
 
@@ -106,6 +110,13 @@ export function ChatScreen() {
     }
   }, [resume, loadHistory, signedIn])
 
+  // The starter-credit offer: asked once per login, never polled; any failure just hides the banner.
+  const loadFreeCredit = useAccount((s) => s.loadFreeCredit)
+  const creditLoad = useAccount((s) => s.creditLoad)
+  useEffect(() => {
+    if (signedIn && creditLoad === 'idle') void loadFreeCredit()
+  }, [signedIn, creditLoad, loadFreeCredit])
+
   useEffect(() => {
     try {
       setCollapsed(localStorage.getItem('edito.chat-web.sidebar') === 'closed')
@@ -161,6 +172,7 @@ export function ChatScreen() {
   }
 
   const sendDisabled = busy || running || uploading
+  const needCredit = actionError !== null && isSubscriptionRequired(actionError)
   const showTopError = actionError !== null && lostJobId === null
 
   const sidebar = (
@@ -273,6 +285,8 @@ export function ChatScreen() {
           ) : null}
         </header>
 
+        <FreeCreditBanner nudge={needCredit} />
+
         <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto min-h-full w-full max-w-3xl px-4 py-4">
             {messages.length === 0 ? (
@@ -298,7 +312,13 @@ export function ChatScreen() {
           <div className="mx-auto w-full max-w-3xl space-y-2">
             {showTopError && (
               <div className="flex items-start justify-between gap-2">
-                <InlineError error={actionError} />
+                {needCredit ? (
+                  <p role="alert" data-testid={TID.needCredit} className="text-label text-danger">
+                    {t('chat.needCredit')}
+                  </p>
+                ) : (
+                  <InlineError error={actionError} />
+                )}
                 <IconButton size="sm" icon={X} aria-label={t('common.close')} onClick={clearActionError} />
               </div>
             )}

@@ -10,6 +10,13 @@ export const TID = {
   live: 'chat-live-line',
   avatar: 'chat-avatar',
   summary: 'chat-activity-summary',
+  credit: 'credit-banner',
+  creditPhone: 'credit-phone',
+  creditClaim: 'credit-claim',
+  creditDismiss: 'credit-dismiss',
+  creditError: 'credit-error',
+  creditDone: 'credit-done',
+  needCredit: 'chat-need-credit',
 } as const
 
 export type TestId = (typeof TID)[keyof typeof TID]

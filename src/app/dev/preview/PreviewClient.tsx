@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/auth/authStore'
-import { setAccountApi } from '@/account/accountApi'
+import { setAccountApi, type AccountApi } from '@/account/accountApi'
+import { ApiError } from '@/lib/apiClient'
+import type { FreeCreditStatus } from '@/account/types'
 import { useAccount, type AccountDialog } from '@/account/accountStore'
 import { accountFixtureApi, isAccountScenario } from './accountFixtures'
 import { setChatApi } from '@/chat/chatApi'
@@ -91,6 +93,22 @@ function seed(s: string) {
   return { ...base, messages: [user('u1', prompt), asst({})] }
 }
 
+/** Free-credit banner scenarios; the claim call is faked per scenario (type +91 98765 43210, press Claim). */
+const CREDIT_SCENARIOS = ['credit-unclaimed', 'credit-claiming', 'credit-error', 'credit-success', 'credit-402']
+const offer: FreeCreditStatus = { enabled: true, claimed: false, tokens: 1_500_000, usd: 2, phoneMasked: null }
+
+function creditApi(s: string): Partial<AccountApi> {
+  return {
+    entitlement: async () => null,
+    freeCredit: async () => offer,
+    claimFreeCredit: async () => {
+      if (s === 'credit-claiming') return new Promise<FreeCreditStatus>(() => undefined)
+      if (s === 'credit-error') throw new ApiError(409, '409 This phone number already received the free credit. Email hello@trybroll.com if this is a mistake.')
+      return { ...offer, claimed: true, phoneMasked: '+91 98xxxxxx10' }
+    },
+  }
+}
+
 /** Seeds the chat store + fake APIs so the logged-in screens can be looked at. Dev only. */
 export function PreviewClient({ scenario, open }: { scenario: string; open?: string }) {
   const [ready, setReady] = useState(false)
@@ -104,10 +122,14 @@ export function PreviewClient({ scenario, open }: { scenario: string; open?: str
     })
     setHistoryApi({ list: async () => jobs, get: async () => { throw new Error('preview') } })
     const acct = isAccountScenario(scenario)
-    setAccountApi(acct ? accountFixtureApi(scenario) : null)
+    const credit = CREDIT_SCENARIOS.includes(scenario)
+    setAccountApi(acct ? accountFixtureApi(scenario) : credit ? creditApi(scenario) : null)
     useAccount.getState().reset()
     useAuth.setState({ status: 'authenticated', user: { id: 'preview', email: 'preview@example.com', name: 'Preview', isAdmin: acct } })
-    useChat.setState({ ...seed(acct ? 'done' : scenario), userId: 'preview', history: [], historyState: 'idle' })
+    useChat.setState({ ...seed(acct ? 'done' : credit ? 'empty' : scenario), userId: 'preview', history: [], historyState: 'idle' })
+    if (scenario === 'credit-402') {
+      useChat.setState({ actionError: new ApiError(402, '402 An active subscription or Weekly Pass is required to use AI features.', { reason: 'subscription_required' }) })
+    }
     if (acct && ['usage', 'billing', 'help', 'legal'].includes(open ?? '')) useAccount.getState().openDialog(open as AccountDialog)
     setReady(true)
     const clean = () => {

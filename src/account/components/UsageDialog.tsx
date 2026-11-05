@@ -24,6 +24,7 @@ export function UsageDialog() {
   const { t } = useT()
   const close = useAccount((s) => s.closeDialog)
   const openDialog = useAccount((s) => s.openDialog)
+  const showCredit = useAccount((s) => s.showCredit)
   const tokens = useAsync(() => accountApi().tokenUsage())
   const sub = useAsync(() => accountApi().subscription())
   const credit = useAsync(() => accountApi().freeCredit())
@@ -73,6 +74,19 @@ export function UsageDialog() {
                     : t('acct.usage.creditClaimed', { amount: creditAmount })
                   : t('acct.usage.creditOffer', { amount: creditAmount })}
               </p>
+              {!c.claimed && (
+                <Button
+                  variant="secondary"
+                  className="mt-2 h-8"
+                  data-testid="usage-credit-claim"
+                  onClick={() => {
+                    showCredit()
+                    close()
+                  }}
+                >
+                  {t('acct.usage.creditClaimNow')}
+                </Button>
+              )}
             </div>
           </section>
         ) : null}

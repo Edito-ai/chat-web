@@ -8,6 +8,7 @@ export const realAccountApi = {
   subscription: billing.fetchSubscription,
   tokenUsage: billing.fetchTokenUsage,
   freeCredit: billing.fetchFreeCredit,
+  claimFreeCredit: billing.claimFreeCredit,
   checkout: billing.createCheckoutSession,
   trial: billing.startFreeTrial,
   cancel: billing.cancelSubscription,
