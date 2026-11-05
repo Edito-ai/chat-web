@@ -49,17 +49,21 @@ export function FreeCreditBanner({ nudge = false }: { nudge?: boolean }) {
   const show = shouldShowCreditBanner(credit, load, dismissed, nudge)
   if (done !== null) {
     return (
-      <div className="shrink-0 px-3 sm:px-4">
+      <div className="shrink-0">
         <div
           role="region"
           aria-label={t('credit.region')}
           data-testid={TID.credit}
-          className="mx-auto flex w-full max-w-3xl items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-label text-ink-0"
+          className="border-b border-success/30 bg-gradient-to-r from-success/25 via-success/10 to-transparent px-3 py-2.5 sm:px-4"
         >
-          <Check size={15} strokeWidth={2} aria-hidden className="shrink-0 text-ink-1" />
-          <p role="status" aria-live="polite" data-testid={TID.creditDone}>
-            {t('credit.done', { amount: formatTokens(done) })}
-          </p>
+          <div className="mx-auto flex w-full max-w-5xl items-center gap-2.5 text-body font-medium text-ink-0">
+            <span aria-hidden className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-success/25 text-success ring-1 ring-success/40">
+              <Check size={15} strokeWidth={2.25} />
+            </span>
+            <p role="status" aria-live="polite" data-testid={TID.creditDone}>
+              {t('credit.done', { amount: formatTokens(done) })}
+            </p>
+          </div>
         </div>
       </div>
     )
@@ -100,61 +104,74 @@ export function FreeCreditBanner({ nudge = false }: { nudge?: boolean }) {
   }
 
   return (
-    <div className="shrink-0 px-3 sm:px-4">
+    <div className="shrink-0">
       <section
         role="region"
         aria-label={t('credit.region')}
         data-testid={TID.credit}
-        className="mx-auto w-full max-w-3xl animate-rise rounded-xl border border-line bg-surface-2 px-3 py-2.5 motion-reduce:animate-none"
+        className="relative overflow-hidden border-b border-accent-line bg-gradient-to-r from-accent/45 via-accent/15 to-warning/40 px-3 py-2.5 animate-rise motion-reduce:animate-none sm:px-4"
       >
-        <div className="flex items-start gap-2">
-          <Gift size={16} strokeWidth={1.75} aria-hidden className="mt-0.5 shrink-0 text-ink-3" />
-          <p className="min-w-0 flex-1 text-label font-medium text-ink-0">{t(nudge ? 'credit.need' : 'credit.offer', amounts)}</p>
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2">
+          <span
+            aria-hidden
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent/25 text-accent ring-1 ring-accent-line"
+          >
+            <Gift size={18} strokeWidth={1.9} />
+          </span>
+          <div className="min-w-0 flex-1 basis-56">
+            <p className="flex flex-wrap items-center gap-2 text-body font-semibold text-ink-0">
+              <span className="rounded-full bg-warning px-2 py-px text-caption font-bold uppercase tracking-wide text-surface-0">
+                {t('credit.badge')}
+              </span>
+              {t(nudge ? 'credit.need' : 'credit.offer', amounts)}
+            </p>
+            <p className="mt-0.5 text-caption text-ink-2">{t('credit.sub')}</p>
+          </div>
+          <form onSubmit={(e) => void submit(e)} className="flex min-w-0 flex-1 basis-72 items-center gap-2 sm:max-w-md" noValidate>
+            <label htmlFor={inputId} className="sr-only">
+              {t('credit.phone')}
+            </label>
+            <input
+              ref={inputRef}
+              id={inputId}
+              data-testid={TID.creditPhone}
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              maxLength={40}
+              value={phone}
+              disabled={busy}
+              placeholder={t('credit.placeholder')}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errId : undefined}
+              onChange={(e) => {
+                setPhone(e.target.value)
+                if (error) setError(null)
+              }}
+              className="h-9 min-w-0 flex-1 rounded-lg border border-accent-line bg-surface-0/70 px-3 text-body text-ink-0 placeholder:text-ink-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60"
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              data-testid={TID.creditClaim}
+              disabled={busy}
+              aria-busy={busy}
+              className="shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {busy && <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />}
+              {t(busy ? 'credit.claiming' : 'credit.claim')}
+            </Button>
+          </form>
           <IconButton
             size="sm"
             icon={X}
             data-testid={TID.creditDismiss}
             aria-label={t('credit.dismiss')}
             onClick={dismiss}
-            className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink-2"
+            className="shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           />
         </div>
-        <form onSubmit={(e) => void submit(e)} className="mt-2 flex flex-wrap items-center gap-2 pl-6" noValidate>
-          <label htmlFor={inputId} className="sr-only">
-            {t('credit.phone')}
-          </label>
-          <input
-            ref={inputRef}
-            id={inputId}
-            data-testid={TID.creditPhone}
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            maxLength={40}
-            value={phone}
-            disabled={busy}
-            placeholder={t('credit.placeholder')}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? errId : undefined}
-            onChange={(e) => {
-              setPhone(e.target.value)
-              if (error) setError(null)
-            }}
-            className="h-9 min-w-0 flex-1 basis-44 rounded-lg border border-line bg-surface-1 px-3 text-body text-ink-0 placeholder:text-ink-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink-2 disabled:opacity-60"
-          />
-          <Button
-            type="submit"
-            variant="primary"
-            data-testid={TID.creditClaim}
-            disabled={busy}
-            aria-busy={busy}
-            className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink-2"
-          >
-            {busy && <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />}
-            {t(busy ? 'credit.claiming' : 'credit.claim')}
-          </Button>
-        </form>
-        <div aria-live="polite" className="pl-6">
+        <div aria-live="polite" className="mx-auto w-full max-w-5xl">
           {error && (
             <p id={errId} role="alert" data-testid={TID.creditError} className="mt-2 flex items-start gap-1.5 text-label text-danger">
               <AlertCircle size={12} className="mt-0.5 shrink-0" aria-hidden /> {error}

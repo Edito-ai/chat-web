@@ -149,6 +149,8 @@ export const en = {
   'chat.result.notIncluded': 'Not in this draft',
   'chat.result.earlier': 'An earlier version. Ask again to get a new video.',
   'chat.result.duration': 'Length {time}',
+  'credit.badge': 'OFFER',
+  'credit.sub': 'One-time gift, just your phone number. No code to enter.',
   'credit.region': 'Free starter credit',
   'credit.offer': 'Claim your free starter credit: ${usd} / {amount} tokens',
   'credit.need': 'You need credits to make this video: claim your free credit (${usd} / {amount} tokens)',

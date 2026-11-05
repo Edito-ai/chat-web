@@ -150,6 +150,8 @@ export const hi: Record<MessageKey, string> = {
   'chat.result.notIncluded': 'इस ड्राफ़्ट में नहीं',
   'chat.result.earlier': 'यह पुराना वर्ज़न है। नया वीडियो पाने के लिए दोबारा कहें।',
   'chat.result.duration': 'लंबाई {time}',
+  'credit.badge': 'ऑफ़र',
+  'credit.sub': 'एक बार का तोहफ़ा, बस आपका फ़ोन नंबर। कोई कोड नहीं।',
   'credit.region': 'मुफ़्त स्टार्टर क्रेडिट',
   'credit.offer': 'अपना मुफ़्त स्टार्टर क्रेडिट क्लेम करें: ${usd} / {amount} टोकन',
   'credit.need': 'यह वीडियो बनाने के लिए क्रेडिट चाहिए: अपना मुफ़्त क्रेडिट क्लेम करें (${usd} / {amount} टोकन)',

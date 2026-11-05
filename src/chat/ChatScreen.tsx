@@ -232,6 +232,8 @@ export function ChatScreen() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <FreeCreditBanner nudge={needCredit} />
+
         <header className="flex h-14 shrink-0 items-center gap-1 px-3 sm:gap-2 sm:px-4">
           <IconButton
             data-testid="chat-menu"
@@ -284,8 +286,6 @@ export function ChatScreen() {
             </>
           ) : null}
         </header>
-
-        <FreeCreditBanner nudge={needCredit} />
 
         <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto min-h-full w-full max-w-3xl px-4 py-4">
