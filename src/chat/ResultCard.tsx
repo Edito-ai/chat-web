@@ -13,7 +13,7 @@ export function ResultCard({ msg }: { msg: ChatAssistantMessage & { result: NonN
   const { text, notIncluded } = splitReply(msg.reply)
   const [duration, setDuration] = useState<number | null>(null)
   return (
-    <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-line bg-surface-1 shadow-lift">
+    <div className="w-full max-w-xl animate-rise overflow-hidden rounded-2xl border border-line-strong bg-surface-1 shadow-lift">
       <video
         data-testid="chat-video"
         aria-label={t('chat.result.aria')}
@@ -47,7 +47,7 @@ export function ResultCard({ msg }: { msg: ChatAssistantMessage & { result: NonN
 
         {notIncluded.length > 0 && (
           <div data-testid="chat-not-included" className="space-y-1.5">
-            <p className="text-caption uppercase tracking-[0.08em] text-ink-4">{t('chat.result.notIncluded')}</p>
+            <p className="text-label text-ink-3">{t('chat.result.notIncluded')}</p>
             <ul className="flex flex-wrap gap-1.5">
               {notIncluded.map((item) => (
                 <li
@@ -68,7 +68,7 @@ export function ResultCard({ msg }: { msg: ChatAssistantMessage & { result: NonN
             download={result.fileName ?? 'edited.mp4'}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-ink-0 px-4 text-body font-semibold text-surface-0 transition-colors hover:bg-white"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] px-4 text-body font-semibold text-white shadow-[0_8px_22px_-10px_rgb(255_90_80/0.8)] transition-all hover:-translate-y-px hover:brightness-110 active:translate-y-0 active:scale-[0.98]"
           >
             <Download size={15} strokeWidth={2} aria-hidden /> {t('chat.download')}
           </a>

@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from 'next'
-import '@fontsource-variable/inter'
+import '@fontsource-variable/figtree'
+import '@fontsource-variable/unbounded'
 import '@fontsource-variable/jetbrains-mono'
-import '@fontsource/instrument-serif/latin-400.css'
-import '@fontsource/instrument-serif/latin-400-italic.css'
 import '@fontsource/noto-sans-devanagari/devanagari-400.css'
 import '@fontsource/noto-sans-devanagari/devanagari-500.css'
 import '@fontsource/noto-sans-devanagari/devanagari-600.css'
@@ -17,15 +16,15 @@ export const metadata: Metadata = {
   title: { default: TITLE, template: `%s | ${SITE_NAME}` },
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
-  openGraph: { type: 'website', siteName: SITE_NAME, title: TITLE, description: SITE_DESCRIPTION, url: '/' },
-  twitter: { card: 'summary_large_image', title: TITLE, description: SITE_DESCRIPTION },
+  openGraph: { type: 'website', siteName: SITE_NAME, title: TITLE, description: SITE_DESCRIPTION, url: '/', images: [{ url: '/brand/og.png', width: 1200, height: 628, alt: 'Broll' }] },
+  twitter: { card: 'summary_large_image', title: TITLE, description: SITE_DESCRIPTION, images: ['/brand/og.png'] },
 }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#050506',
+  themeColor: '#070914',
   colorScheme: 'dark',
 }
 

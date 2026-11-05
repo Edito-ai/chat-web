@@ -102,24 +102,83 @@ describe('chat store: attaching', () => {
     expect(await useChat.getState().send('go')).toBeNull()
   })
 
-  it('removing a finished attachment deletes the uploaded asset', async () => {
+  it('removing a finished attachment only detaches it: the upload stays in the library', async () => {
     await useChat.getState().attach([file('a.mp4')])
     await tick(0)
     useChat.getState().removeAttachment(useChat.getState().attachments[0]!.id)
     expect(useChat.getState().attachments).toEqual([])
-    expect(deleteAsset).toHaveBeenCalledWith('remote-a.mp4')
+    expect(deleteAsset).not.toHaveBeenCalled()
+  })
+
+  it('starting a new chat does not delete what was uploaded either', async () => {
+    await useChat.getState().attach([file('a.mp4')])
+    await tick(0)
+    await useChat.getState().newChat()
+    expect(deleteAsset).not.toHaveBeenCalled()
   })
 })
 
 describe('chat store: sending', () => {
-  it('refuses without a video or prompt, and does not call the API', async () => {
+  it('refuses an empty prompt and does not call the API', async () => {
     const api = fakeApi(async (id) => running(id))
     setChatApi(api)
-    expect(await useChat.getState().send('hello')).toBe('noVideo')
     await useChat.getState().attach([file('a.mp4')])
     await tick(0)
     expect(await useChat.getState().send('   ')).toBe('noPrompt')
     expect(api.createJob).not.toHaveBeenCalled()
+  })
+
+  it('words alone start a conversation: it makes its own project and sends no videos', async () => {
+    const api = fakeApi(async (id) => running(id))
+    setChatApi(api)
+    expect(await useChat.getState().send('hi')).toBeNull()
+    expect(createChatProject).toHaveBeenCalledTimes(1)
+    expect(api.createJob).toHaveBeenCalledWith({ projectId: 'proj-1', videoIds: [], prompt: 'hi' })
+  })
+
+  it('a plain reply is a finished turn with no video, keeps its quick replies, and the chat can go on', async () => {
+    const reply: ChatJobSnapshot = {
+      ...base, videoIds: [], jobId: 'job-1', status: 'complete', stage: null, progress: 1, result: null, canFollowUp: true,
+      kind: 'chat', reply: 'Hi! Upload footage or tell me what to make.',
+      suggestions: [{ id: 'upload', label: 'Upload footage', action: 'upload', prompt: null }],
+    }
+    const api = fakeApi(async () => reply)
+    api.createJob.mockResolvedValueOnce({ ...reply, status: 'queued', result: null, reply: null, suggestions: [] })
+    setChatApi(api)
+    await useChat.getState().send('hi')
+    await tick(2500)
+    const last = useChat.getState().messages.at(-1)
+    expect(last).toMatchObject({ role: 'assistant', status: 'complete', kind: 'chat', result: null })
+    expect(last).toMatchObject({ reply: 'Hi! Upload footage or tell me what to make.', suggestions: [{ id: 'upload' }] })
+    expect(useChat.getState().canFollowUp).toBe(true)
+    // the next message continues the same conversation, it does not start a new job
+    await useChat.getState().send('make a promo')
+    expect(api.followUp).toHaveBeenCalledWith('job-1', 'make a promo', undefined, [])
+    expect(api.createJob).toHaveBeenCalledTimes(1)
+  })
+
+  it('footage added after a reply travels with the next message', async () => {
+    const reply: ChatJobSnapshot = {
+      ...base, videoIds: [], jobId: 'job-1', status: 'complete', stage: null, progress: 1, result: null, canFollowUp: true, kind: 'chat',
+    }
+    const api = fakeApi(async () => reply)
+    setChatApi(api)
+    await useChat.getState().send('hi')
+    await tick(2500)
+    await useChat.getState().attach([file('a.mp4')])
+    await tick(0)
+    await useChat.getState().send('cut the pauses')
+    expect(api.followUp).toHaveBeenCalledWith('job-1', 'cut the pauses', undefined, ['remote-a.mp4'])
+  })
+
+  it('library picks are attached as ready, move a footage-less chat to their project, and are never deleted', async () => {
+    setChatApi(fakeApi(async (id) => running(id)))
+    useChat.getState().attachFromLibrary([{ id: 'lib-1', name: 'old.mp4', durationSec: 12, projectId: 'old-proj', createdAt: '2026-01-01' }])
+    const s = useChat.getState()
+    expect(s.projectId).toBe('old-proj')
+    expect(s.attachments).toMatchObject([{ name: 'old.mp4', state: 'ready', videoId: 'lib-1', fromLibrary: true }])
+    useChat.getState().removeAttachment(s.attachments[0]!.id)
+    expect(deleteAsset).not.toHaveBeenCalled()
   })
 
   it('creates a job with backend ids, and finishes with a video', async () => {
@@ -148,7 +207,7 @@ describe('chat store: sending', () => {
     await tick(0)
     expect(useChat.getState().canFollowUp).toBe(true)
     expect(await useChat.getState().send('captions bigger')).toBeNull()
-    expect(api.followUp).toHaveBeenCalledWith('job-1', 'captions bigger')
+    expect(api.followUp).toHaveBeenCalledWith('job-1', 'captions bigger', undefined, [])
     expect(api.createJob).toHaveBeenCalledTimes(1)
     expect(useChat.getState().messages.at(-1)).toMatchObject({ role: 'assistant', turn: 2, status: 'running' })
   })

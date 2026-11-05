@@ -43,7 +43,8 @@ export function buildTimeline(msg: ChatAssistantMessage, now: number): TimelineS
   STEP_IDS.forEach((id, i) => {
     if (entries[id] !== undefined) reached = Math.max(reached, i)
   })
-  const visible = STEP_IDS.filter((id) => !(id === 'analyzing' && msg.turn > 1 && entries.analyzing === undefined))
+  const noFootageStep = msg.turn > 1 || msg.kind === 'graphics'
+  const visible = STEP_IDS.filter((id) => !(id === 'analyzing' && noFootageStep && entries.analyzing === undefined))
   const end = terminal ? (msg.finishedAt ?? null) : now
   return visible.map((id): TimelineStep => {
     const i = idx(id)
@@ -134,4 +135,20 @@ export function splitReply(reply: string | null): { text: string; notIncluded: s
   if (!m) return { text: reply, notIncluded: [] }
   const items = splitTopLevel(m[1]!).map((s) => s.trim()).filter(Boolean)
   return { text: reply.slice(0, m.index).trim(), notIncluded: items }
+}
+
+
+const ETA_MIN_PROGRESS = 0.05
+const ETA_MIN_ELAPSED_MS = 10_000
+const ETA_MAX_MS = 3 * 60 * 60 * 1000
+
+/**
+ * Estimated time left, from real numbers only: how far along the job is (0..1) and how long it has run. Linear
+ * (remaining = elapsed * (1 - p) / p), so it is an estimate. Returns null while there is too little to go on.
+ */
+export function estimateRemainingMs(progress: number | null, elapsedMs: number | null): number | null {
+  if (progress === null || elapsedMs === null) return null
+  if (progress < ETA_MIN_PROGRESS || progress >= 1 || elapsedMs < ETA_MIN_ELAPSED_MS) return null
+  const left = (elapsedMs * (1 - progress)) / progress
+  return Number.isFinite(left) ? Math.min(ETA_MAX_MS, Math.max(0, left)) : null
 }

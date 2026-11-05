@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react'
 import clsx from 'clsx'
 import { AlertCircle, Check, ChevronRight, Square } from 'lucide-react'
 import { useT, type MessageKey } from '@/i18n'
-import { buildTimeline, formatElapsed, hintIndex, percent, totalElapsedMs, type TimelineStep } from './activity'
+import { buildTimeline, estimateRemainingMs, formatElapsed, hintIndex, percent, totalElapsedMs, type TimelineStep } from './activity'
+import { WORKING_SCENE_ENABLED } from '@/lib/features'
+import { WorkingScene } from './WorkingScene'
 import { knownStage } from './chatState'
 import type { ChatAssistantMessage } from './chatTypes'
 import { buildTranscript } from './buildTranscript'
-import { TranscriptView, useActTitle } from './Transcript'
+import { useActTitle } from './Transcript'
 import { ToolsFold, toolsUsedLabel } from './ToolsFold'
 import { TID } from './testIds'
 
@@ -103,15 +105,22 @@ export function StepTimeline({ msg, now, showHint }: { msg: ChatAssistantMessage
   )
 }
 
-/** Live panel while the edit runs: pulsing current step, real elapsed per step, overall bar, generic hints. */
+/**
+ * One card while the edit runs: the assistant's thought on top, then the real progress bar and the ticked step list.
+ * A pointer on its top-left corner leads to the B in the avatar slot. Every number is real: stage, percent, step times.
+ */
 export function LiveActivity({ msg }: { msg: ChatAssistantMessage }) {
   const { t } = useT()
   const now = useNow(true)
+  // The backend's own narration of what it is doing (thoughts, tools), when it reports one: shown inside the card.
   const transcript = buildTranscript(msg, now)
-  if (transcript.source === 'activity') return <TranscriptView data={transcript} />
   const stage = knownStage(msg.stage)
   const pct = percent(msg)
   const total = totalElapsedMs(msg, now)
+  const steps = buildTimeline(msg, now)
+  const etaMs = estimateRemainingMs(msg.progress, total)
+  const activeAt = steps.findIndex((s) => s.status === 'active')
+  const stepInfo = activeAt >= 0 ? { id: steps[activeAt]!.id, index: activeAt + 1, count: steps.length, elapsedMs: steps[activeAt]!.elapsedMs } : null
   const label = msg.message ?? t(stage ? (`chat.stage.${stage}` as MessageKey) : 'chat.stage.working')
   // Announce the step and each 10% once, not every second.
   const announce = `${label}${pct !== null ? `. ${t('chat.activity.percent', { pct: Math.floor(pct / 10) * 10 })}` : ''}`
@@ -119,46 +128,52 @@ export function LiveActivity({ msg }: { msg: ChatAssistantMessage }) {
     <section
       data-testid="chat-progress"
       aria-label={t('chat.activity.title')}
-      className="w-full max-w-lg overflow-hidden rounded-2xl border border-line bg-surface-1/80 p-4 shadow-lift"
+      className="relative w-full max-w-lg rounded-2xl rounded-tl-md border border-white/15 bg-surface-2/85 p-4 shadow-lift backdrop-blur-md"
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="h-2 w-2 shrink-0 animate-pulse-ring rounded-full bg-accent" aria-hidden />
-          <h3 className="truncate font-serif text-title text-ink-0">{t('chat.activity.title')}</h3>
+      <span aria-hidden className="absolute -left-[7px] top-5 h-3.5 w-3.5 rotate-45 border-b border-l border-white/15 bg-surface-2" />
+      {WORKING_SCENE_ENABLED ? (
+        <WorkingScene
+          stage={stage === 'queued' || stage === null ? 'queued' : stage}
+          elapsedMs={total ?? 0}
+          step={stepInfo}
+          etaMs={etaMs}
+          transcript={transcript.source === 'activity' ? transcript : null}
+        />
+      ) : (
+        <p className="shimmer-text text-prose font-medium">{label}</p>
+      )}
+
+      <div className="mt-4 border-t border-white/10 pt-4">
+        <div className="flex items-center gap-3">
+          <div
+            role="progressbar"
+            aria-label={t('chat.progress.aria')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            {...(pct !== null ? { 'aria-valuenow': pct } : {})}
+            className="relative h-2 flex-1 overflow-hidden rounded-full bg-white/[0.07]"
+          >
+            {pct === null ? (
+              <div className="absolute inset-y-0 left-0 w-1/3 animate-sheen rounded-full bg-gradient-to-r from-[#D8264A] to-[#FF7A5C]" />
+            ) : (
+              <div
+                className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#D8264A] to-[#FF7A5C] transition-[width] duration-700 ease-out"
+                style={{ width: `${Math.max(pct, 3)}%` }}
+              >
+                <div className="absolute inset-y-0 left-0 w-1/3 animate-sheen bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+              </div>
+            )}
+          </div>
+          {pct !== null && <span className="w-9 text-right font-mono text-caption tabular-nums text-ink-2">{pct}%</span>}
         </div>
         {total !== null && (
-          <span aria-hidden className="shrink-0 font-mono text-caption tabular-nums text-ink-3">
+          <p aria-hidden className="mt-1.5 font-mono text-caption tabular-nums text-ink-4">
             {t('chat.activity.elapsed', { time: formatElapsed(total) })}
-          </span>
+          </p>
         )}
-      </div>
-
-      <p className="mt-3 text-prose text-ink-0">{label}</p>
-      <div className="mt-2.5 flex items-center gap-3">
-        <div
-          role="progressbar"
-          aria-label={t('chat.progress.aria')}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          {...(pct !== null ? { 'aria-valuenow': pct } : {})}
-          className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.07]"
-        >
-          {pct === null ? (
-            <div className="absolute inset-y-0 left-0 w-1/3 animate-sheen rounded-full bg-accent/70" />
-          ) : (
-            <div
-              className="relative h-full overflow-hidden rounded-full bg-accent transition-[width] duration-700 ease-out"
-              style={{ width: `${Math.max(pct, 3)}%` }}
-            >
-              <div className="absolute inset-y-0 left-0 w-1/3 animate-sheen bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-            </div>
-          )}
+        <div className="mt-4">
+          <StepTimeline msg={msg} now={now} showHint={false} />
         </div>
-        {pct !== null && <span className="w-9 text-right font-mono text-caption tabular-nums text-ink-2">{pct}%</span>}
-      </div>
-
-      <div className="mt-4 border-t border-line pt-4">
-        <StepTimeline msg={msg} now={now} showHint />
       </div>
       <p className="sr-only" role="status" aria-live="polite">
         {announce}

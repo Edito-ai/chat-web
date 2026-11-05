@@ -47,6 +47,8 @@ export function applySnapshot(messages: readonly ChatMessage[], snap: ChatJobSna
       stage: snap.stage ?? m.stage,
       message: snap.message ?? m.message,
       reply: snap.reply ?? m.reply,
+      kind: snap.kind ?? m.kind,
+      suggestions: snap.status === 'complete' ? (snap.suggestions ?? m.suggestions) : m.suggestions,
       timings: snap.stageTimings && snap.stageTimings.length > 0 ? snap.stageTimings : m.timings,
       startedAt: snap.startedAt ?? m.startedAt ?? null,
       finishedAt: terminal ? (snap.updatedAt ?? m.finishedAt ?? null) : null,
@@ -54,9 +56,10 @@ export function applySnapshot(messages: readonly ChatMessage[], snap: ChatJobSna
       activity: snap.activity && snap.activity.length > 0 ? snap.activity : m.activity,
     }
     if (snap.status === 'complete') {
-      return snap.result
-        ? { ...base, status: 'complete', progress: 1, result: snap.result, error: null }
-        : { ...base, status: 'failed', progress, result: null, error: snap.error ?? 'missing_result' }
+      if (snap.result) return { ...base, status: 'complete', progress: 1, result: snap.result, error: null }
+      // A plain reply has no video behind it, and that is a finished turn. Any other "complete" without one is a fault.
+      if (snap.kind === 'chat') return { ...base, status: 'complete', progress: 1, result: null, error: null }
+      return { ...base, status: 'failed', progress, result: null, error: snap.error ?? 'missing_result' }
     }
     if (snap.status === 'failed') {
       return { ...base, status: 'failed', progress, result: null, error: snap.error ?? 'failed' }

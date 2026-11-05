@@ -46,7 +46,7 @@ export function Button({ variant = 'secondary', icon: Icon, className, children,
       type={type}
       className={clsx(
         'inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg px-3.5 text-body font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40',
-        variant === 'primary' && 'bg-ink-0 text-surface-0 hover:bg-white',
+        variant === 'primary' && 'bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white shadow-[0_8px_22px_-10px_rgb(255_90_80/0.8)] hover:brightness-110',
         variant === 'secondary' && 'border border-line bg-surface-3 text-ink-0 hover:bg-surface-4',
         variant === 'ghost' && 'text-ink-1 hover:bg-white/[0.06] hover:text-ink-0',
         className,
@@ -59,28 +59,57 @@ export function Button({ variant = 'secondary', icon: Icon, className, children,
   )
 }
 
-/** The Broll mark is white on transparency, so it is a CSS mask filled with currentColor. */
+/** The Broll mark is white on transparency, so it is a CSS mask filled with currentColor (or any background class). */
+export function LogoMark({ size = 28, className = 'bg-current' }: { size?: number; className?: string }) {
+  return (
+    <span
+      role="img"
+      aria-label="Broll"
+      className={`inline-block shrink-0 ${className}`}
+      style={{
+        width: size,
+        height: size,
+        maskImage: `url(${logoUrl})`,
+        WebkitMaskImage: `url(${logoUrl})`,
+        maskSize: 'contain',
+        WebkitMaskSize: 'contain',
+        maskRepeat: 'no-repeat',
+        WebkitMaskRepeat: 'no-repeat',
+        maskPosition: 'center',
+        WebkitMaskPosition: 'center',
+      }}
+    />
+  )
+}
+
+/** The BROLL wordmark (white on transparency, 720x206), drawn as a mask so it takes the current text colour. */
+export function Wordmark({ height = 16 }: { height?: number }) {
+  return (
+    <span
+      role="img"
+      aria-label="Broll"
+      className="inline-block shrink-0 bg-current"
+      style={{
+        height,
+        width: Math.round((height * 720) / 206),
+        maskImage: 'url(/brand/wordmark.png)',
+        WebkitMaskImage: 'url(/brand/wordmark.png)',
+        maskSize: 'contain',
+        WebkitMaskSize: 'contain',
+        maskRepeat: 'no-repeat',
+        WebkitMaskRepeat: 'no-repeat',
+        maskPosition: 'left center',
+        WebkitMaskPosition: 'left center',
+      }}
+    />
+  )
+}
+
+/** Header logo: the wordmark. `size` is the old mark size, so call sites keep their meaning (about 55% as tall). */
 export function Logo({ size = 28 }: { size?: number }) {
   return (
-    <div className="flex items-center gap-2 text-ink-0">
-      <span
-        role="img"
-        aria-label="Broll"
-        className="inline-block shrink-0 bg-current"
-        style={{
-          width: size,
-          height: size,
-          maskImage: `url(${logoUrl})`,
-          WebkitMaskImage: `url(${logoUrl})`,
-          maskSize: 'contain',
-          WebkitMaskSize: 'contain',
-          maskRepeat: 'no-repeat',
-          WebkitMaskRepeat: 'no-repeat',
-          maskPosition: 'center',
-          WebkitMaskPosition: 'center',
-        }}
-      />
-      <span className="text-title font-semibold leading-none tracking-[-0.02em]">Broll</span>
+    <div className="flex items-center text-ink-0">
+      <Wordmark height={Math.max(12, Math.round(size * 0.55))} />
     </div>
   )
 }

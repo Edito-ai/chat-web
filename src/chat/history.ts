@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { newAssistant } from './chatState'
-import { toSnapshot, type ChatJobWire } from './chatApi'
+import { toSnapshot, type ChatJobWire, toSuggestions } from './chatApi'
 import type { ChatAssistantMessage, ChatMessage } from './chatTypes'
 
 export type HistoryStatus = 'running' | 'complete' | 'failed'
@@ -90,6 +90,8 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
       reply: t.reply ?? null,
       progress: 1,
       durationSec: t.durationSec ?? null,
+      kind: t.kind,
+      suggestions: toSuggestions(t.suggestions),
     })
   }
   const last = out[out.length - 1]
@@ -102,17 +104,18 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
   return out.map((m): ChatMessage => {
     if (m.role !== 'assistant' || m.turn !== current) return m
     const a: ChatAssistantMessage = m
-    if (snap.status === 'complete' && snap.result) {
+    if (snap.status === 'complete' && (snap.result || snap.kind === 'chat')) {
       return {
-        ...a, status: 'complete', result: snap.result, reply: snap.reply ?? a.reply,
+        ...a, status: 'complete', result: snap.result ?? null, reply: snap.reply ?? a.reply,
         durationSec: snap.durationSec ?? a.durationSec ?? null, timings: snap.stageTimings, activity: snap.activity,
         startedAt: snap.startedAt ?? null, finishedAt: snap.updatedAt ?? null,
+        kind: snap.kind ?? a.kind, suggestions: snap.suggestions ?? a.suggestions,
       }
     }
     if (snap.status === 'running' || snap.status === 'queued') {
       return {
         ...a, status: snap.status, stage: snap.stage, progress: snap.progress, message: snap.message,
-        timings: snap.stageTimings, activity: snap.activity, startedAt: snap.startedAt ?? null,
+        timings: snap.stageTimings, activity: snap.activity, startedAt: snap.startedAt ?? null, kind: snap.kind ?? a.kind,
       }
     }
     return a.status === 'failed' ? { ...a, error: snap.error } : a

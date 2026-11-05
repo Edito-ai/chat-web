@@ -1,20 +1,24 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import clsx from 'clsx'
 import { useRouter } from 'next/navigation'
-import { Menu, PanelLeftOpen, SquarePen, X } from 'lucide-react'
-import { useT, useLocale, type MessageKey } from '@/i18n'
+import { BrandTile } from '@/components/BrandTile'
+import { ArrowUpRight, Menu, PanelLeftOpen, SquarePen, X } from 'lucide-react'
+import { useT, type MessageKey } from '@/i18n'
 import { Button, IconButton, InlineError, Logo } from '@/components/ui'
 import { useAuth } from '@/auth/authStore'
+import { useAccount } from '@/account/accountStore'
+import { AccountDialogs } from '@/account/components/AccountDialogs'
 import { useChat, type ChatSendProblem } from './chatStore'
+import type { ChatSuggestion } from './chatTypes'
 import { activeAssistant, lastCompleted } from './chatState'
 import { Bubble } from './Messages'
 import { Composer } from './Composer'
+import { LibraryDialog } from './LibraryDialog'
 import { Sidebar } from './Sidebar'
 import { useNow } from './ActivityPanel'
 import { FreeCreditBanner } from './FreeCreditBanner'
 import { takeFreshStart } from './freshStart'
 import { TID } from './testIds'
-import { useAccount } from '@/account/accountStore'
 import { isSubscriptionRequired } from '@/account/lib/freeCredit'
 
 const VIDEO_ACCEPT = 'video/*,.mp4,.mov,.avi,.mkv,.webm,.m4v'
@@ -31,29 +35,31 @@ const EXAMPLES = [1, 2, 3, 4] as const
 function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
   const { t } = useT()
   return (
-    <div className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center px-1 py-10 text-center">
-      <h2 className="animate-rise font-serif text-display text-ink-0 sm:text-hero">{t('chat.empty.title')}</h2>
-      <p className="mt-4 max-w-md animate-rise text-prose text-ink-3 [animation-delay:60ms]">{t('chat.empty.sub')}</p>
-      <div className="mt-9 w-full animate-rise [animation-delay:120ms]">
-        <p className="mb-3 text-caption font-medium uppercase tracking-[0.1em] text-ink-4">{t('chat.example.heading')}</p>
-        <ul className="grid gap-2.5 sm:grid-cols-2">
-          {EXAMPLES.map((n) => (
-            <li key={n}>
-              <button
-                type="button"
-                data-testid={`chat-example-${n}`}
-                onClick={() => onPick(t(`chat.example.${n}.prompt` as MessageKey))}
-                className="group flex h-full min-h-[76px] w-full flex-col items-start gap-1 rounded-2xl border border-line bg-surface-1/70 px-4 py-3 text-left transition-all hover:-translate-y-px hover:border-line-strong hover:bg-surface-2"
-              >
-                <span className="text-body font-medium text-ink-0">{t(`chat.example.${n}.title` as MessageKey)}</span>
-                <span className="line-clamp-2 text-label text-ink-3 group-hover:text-ink-2">
-                  {t(`chat.example.${n}.prompt` as MessageKey)}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
+    <div className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center px-1 py-8 text-center">
+      <BrandTile size={56} className="animate-rise" />
+      <h2 className="mt-6 animate-rise font-display text-[1.65rem] font-bold leading-[1.18] tracking-[-0.02em] text-ink-0 [animation-delay:40ms] sm:text-[2.2rem]">
+        {t('chat.empty.title')}
+      </h2>
+      <p className="mt-3 max-w-md animate-rise text-prose text-ink-2 [animation-delay:80ms]">{t('chat.empty.sub')}</p>
+      <ul className="mt-8 grid w-full animate-rise gap-2.5 text-left [animation-delay:140ms] sm:grid-cols-2">
+        {EXAMPLES.map((n) => (
+          <li key={n}>
+            <button
+              type="button"
+              data-testid={`chat-example-${n}`}
+              aria-label={t(`chat.example.${n}.title` as MessageKey)}
+              onClick={() => onPick(t(`chat.example.${n}.prompt` as MessageKey))}
+              className="group flex h-full w-full flex-col gap-1 rounded-2xl border border-white/10 text-left bg-surface-1/60 px-4 py-3.5 backdrop-blur transition-all hover:-translate-y-px hover:border-accent-line hover:bg-surface-2/80"
+            >
+              <span className="flex items-center justify-between gap-2 text-body font-semibold text-ink-0">
+                {t(`chat.example.${n}.title` as MessageKey)}
+                <ArrowUpRight size={14} aria-hidden className="shrink-0 text-accent opacity-0 transition-opacity group-hover:opacity-100" />
+              </span>
+              <span className="line-clamp-2 text-label text-ink-3 transition-colors group-hover:text-ink-2">{t(`chat.example.${n}.prompt` as MessageKey)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -63,8 +69,7 @@ function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
  * watch what it is doing, get the video back with a player and Download, then send follow-ups. No timeline.
  */
 export function ChatScreen() {
-  const { t, locale } = useT()
-  const setLocale = useLocale((s) => s.setLocale)
+  const { t } = useT()
   const messages = useChat((s) => s.messages)
   const attachments = useChat((s) => s.attachments)
   const busy = useChat((s) => s.busy)
@@ -73,7 +78,10 @@ export function ChatScreen() {
   const history = useChat((s) => s.history)
   const historyState = useChat((s) => s.historyState)
   const currentJobId = useChat((s) => s.jobId)
+  const videoIds = useChat((s) => s.videoIds)
+  const projectId = useChat((s) => s.projectId)
   const user = useAuth((s) => s.user)
+  const openDialog = useAccount((s) => s.openDialog)
   const signOut = () => {
     useChat.getState().reset()
     useAuth.getState().logout()
@@ -91,6 +99,7 @@ export function ChatScreen() {
   const [text, setText] = useState('')
   const [problem, setProblem] = useState<ChatSendProblem | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [libraryOpen, setLibraryOpen] = useState(false)
   /** Mobile drawer / desktop collapse. */
   const [drawer, setDrawer] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -153,6 +162,14 @@ export function ChatScreen() {
     if (p === null && prompt.trim()) setText('')
   }
 
+  /** A quick reply under an assistant message: open the picker, open the library, or send its words. */
+  const onSuggest = (chip: ChatSuggestion) => {
+    if (running || busy || !requireAuth()) return
+    if (chip.action === 'upload') fileRef.current?.click()
+    else if (chip.action === 'library') setLibraryOpen(true)
+    else if (chip.prompt) void send(chip.prompt).then(setProblem)
+  }
+
   const onDrop = (e: DragEvent) => {
     e.preventDefault()
     setDragging(false)
@@ -176,7 +193,7 @@ export function ChatScreen() {
   const needCredit = actionError !== null && isSubscriptionRequired(actionError)
   const showTopError = actionError !== null && lostJobId === null
 
-  const sidebar = (
+  const renderSidebar = (inDrawer: boolean) => (
     <Sidebar
       items={history}
       loadState={historyState}
@@ -188,15 +205,20 @@ export function ChatScreen() {
       onNew={startNew}
       onOpen={open}
       onRetry={() => void loadHistory()}
-      onClose={() => (drawer ? setDrawer(false) : setCollapsedPersist(true))}
+      onClose={() => (inDrawer ? setDrawer(false) : setCollapsedPersist(true))}
+      drawer={inDrawer}
       user={user ? { name: user.name, email: user.email, isAdmin: user.isAdmin === true } : null}
       onSignOut={signOut}
     />
   )
 
+  // A swipe to the left closes the drawer (Escape is handled above).
+  const swipeX = useRef<number | null>(null)
+
   return (
     <div
       data-testid="chat-screen"
+      data-calm={messages.length > 0}
       className="app-shell relative flex h-full w-full overflow-hidden text-ink-1"
       onDragOver={(e) => {
         e.preventDefault()
@@ -208,8 +230,8 @@ export function ChatScreen() {
       onDrop={onDrop}
     >
       {/* Desktop rail */}
-      <aside className={clsx('hidden w-[17.5rem] shrink-0 border-r border-line bg-surface-1/60 md:block', collapsed && 'md:hidden')}>
-        {sidebar}
+      <aside className={clsx('hidden w-[17.5rem] shrink-0 border-r border-white/[0.08] bg-gradient-to-b from-white/[0.02] to-black/25 backdrop-blur-md md:block', collapsed && 'md:hidden')}>
+        {renderSidebar(false)}
       </aside>
 
       {/* Mobile drawer */}
@@ -218,16 +240,25 @@ export function ChatScreen() {
           <button
             type="button"
             aria-label={t('nav.close')}
-            className="absolute inset-0 animate-rise bg-black/60 backdrop-blur-[2px]"
+            className="absolute inset-0 animate-fade-in bg-black/65 backdrop-blur-[3px]"
             onClick={() => setDrawer(false)}
           />
           <aside
             role="dialog"
             aria-modal="true"
             aria-label={t('nav.aria')}
-            className="absolute inset-y-0 left-0 w-[min(20rem,86vw)] animate-rise border-r border-line bg-surface-1 shadow-lift"
+            onTouchStart={(e) => {
+              swipeX.current = e.touches[0]?.clientX ?? null
+            }}
+            onTouchEnd={(e) => {
+              const start = swipeX.current
+              const end = e.changedTouches[0]?.clientX
+              swipeX.current = null
+              if (start !== null && end !== undefined && start - end > 70) setDrawer(false)
+            }}
+            className="absolute inset-y-0 left-0 w-[min(21rem,88vw)] animate-drawer-in overflow-hidden rounded-r-3xl border-r border-white/15 bg-[linear-gradient(to_bottom,#0e0f12,#141519)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-[0_0_80px_rgb(0_0_0/0.75)]"
           >
-            {sidebar}
+            {renderSidebar(true)}
           </aside>
         </div>
       )}
@@ -255,7 +286,10 @@ export function ChatScreen() {
           <div className={clsx('hidden', collapsed && 'md:block')}>
             <Logo />
           </div>
-          <h1 className="min-w-0 flex-1 truncate font-serif text-heading text-ink-0 md:pl-1">{t('chat.title')}</h1>
+          <span className="md:hidden">
+            <Logo size={24} />
+          </span>
+          <h1 className="hidden min-w-0 flex-1 truncate text-body font-medium text-ink-2 md:block md:pl-1">{t('chat.title')}</h1>
           <Button
             data-testid="chat-new"
             variant="ghost"
@@ -267,15 +301,6 @@ export function ChatScreen() {
             <span className="hidden sm:inline">{t('chat.new')}</span>
             <span className="sr-only sm:hidden">{t('chat.new')}</span>
           </Button>
-          <select
-            aria-label={t('lang.switch')}
-            value={locale}
-            onChange={(e) => setLocale(e.target.value === 'hi' ? 'hi' : 'en')}
-            className="h-9 rounded-lg border border-line bg-surface-2 px-2 text-label text-ink-1"
-          >
-            <option value="en">EN</option>
-            <option value="hi">हिं</option>
-          </select>
           {signedIn ? null : authStatus === 'unauthenticated' ? (
             <>
               <Button data-testid="chat-login" variant="ghost" onClick={() => router.push('/login')}>
@@ -300,8 +325,8 @@ export function ChatScreen() {
               />
             ) : (
               <ol data-testid="chat-log" role="log" aria-label={t('chat.log.aria')} className="space-y-6 pb-4">
-                {messages.map((m) => (
-                  <Bubble key={m.id} msg={m} />
+                {messages.map((m, i) => (
+                  <Bubble key={m.id} msg={m} chips={i === messages.length - 1 && !running} onSuggest={onSuggest} />
                 ))}
               </ol>
             )}
@@ -347,18 +372,42 @@ export function ChatScreen() {
               attachments={attachments}
               onRemoveAttachment={removeAttachment}
               onAttachClick={() => (requireAuth() ? fileRef.current?.click() : undefined)}
+              onLibraryClick={() => (requireAuth() ? setLibraryOpen(true) : undefined)}
               attachDisabled={busy || running}
               running={running}
               sendDisabled={sendDisabled}
               onSend={() => void submit()}
               onStop={() => void cancel()}
             />
+            <p data-testid="chat-disclaimer" className="px-3 pt-0.5 text-center text-caption leading-snug text-ink-4">
+              {t('chat.disclaimer.pre')}
+              <button
+                type="button"
+                data-testid="chat-terms-link"
+                onClick={() => openDialog('legal')}
+                className="rounded underline decoration-white/25 underline-offset-2 transition-colors hover:text-ink-2 hover:decoration-white/50"
+              >
+                {t('chat.disclaimer.link')}
+              </button>
+              {t('chat.disclaimer.post')}
+            </p>
           </div>
         </div>
       </div>
 
+      {libraryOpen && (
+        <LibraryDialog
+          onClose={() => setLibraryOpen(false)}
+          onPick={useChat.getState().attachFromLibrary}
+          lockProjectId={videoIds.length > 0 || attachments.length > 0 ? (projectId ?? null) : null}
+        />
+      )}
+
+      {/* Signed-in users get the dialogs from the profile menu; guests still need Terms to open from the disclaimer. */}
+      {!user && <AccountDialogs />}
+
       {dragging && (
-        <div className="pointer-events-none absolute inset-0 z-50 grid place-items-center bg-surface-0/80 font-serif text-display text-ink-0 backdrop-blur-sm">
+        <div className="pointer-events-none absolute inset-0 z-50 grid place-items-center bg-surface-0/80 font-display text-heading text-ink-0 backdrop-blur-sm">
           {t('chat.dropHint')}
         </div>
       )}

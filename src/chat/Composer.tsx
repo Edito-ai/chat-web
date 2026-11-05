@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import clsx from 'clsx'
-import { ArrowUp, Check, Paperclip, Square, X, AlertCircle } from 'lucide-react'
+import { ArrowUp, Check, FolderOpen, Paperclip, Square, X, AlertCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 import { IconButton } from '@/components/ui'
 import type { ChatAttachment } from './chatStore'
@@ -17,7 +17,7 @@ function ProgressRing({ item }: { item: ChatAttachment }) {
     <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden className="-rotate-90">
       <circle cx="10" cy="10" r={r} fill="none" stroke="currentColor" strokeOpacity="0.18" strokeWidth="2.5" />
       <circle
-        cx="10" cy="10" r={r} fill="none" stroke="rgb(165 174 255)" strokeWidth="2.5" strokeLinecap="round"
+        cx="10" cy="10" r={r} fill="none" stroke="rgb(255 158 140)" strokeWidth="2.5" strokeLinecap="round"
         strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(1, Math.max(0.04, item.progress)))}
         className="transition-[stroke-dashoffset] duration-300"
       />
@@ -56,6 +56,7 @@ export interface ComposerProps {
   attachments: ChatAttachment[]
   onRemoveAttachment: (id: string) => void
   onAttachClick: () => void
+  onLibraryClick: () => void
   attachDisabled: boolean
   running: boolean
   sendDisabled: boolean
@@ -87,7 +88,7 @@ export function Composer(p: ComposerProps) {
   }
   const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0)
   return (
-    <div className="rounded-3xl border border-line-strong bg-surface-1 shadow-composer transition-colors focus-within:border-accent-line">
+    <div className="rounded-[1.75rem] border border-white/15 bg-surface-1/75 backdrop-blur-xl shadow-composer transition-[border-color,box-shadow] duration-200 focus-within:border-accent-line focus-within:shadow-[0_0_0_4px_rgb(255_158_140/0.10),0_20px_50px_-20px_rgb(0_0_0/0.9)]">
       {p.attachments.length > 0 && (
         <ul className="flex flex-wrap gap-2 px-3 pt-3">
           {p.attachments.map((a) => (
@@ -95,36 +96,42 @@ export function Composer(p: ComposerProps) {
           ))}
         </ul>
       )}
-      <textarea
-        ref={setRef}
-        data-testid="chat-input"
-        aria-label={t('chat.composer.aria')}
-        value={p.text}
-        rows={1}
-        onChange={(e) => p.onText(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder={p.placeholder}
-        className="scroll-thin block max-h-44 min-h-[52px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-prose text-ink-0 placeholder:text-ink-4 focus:!outline-none focus-visible:!outline-none"
-      />
-      <div className="flex items-center justify-between gap-2 px-2 pb-2">
-        <div className="flex min-w-0 items-center gap-1">
-          <IconButton
-            data-testid="chat-attach"
-            icon={Paperclip}
-            size="lg"
-            aria-label={t('chat.attach')}
-            disabled={p.attachDisabled}
-            onClick={p.onAttachClick}
-            className="rounded-full"
-          />
-          <span className="hidden truncate text-caption text-ink-4 sm:inline">{t('chat.composer.hint')}</span>
-        </div>
+      <div className="flex items-end gap-1.5 p-2">
+        <IconButton
+          data-testid="chat-attach"
+          icon={Paperclip}
+          size="lg"
+          aria-label={t('chat.attach')}
+          disabled={p.attachDisabled}
+          onClick={p.onAttachClick}
+          className="shrink-0 rounded-full"
+        />
+        <IconButton
+          data-testid="chat-library"
+          icon={FolderOpen}
+          size="lg"
+          aria-label={t('chat.library.open')}
+          disabled={p.attachDisabled}
+          onClick={p.onLibraryClick}
+          className="shrink-0 rounded-full"
+        />
+        <textarea
+          ref={setRef}
+          data-testid="chat-input"
+          aria-label={t('chat.composer.aria')}
+          value={p.text}
+          rows={1}
+          onChange={(e) => p.onText(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder={p.placeholder}
+          className="scroll-thin block max-h-44 min-h-[40px] min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2.5 text-prose text-ink-0 placeholder:text-ink-4 focus:!outline-none focus-visible:!outline-none"
+        />
         {p.running ? (
           <button
             type="button"
             data-testid="chat-stop"
             onClick={p.onStop}
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-line-strong bg-surface-3 pl-3.5 pr-4 text-body font-medium text-ink-0 transition-colors hover:bg-surface-4"
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-line-strong bg-surface-3 pl-3.5 pr-4 text-body font-medium text-ink-0 transition-colors hover:bg-surface-4"
           >
             <Square size={12} fill="currentColor" aria-hidden /> {t('chat.stop')}
           </button>
@@ -136,8 +143,8 @@ export function Composer(p: ComposerProps) {
             aria-disabled={!canSend}
             onClick={p.onSend}
             className={clsx(
-              'inline-flex h-10 w-10 items-center justify-center rounded-full transition-all active:scale-95 disabled:pointer-events-none disabled:opacity-30',
-              canSend ? 'bg-ink-0 text-surface-0 hover:bg-white' : 'bg-white/[0.08] text-ink-3',
+              'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 disabled:pointer-events-none disabled:opacity-30',
+              canSend ? 'bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white shadow-[0_8px_22px_-8px_rgb(255_90_80/0.8)] hover:-translate-y-px hover:brightness-110' : 'bg-white/[0.08] text-ink-3',
             )}
           >
             <ArrowUp size={18} strokeWidth={2.25} aria-hidden />

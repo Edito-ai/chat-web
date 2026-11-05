@@ -90,7 +90,7 @@ export function Dialog({
         )}
       >
         <header className="flex shrink-0 items-center gap-2 border-b border-line px-5 py-3">
-          <h2 id={titleId} className="min-w-0 flex-1 truncate font-serif text-heading text-ink-0">
+          <h2 id={titleId} className="min-w-0 flex-1 truncate font-display text-title font-semibold tracking-[-0.01em] text-ink-0">
             {title}
           </h2>
           {headerExtra}

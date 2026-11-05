@@ -1,9 +1,8 @@
 'use client'
 
-import clsx from 'clsx'
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
-import { BarChart3, ChevronsUpDown, CreditCard, ExternalLink, Languages, LifeBuoy, LogOut, Scale, ShieldCheck, Sparkles, SquareArrowOutUpRight, type LucideIcon } from 'lucide-react'
-import { useLocale, useT, type Locale, type MessageKey } from '@/i18n'
+import { BarChart3, ChevronsUpDown, CreditCard, ExternalLink, LifeBuoy, LogOut, Scale, ShieldCheck, SquareArrowOutUpRight, type LucideIcon } from 'lucide-react'
+import { useT } from '@/i18n'
 import { EDITOR_URL } from '@/lib/env'
 import { AccountDialogs } from '@/account/components/AccountDialogs'
 import { PlanBadge } from '@/account/components/PlanBadge'
@@ -24,41 +23,6 @@ function MenuButton({ icon: Icon, label, onClick, testId }: { icon: LucideIcon; 
 
 function Sep() {
   return <div role="separator" className="my-1 h-px bg-line" />
-}
-
-/** Language row: two radio items so the choice is one keypress and stays visible. */
-function LanguageRow() {
-  const { t } = useT()
-  const locale = useLocale((s) => s.locale)
-  const setLocale = useLocale((s) => s.setLocale)
-  const opt = (value: Locale, short: MessageKey, full: MessageKey) => (
-    <button
-      type="button"
-      role="menuitemradio"
-      aria-checked={locale === value}
-      aria-label={t(full)}
-      tabIndex={-1}
-      lang={value}
-      data-testid={`chat-lang-${value}`}
-      onClick={() => setLocale(value)}
-      className={clsx(
-        'min-h-[28px] min-w-[36px] rounded-md px-2 text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-line',
-        locale === value ? 'bg-white/[0.12] text-ink-0' : 'text-ink-3 hover:bg-white/[0.06] hover:text-ink-0',
-      )}
-    >
-      {t(short)}
-    </button>
-  )
-  return (
-    <div className="flex min-h-[36px] items-center gap-2.5 px-3 text-body text-ink-1">
-      <Languages size={15} strokeWidth={1.75} aria-hidden className="shrink-0 text-ink-2" />
-      <span className="flex-1">{t('acct.menu.language')}</span>
-      <div role="group" aria-label={t('acct.menu.language')} className="flex gap-0.5 rounded-lg border border-line p-0.5">
-        {opt('en', 'acct.lang.en', 'acct.lang.enFull')}
-        {opt('hi', 'acct.lang.hi', 'acct.lang.hiFull')}
-      </div>
-    </div>
-  )
 }
 
 /**
@@ -144,11 +108,9 @@ export function ProfileMenu({ user, onSignOut }: { user: ProfileUser; onSignOut:
           <Sep />
           <MenuButton icon={BarChart3} label={t('acct.menu.usage')} testId="chat-menu-usage" onClick={() => pick('usage')} />
           <MenuButton icon={CreditCard} label={t('acct.menu.billing')} testId="chat-menu-billing" onClick={() => pick('billing')} />
-          <MenuButton icon={Sparkles} label={t('acct.menu.pricing')} testId="chat-menu-pricing" onClick={() => pick('billing', 'plans')} />
           <Sep />
           <MenuButton icon={LifeBuoy} label={t('acct.menu.help')} testId="chat-menu-help" onClick={() => pick('help')} />
           <MenuButton icon={Scale} label={t('acct.menu.legal')} testId="chat-menu-legal" onClick={() => pick('legal')} />
-          <LanguageRow />
           {EDITOR_URL ? (
             <>
               <Sep />
@@ -216,7 +178,7 @@ export function ProfileMenu({ user, onSignOut }: { user: ProfileUser; onSignOut:
       >
         <span
           aria-hidden
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-accent-line bg-accent-soft font-serif text-title text-accent"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-accent-line bg-accent-soft font-display text-body font-semibold text-accent"
         >
           {initialOf(user)}
         </span>

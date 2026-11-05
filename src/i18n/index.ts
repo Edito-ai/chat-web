@@ -11,13 +11,8 @@ const tables: Record<Locale, Record<MessageKey, string>> = { en, hi }
 
 /** Browser-only: stored choice, else the browser language. Never call during server render. */
 export function detectLocale(): Locale {
-  try {
-    const saved = localStorage.getItem(KEY)
-    if (saved === 'en' || saved === 'hi') return saved
-  } catch {
-    // storage blocked: fall through to the browser language
-  }
-  return typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('hi') ? 'hi' : 'en'
+  // The language switch was removed: the app is English. (The Hindi table stays for when a switch comes back.)
+  return 'en'
 }
 
 export const useLocale = create<{ locale: Locale; setLocale: (l: Locale) => void }>((set) => ({

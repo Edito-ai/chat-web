@@ -5,12 +5,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        surface: { 0: '#050506', 1: '#0B0B0D', 2: '#111114', 3: '#17171A', 4: '#1F1F23' },
+        surface: { 0: '#070914', 1: '#0C1022', 2: '#121832', 3: '#192042', 4: '#222A56' },
         ink: { 0: '#F6F6F4', 1: '#C9C9CE', 2: '#9B9BA3', 3: '#8E8E97', 4: '#80808A', disabled: '#4C4C54' },
         line: { DEFAULT: 'rgb(255 255 255 / 0.07)', strong: 'rgb(255 255 255 / 0.14)' },
         danger: { DEFAULT: '#E0565C', soft: 'rgb(224 86 92 / 0.12)' },
         warning: { DEFAULT: '#D8A64B', soft: 'rgb(216 166 75 / 0.12)' },
-        accent: { DEFAULT: '#A5AEFF', soft: 'rgb(165 174 255 / 0.12)', line: 'rgb(165 174 255 / 0.35)' },
+        accent: { DEFAULT: '#FF9E8C', soft: 'rgb(255 158 140 / 0.12)', line: 'rgb(255 158 140 / 0.38)' },
         success: { DEFAULT: '#5CA97A', soft: 'rgb(92 169 122 / 0.12)' },
       },
       fontSize: {
@@ -24,9 +24,10 @@ module.exports = {
         hero: ['44px', { lineHeight: '1.08', letterSpacing: '-0.015em' }],
       },
       fontFamily: {
-        serif: ['Instrument Serif', 'Noto Sans Devanagari', 'Georgia', 'serif'],
+        serif: ['Fraunces Variable', 'Noto Sans Devanagari', 'Georgia', 'serif'],
+        display: ['Unbounded Variable', 'Figtree Variable', 'Noto Sans Devanagari', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono Variable', 'JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Consolas', 'monospace'],
-        sans: ['Inter Variable', 'Inter', 'Noto Sans Devanagari', 'SF Pro Display', 'Segoe UI', 'system-ui', 'sans-serif'],
+        sans: ['Figtree Variable', 'Noto Sans Devanagari', 'SF Pro Display', 'Segoe UI', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         ring: 'inset 0 0 0 1px rgb(255 255 255 / 0.12)',
@@ -35,9 +36,27 @@ module.exports = {
       },
       keyframes: {
         rise: { from: { opacity: '0', transform: 'translateY(6px)' }, to: { opacity: '1', transform: 'none' } },
-        pulseRing: { '0%': { boxShadow: '0 0 0 0 rgb(165 174 255 / 0.45)' }, '100%': { boxShadow: '0 0 0 8px rgb(165 174 255 / 0)' } },
+        pulseRing: { '0%': { boxShadow: '0 0 0 0 rgb(255 158 140 / 0.5)' }, '100%': { boxShadow: '0 0 0 8px rgb(255 158 140 / 0)' } },
         sheen: { from: { transform: 'translateX(-100%)' }, to: { transform: 'translateX(250%)' } },
         blink: { '0%, 90%, 100%': { transform: 'scaleY(1)' }, '95%': { transform: 'scaleY(0.08)' } },
+        orbBounce: {
+          '0%': { transform: 'translateY(0) scale(1.06,0.92)' },
+          '20%': { transform: 'translateY(-12%) scale(0.98,1.04)' },
+          '42%': { transform: 'translateY(-16%) scale(1,1)' },
+          '72%': { transform: 'translateY(-3%) scale(1.01,0.99)' },
+          '90%': { transform: 'translateY(0) scale(1.05,0.93)' },
+          '100%': { transform: 'translateY(0) scale(1.06,0.92)' },
+        },
+        orbIdle: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-4%)' } },
+        orbShadow: { '0%,100%': { transform: 'scale(1)', opacity: '0.7' }, '42%': { transform: 'scale(0.62)', opacity: '0.3' } },
+        orbShadowIdle: { '0%,100%': { transform: 'scale(1)', opacity: '0.6' }, '50%': { transform: 'scale(0.86)', opacity: '0.4' } },
+        tilePulse: {
+          '0%,100%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgb(255 122 92 / 0.0)' },
+          '50%': { transform: 'scale(1.05)', boxShadow: '0 0 28px 4px rgb(255 122 92 / 0.35)' },
+        },
+        spinSlow: { to: { transform: 'rotate(360deg)' } },
+        drawerIn: { from: { transform: 'translateX(-100%)' }, to: { transform: 'none' } },
+        fadeIn: { from: { opacity: '0' }, to: { opacity: '1' } },
         fadeHint: { '0%': { opacity: '0', transform: 'translateY(3px)' }, '100%': { opacity: '1', transform: 'none' } },
       },
       animation: {
@@ -45,6 +64,14 @@ module.exports = {
         'pulse-ring': 'pulseRing 1.8s ease-out infinite',
         sheen: 'sheen 1.8s ease-in-out infinite',
         blink: 'blink 4.2s ease-in-out infinite',
+        'orb-bounce': 'orbBounce 1.5s cubic-bezier(0.45,0.05,0.55,0.95) infinite',
+        'orb-idle': 'orbIdle 3.4s ease-in-out infinite',
+        'orb-shadow': 'orbShadow 1.5s cubic-bezier(0.45,0.05,0.55,0.95) infinite',
+        'orb-shadow-idle': 'orbShadowIdle 3.4s ease-in-out infinite',
+        'tile-pulse': 'tilePulse 1.8s ease-in-out infinite',
+        'spin-slow': 'spinSlow 2.6s linear infinite',
+        'drawer-in': 'drawerIn 0.3s cubic-bezier(0.2,0.8,0.2,1) both',
+        'fade-in': 'fadeIn 0.25s ease-out both',
         'fade-hint': 'fadeHint 0.4s ease both',
       },
     },

@@ -85,6 +85,19 @@ function seed(s: string) {
     return { ...base, messages: [user('u1', prompt), { ...done, activity: finishedActivity }, user('u2', 'Make the captions bigger.'), follow] }
   }
   if (s === 'empty') return { ...base, messages: [], jobId: null, projectId: null }
+  if (s === 'talk' || s === 'typing') {
+    const ask = 'make a 30 second promo for my cafe'
+    const reply = asst({
+      id: 'a-talk', kind: 'chat', status: s === 'typing' ? 'running' : 'complete', stage: null, progress: null, timings: undefined,
+      reply: s === 'typing' ? null : 'I can do that, but I need something to work with. You can upload your footage, pick a video you already uploaded, or I can build it for you from motion graphics and stock B-roll. Which do you prefer?',
+      suggestions: s === 'typing' ? [] : [
+        { id: 'upload', label: 'Upload footage', action: 'upload' },
+        { id: 'library', label: 'Pick from library (3)', action: 'library' },
+        { id: 'generate', label: 'Make it with motion graphics and B-roll', action: 'send', prompt: 'x' },
+      ],
+    })
+    return { ...base, jobId: 'p-talk', canFollowUp: s !== 'typing', videoIds: [], messages: [user('u1', ask), reply] }
+  }
   if (s === 'done') return { ...base, messages: [user('u1', prompt), done], canFollowUp: true }
   if (s === 'failed')
     return {

@@ -30,6 +30,14 @@ export interface ChatJobResult {
   fileName: string | null
 }
 
+/** A quick reply under an assistant message. `upload` opens the file picker, `library` the library, `send` sends `prompt`. */
+export interface ChatSuggestion {
+  id: string
+  label: string
+  action: 'upload' | 'library' | 'send'
+  prompt?: string | null
+}
+
 /** One poll of a job, already normalised by the adapter. */
 export interface ChatJobSnapshot {
   jobId: string
@@ -51,6 +59,12 @@ export interface ChatJobSnapshot {
   videoIds: string[]
   /** A follow-up may be sent now. */
   canFollowUp: boolean
+  /** `chat` = a plain reply (no video), `graphics` = built without footage; anything else is an edit. */
+  kind?: string
+  /** Quick replies for the finished turn. */
+  suggestions?: ChatSuggestion[]
+  /** The project the conversation lives in (it can move when footage from the library is added). */
+  projectId?: string | null
   /** Real step-entry times of the current turn (older backends send none). */
   stageTimings?: StageEvent[]
   /** Epoch ms the turn began: first recorded step, else the job's creation for turn 1. */
@@ -75,7 +89,7 @@ export interface ChatApi {
   /** Starts a new job; resolves with its first snapshot. */
   createJob(input: CreateChatJobInput, signal?: AbortSignal): Promise<ChatJobSnapshot>
   /** Starts the next turn of a finished job; resolves with the new turn's first snapshot. */
-  followUp(jobId: string, prompt: string, signal?: AbortSignal): Promise<ChatJobSnapshot>
+  followUp(jobId: string, prompt: string, signal?: AbortSignal, videoIds?: string[]): Promise<ChatJobSnapshot>
   getJob(jobId: string, signal?: AbortSignal): Promise<ChatJobSnapshot>
   cancelJob(jobId: string): Promise<ChatJobSnapshot>
 }
@@ -108,6 +122,9 @@ export interface ChatAssistantMessage {
   durationSec?: number | null
   /** The turn's transcript, when the backend reported one. */
   activity?: ActivityEvent[]
+  /** `chat` = this turn is a plain reply, with no video behind it. */
+  kind?: string
+  suggestions?: ChatSuggestion[]
 }
 
 export type ChatMessage = ChatUserMessage | ChatAssistantMessage

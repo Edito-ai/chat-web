@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useAuth } from '@/auth/authStore'
 import { ApiError } from '@/lib/apiClient'
-import { getChatApi, toSnapshot } from './chatApi'
+import { getChatApi, toSnapshot, type LibraryVideo } from './chatApi'
 import { createChatProject, deleteAsset, uploadVideo } from './chatUploads'
 import { looksLikeVideo, probeVideo, type VideoProbe } from './probe'
 import { shapeFor } from './projectShape'
@@ -27,6 +27,8 @@ export interface ChatAttachment {
   /** Backend asset id once uploaded: the `videoId` the job takes. */
   videoId: string | null
   error: string | null
+  /** Picked from the library. (Uploads stay in the library too: removing a chip only detaches it.) */
+  fromLibrary?: boolean
 }
 
 /** Why a send could not start; the screen maps the code to copy. */
@@ -58,6 +60,8 @@ interface ChatState {
   openJob: (jobId: string) => Promise<void>
 
   attach: (files: File[]) => Promise<void>
+  /** Adds library videos to the next message. They all belong to one project; the chat moves there if it has no footage yet. */
+  attachFromLibrary: (items: LibraryVideo[]) => void
   removeAttachment: (id: string) => void
   send: (prompt: string) => Promise<ChatSendProblem | null>
   cancel: () => Promise<void>
@@ -110,6 +114,7 @@ function absorb(snap: ChatJobSnapshot): void {
     jobId: snap.jobId,
     canFollowUp: snap.canFollowUp,
     videoIds: snap.videoIds.length > 0 ? snap.videoIds : s.videoIds,
+    projectId: snap.projectId ?? s.projectId,
   }))
 }
 
@@ -268,12 +273,34 @@ export const useChat = create<ChatState>()(
         }
       },
 
+      attachFromLibrary: (items) => {
+        if (items.length === 0) return
+        set((s) => {
+          const have = new Set(s.attachments.map((a) => a.videoId))
+          const fresh = items.filter((i) => !have.has(i.id))
+          return {
+            // A chat with no footage yet has nothing tied to its project, so it moves to the picked videos' project.
+            projectId: s.videoIds.length === 0 && s.attachments.length === 0 ? items[0]!.projectId : s.projectId,
+            actionError: null,
+            userId: currentUserId(),
+            attachments: [
+              ...s.attachments,
+              ...fresh.map((i): ChatAttachment => ({
+                id: newId(), name: i.name, state: 'ready', progress: 1, videoId: i.id, error: null, fromLibrary: true,
+              })),
+            ],
+          }
+        })
+      },
+
       removeAttachment: (id) => {
         const att = get().attachments.find((a) => a.id === id)
         uploads.get(id)?.abort()
         uploads.delete(id)
         set((s) => ({ attachments: s.attachments.filter((a) => a.id !== id) }))
-        if (att?.videoId) void deleteAsset(att.videoId)
+        // A finished upload stays in the library: taking it out of the message only detaches it. Only a cancelled,
+        // half-finished upload (handled in runUpload) is cleaned up.
+        void att
       },
 
       send: async (rawPrompt) => {
@@ -281,22 +308,26 @@ export const useChat = create<ChatState>()(
         const s0 = get()
         if (s0.busy || activeAssistant(s0.messages)) return null
         if (!prompt) return 'noPrompt'
-        // No new files and the last turn finished: it is a follow-up on the same job.
-        const followUp = s0.attachments.length === 0 && s0.jobId !== null && s0.canFollowUp
-        if (!followUp && s0.attachments.length === 0 && s0.videoIds.length === 0) return 'noVideo'
-        if (!s0.projectId) return 'noVideo'
+        // The conversation goes on when its last turn finished (an edit, or just a reply); new files ride along with it.
+        const followUp = s0.jobId !== null && s0.canFollowUp
         if (s0.attachments.some((a) => a.state === 'uploading')) return 'uploading'
         if (s0.attachments.some((a) => a.state === 'failed' || !a.videoId)) return 'uploadFailed'
 
         set({ busy: true, actionError: null })
         try {
           const api = getChatApi()
+          const attached = s0.attachments.map((a) => a.videoId!)
           let snap: ChatJobSnapshot
           if (followUp) {
-            snap = await api.followUp(s0.jobId!, prompt)
+            snap = await api.followUp(s0.jobId!, prompt, undefined, attached)
           } else {
-            const videoIds = s0.attachments.length > 0 ? s0.attachments.map((a) => a.videoId!) : s0.videoIds
-            snap = await api.createJob({ projectId: s0.projectId, videoIds, prompt })
+            // Words only is fine: a conversation needs a home, not footage. Footage can come with a later message.
+            let projectId = s0.projectId
+            if (!projectId) {
+              projectId = await createChatProject(shapeFor(null, null))
+              set({ projectId, userId: currentUserId() })
+            }
+            snap = await api.createJob({ projectId, videoIds: attached.length > 0 ? attached : s0.videoIds, prompt })
           }
           const user: ChatMessage = { id: newId(), role: 'user', text: prompt, attachments: s0.attachments.map((a) => a.name) }
           set((s) => ({
@@ -377,7 +408,6 @@ export const useChat = create<ChatState>()(
       newChat: async () => {
         await get().cancel()
         abortUploads()
-        for (const a of get().attachments) if (a.videoId) void deleteAsset(a.videoId)
         set({ ...EMPTY_CHAT })
       },
 

@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/apiClient'
-import type { ActivityEvent, ChatApi, ChatJobSnapshot, ChatJobStatus, StageEvent } from './chatTypes'
+import type { ActivityEvent, ChatApi, ChatJobSnapshot, ChatJobStatus, StageEvent, ChatSuggestion } from './chatTypes'
 
 /** The adapter the chat store talks to: the real `/chat/*` backend. Tests inject their own via `setChatApi`. */
 
@@ -20,7 +20,17 @@ export interface ChatJobWire {
   projectId?: string
   title?: string | null
   stageTimings?: { state: string; stage?: string | null; at: string }[]
-  turns?: { turn: number; prompt: string; kind?: string; reply?: string | null; state: string; durationSec?: number | null }[]
+  kind?: string
+  suggestions?: { id: string; label: string; action: string; prompt?: string | null }[]
+  turns?: {
+    turn: number
+    prompt: string
+    kind?: string
+    reply?: string | null
+    state: string
+    durationSec?: number | null
+    suggestions?: { id: string; label: string; action: string; prompt?: string | null }[]
+  }[]
   activity?: {
     id: string
     kind: string
@@ -57,6 +67,15 @@ export function toActivity(raw: ChatJobWire['activity']): ActivityEvent[] {
 const TERMINAL: Record<string, ChatJobStatus> = { complete: 'complete', failed: 'failed', cancelled: 'cancelled' }
 
 /** Wire -> snapshot. `state` is also the stage key (analyzing | planning | assembling | rendering). */
+const ACTIONS = ['upload', 'library', 'send'] as const
+
+/** Quick replies from the wire: unknown actions are dropped, never shown as dead buttons. */
+export function toSuggestions(raw: { id: string; label: string; action: string; prompt?: string | null }[] | undefined): ChatSuggestion[] {
+  return (raw ?? [])
+    .filter((s) => (ACTIONS as readonly string[]).includes(s.action) && s.label)
+    .map((s) => ({ id: s.id, label: s.label, action: s.action as ChatSuggestion['action'], prompt: s.prompt ?? null }))
+}
+
 export function toSnapshot(w: ChatJobWire): ChatJobSnapshot {
   const state = w.state ?? 'queued'
   const status: ChatJobStatus = TERMINAL[state] ?? (state === 'queued' ? 'queued' : 'running')
@@ -76,6 +95,9 @@ export function toSnapshot(w: ChatJobWire): ChatJobSnapshot {
     reply: w.reply ?? null,
     videoIds: w.videoIds ?? [],
     canFollowUp: w.canFollowUp ?? false,
+    kind: w.kind,
+    suggestions: toSuggestions(w.suggestions),
+    projectId: w.projectId ?? null,
     stageTimings: (w.stageTimings ?? [])
       .map((e) => ({ state: e.state, stage: e.stage ?? null, at: ms(e.at) }))
       .filter((e): e is StageEvent => e.at !== null),
@@ -98,8 +120,9 @@ export const httpChatApi: ChatApi = {
       )) as ChatJobWire,
     )
   },
-  async followUp(jobId, prompt, signal) {
-    return toSnapshot((await apiClient.post(`${jobPath(jobId)}/followup`, { prompt }, { signal })) as ChatJobWire)
+  async followUp(jobId, prompt, signal, videoIds) {
+    const body = videoIds && videoIds.length > 0 ? { prompt, videoIds } : { prompt }
+    return toSnapshot((await apiClient.post(`${jobPath(jobId)}/followup`, body, { signal })) as ChatJobWire)
   },
   async getJob(jobId, signal) {
     return toSnapshot((await apiClient.get(jobPath(jobId), { signal })) as ChatJobWire)
@@ -107,6 +130,20 @@ export const httpChatApi: ChatApi = {
   async cancelJob(jobId) {
     return toSnapshot((await apiClient.post(`${jobPath(jobId)}/cancel`)) as ChatJobWire)
   },
+}
+
+export interface LibraryVideo {
+  id: string
+  name: string
+  durationSec: number
+  projectId: string
+  createdAt: string
+}
+
+/** The person's library: every video they uploaded, newest first. */
+export async function fetchLibrary(signal?: AbortSignal): Promise<{ items: LibraryVideo[]; total: number }> {
+  const raw = (await apiClient.get('/chat/library?limit=50', { signal })) as { items?: LibraryVideo[]; total?: number }
+  return { items: raw.items ?? [], total: raw.total ?? 0 }
 }
 
 let current: ChatApi | null = null

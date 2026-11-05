@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Loader2 } from 'lucide-react'
-import { useT, useLocale } from '@/i18n'
-import { Button, InlineError, Logo } from '@/components/ui'
+import { useT } from '@/i18n'
+import { Button, InlineError, LogoMark, Wordmark } from '@/components/ui'
+import { BrandTile } from '@/components/BrandTile'
 import { API_BASE } from '@/lib/env'
 import { useAuth } from './authStore'
 
@@ -24,8 +25,7 @@ async function fetchLegalVersions(signal: AbortSignal): Promise<LegalVersions | 
 }
 
 export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'signup' }) {
-  const { t, locale } = useT()
-  const setLocale = useLocale((s) => s.setLocale)
+  const { t } = useT()
   const { login, signup, loginWithCode, requestLoginCode, clearError } = useAuth.getState()
   const loading = useAuth((s) => s.loading)
   const error = useAuth((s) => s.error)
@@ -95,25 +95,26 @@ export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 
         : email && code.trim().length >= 4)
 
   return (
-    <main className="app-shell flex min-h-full w-full items-center justify-center px-4 py-10 text-ink-1">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="flex items-center justify-between">
-          <Logo size={32} />
-          <select
-            aria-label={t('lang.switch')}
-            value={locale}
-            onChange={(e) => setLocale(e.target.value === 'hi' ? 'hi' : 'en')}
-            className="h-9 rounded-lg border border-line bg-surface-2 px-2 text-label text-ink-1"
-          >
-            <option value="en">EN</option>
-            <option value="hi">हिं</option>
-          </select>
-        </div>
+    <main className="relative isolate flex min-h-full w-full flex-col overflow-hidden bg-[linear-gradient(to_top_right,#0e1020_0%,#2b3a5e_24%,#8a1c3a_44%,#c0202f_56%,#e4776d_76%,#ffc4ae_100%)] text-ink-1">
+      <div aria-hidden className="absolute -right-32 -top-32 -z-10 h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(closest-side,rgb(255_226_210/0.5),transparent)] blur-2xl" />
+      <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(120%_90%_at_0%_100%,rgb(5_6_14/0.5),transparent_60%)]" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-24 -left-16 -z-10 hidden animate-orb-idle opacity-[0.10] lg:block">
+        <LogoMark size={520} className="bg-white" />
+      </div>
 
-        <div className="space-y-1">
-          <h1 data-testid="auth-title" className="text-heading font-semibold text-ink-0">{t(`auth.title.${mode}`)}</h1>
-          <p className="text-body text-ink-3">{mode === 'code' ? t('auth.sub.code', { email }) : t(`auth.sub.${mode}`)}</p>
-        </div>
+      <header className="relative flex items-center justify-between px-5 py-5 sm:px-8 sm:py-6">
+        <span className="text-white">
+          <Wordmark height={20} />
+        </span>
+      </header>
+
+      <div className="relative flex flex-1 flex-col items-center justify-center px-5 pb-8">
+        <div className="w-full max-w-sm space-y-6 rounded-3xl border border-white/15 bg-[#090c1a]/80 p-6 shadow-[0_40px_100px_-30px_rgb(0_0_0/0.9)] backdrop-blur-xl sm:p-8">
+          <BrandTile size={60} className="mx-auto" />
+          <div className="space-y-1.5 text-center">
+            <h1 data-testid="auth-title" className="font-display text-[1.45rem] font-bold leading-tight tracking-[-0.02em] text-ink-0">{t(`auth.title.${mode}`)}</h1>
+            <p className="text-body text-ink-3">{mode === 'code' ? t('auth.sub.code', { email }) : t(`auth.sub.${mode}`)}</p>
+          </div>
 
         <form onSubmit={onSubmit} className="space-y-3" noValidate>
           {mode === 'signup' && (
@@ -165,7 +166,7 @@ export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 
           )}
           {consentNeeded && (
             <label className="flex items-start gap-2 text-label text-ink-2">
-              <input type="checkbox" className="mt-0.5" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#FF7A5C]" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
               <span>{t('auth.consent')}</span>
             </label>
           )}
@@ -173,29 +174,31 @@ export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 
           {error && <InlineError message={error} />}
           {notice && <p role="status" className="text-label text-success">{notice}</p>}
 
-          <Button type="submit" variant="primary" className="h-10 w-full" disabled={!canSubmit} data-testid="auth-submit">
+          <Button type="submit" variant="primary" className="h-11 w-full" disabled={!canSubmit} data-testid="auth-submit">
             {loading && <Loader2 size={14} className="animate-spin" aria-hidden />}
             {t(mode === 'login' ? 'auth.login' : mode === 'signup' ? 'auth.signup' : 'auth.verify')}
           </Button>
         </form>
 
-        <div className="flex flex-col gap-1 text-label">
+        <div className="flex flex-col items-center gap-1 text-label">
           {mode === 'code' && (
-            <button type="button" className="self-start rounded px-1 py-1 text-ink-1 underline-offset-2 hover:underline" onClick={() => void resend()}>
+            <button type="button" className="self-center rounded px-1 py-1 text-ink-1 underline-offset-2 hover:underline" onClick={() => void resend()}>
               {t('auth.resend')}
             </button>
           )}
           {mode === 'login' && (
-            <button type="button" className="self-start rounded px-1 py-1 text-ink-1 underline-offset-2 hover:underline" onClick={() => go('signup')}>
+            <button type="button" className="self-center rounded px-1 py-1 text-ink-1 underline-offset-2 hover:underline" onClick={() => go('signup')}>
               {t('auth.toSignup')}
             </button>
           )}
           {mode !== 'login' && (
-            <button type="button" className="self-start rounded px-1 py-1 text-ink-3 underline-offset-2 hover:text-ink-1 hover:underline" onClick={() => go('login')}>
+            <button type="button" className="self-center rounded px-1 py-1 text-ink-3 underline-offset-2 hover:text-ink-1 hover:underline" onClick={() => go('login')}>
               {mode === 'code' ? t('auth.back') : t('auth.toLogin')}
             </button>
           )}
         </div>
+        </div>
+        <p className="mt-6 max-w-sm text-center font-display text-caption font-medium leading-relaxed text-white/85">{t('chat.empty.title')}</p>
       </div>
     </main>
   )

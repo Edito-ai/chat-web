@@ -1,32 +1,90 @@
 'use client'
 
+import { AlertTriangle } from 'lucide-react'
 import { useT } from '@/i18n'
-import { InlineError } from '@/components/ui'
+import { FolderOpen, Sparkles, Upload } from 'lucide-react'
+import { InlineError, LogoMark } from '@/components/ui'
+import { ORB_ENABLED } from '@/lib/features'
+import { Presence } from './Presence'
 import { useChat } from './chatStore'
 import { ActivitySummary, LiveActivity } from './ActivityPanel'
 import { ResultCard } from './ResultCard'
-import type { ChatAssistantMessage, ChatMessage } from './chatTypes'
-import { Avatar } from './Avatar'
-import { isTerminal } from './chatState'
+import type { ChatAssistantMessage, ChatMessage, ChatSuggestion } from './chatTypes'
 
 function ErrorCard({ msg }: { msg: ChatAssistantMessage }) {
   const { t } = useT()
   const detail = msg.error && msg.error !== 'failed' && msg.error !== 'missing_result' ? msg.error : undefined
   return (
     <div role="alert" className="w-full max-w-lg rounded-2xl border border-danger/25 bg-danger-soft p-4">
-      <p className="font-serif text-title text-ink-0">{t('chat.error.title')}</p>
+      <p className="flex items-center gap-2 font-display text-body font-semibold text-ink-0"><AlertTriangle size={16} className="shrink-0 text-danger" aria-hidden />{t('chat.error.title')}</p>
       {detail && <p className="mt-2 break-words rounded-lg bg-black/25 px-3 py-2 font-mono text-label text-danger">{detail}</p>}
       <p className="mt-2 text-label text-ink-3">{t('chat.error.next')}</p>
     </div>
   )
 }
 
-function AssistantBody({ msg }: { msg: ChatAssistantMessage }) {
+/** Three soft dots while the assistant writes a plain reply (no progress card: nothing is being rendered). */
+function Typing() {
+  const { t } = useT()
+  return (
+    <div data-testid="chat-typing" role="status" className="flex h-8 items-center gap-1.5 px-1">
+      <span className="sr-only">{t('chat.typing')}</span>
+      {[0, 1, 2].map((i) => (
+        <span key={i} aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-ink-3" style={{ animationDelay: `${i * 160}ms` }} />
+      ))}
+    </div>
+  )
+}
+
+const CHIP_ICON = { upload: Upload, library: FolderOpen, send: Sparkles } as const
+
+/** A plain reply: the words, then quick replies (only on the newest message, and only while nothing is running). */
+function ChatReply({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; chips: boolean; onSuggest?: (s: ChatSuggestion) => void }) {
+  const paragraphs = (msg.reply ?? '').split(/\n{2,}/).filter((p) => p.trim())
+  return (
+    <div data-testid="chat-reply" className="max-w-lg space-y-3">
+      <div className="space-y-2">
+        {paragraphs.map((p, i) => (
+          <p key={i} className="whitespace-pre-wrap break-words text-prose text-ink-0">
+            {p}
+          </p>
+        ))}
+      </div>
+      {chips && onSuggest && (msg.suggestions?.length ?? 0) > 0 && (
+        <ul className="flex flex-wrap gap-2" aria-label="Quick replies">
+          {msg.suggestions!.map((s) => {
+            const Icon = CHIP_ICON[s.action]
+            return (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  data-testid={`chat-chip-${s.id}`}
+                  onClick={() => onSuggest(s)}
+                  className="inline-flex min-h-[36px] items-center gap-2 rounded-full border border-white/15 bg-white/[0.05] px-3.5 text-label font-medium text-ink-0 transition-all hover:-translate-y-px hover:border-accent-line hover:bg-white/[0.09]"
+                >
+                  <Icon size={14} strokeWidth={1.75} aria-hidden className="text-accent" />
+                  {s.label}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; chips: boolean; onSuggest?: (s: ChatSuggestion) => void }) {
   const { t } = useT()
   const lostJobId = useChat((s) => s.pollLostJobId)
   const retryPolling = useChat((s) => s.retryPolling)
   const actionError = useChat((s) => s.actionError)
 
+  // A plain reply has no steps and no video: typing while it is written, the words when it is done.
+  if (msg.kind === 'chat') {
+    if (msg.status === 'complete') return <ChatReply msg={msg} chips={chips} onSuggest={onSuggest} />
+    if (msg.status === 'queued' || msg.status === 'running') return lostJobId === msg.jobId ? <ErrorCard msg={{ ...msg, error: null }} /> : <Typing />
+  }
   if (msg.status === 'complete') {
     return (
       <div className="space-y-2">
@@ -69,12 +127,12 @@ function AssistantBody({ msg }: { msg: ChatAssistantMessage }) {
   return <LiveActivity msg={msg} />
 }
 
-export function Bubble({ msg }: { msg: ChatMessage }) {
+export function Bubble({ msg, chips = false, onSuggest }: { msg: ChatMessage; chips?: boolean; onSuggest?: (s: ChatSuggestion) => void }) {
   const { t } = useT()
   if (msg.role === 'user') {
     return (
       <li data-testid={`chat-message-${msg.id}`} className="flex animate-rise justify-end">
-        <div className="max-w-[min(88%,34rem)] space-y-1.5 rounded-2xl rounded-br-md border border-line bg-surface-3 px-4 py-2.5 shadow-sm">
+        <div className="max-w-[min(88%,34rem)] space-y-1.5 rounded-2xl rounded-br-md bg-white/[0.07] px-4 py-2.5 ring-1 ring-white/10">
           <span className="sr-only">{t('chat.you')}: </span>
           {msg.attachments.length > 0 && (
             <p className="break-words font-mono text-caption text-ink-3">{msg.attachments.join(', ')}</p>
@@ -85,11 +143,19 @@ export function Bubble({ msg }: { msg: ChatMessage }) {
     )
   }
   return (
-    <li data-testid={`chat-message-${msg.id}`} className="flex animate-rise justify-start gap-3">
-      <Avatar working={!isTerminal(msg.status)} />
+    <li data-testid={`chat-message-${msg.id}`} className="flex animate-rise justify-start gap-2.5 sm:gap-3">
+      <div className="shrink-0">
+        {ORB_ENABLED ? (
+          <Presence active={msg.status === 'queued' || msg.status === 'running'} />
+        ) : (
+          <span aria-hidden className="grid h-[52px] w-[52px] place-items-center rounded-xl border border-white/[0.12] bg-gradient-to-br from-[#D8264A]/30 to-[#FF7A5C]/10">
+            <LogoMark size={16} />
+          </span>
+        )}
+      </div>
       <div className="min-w-0 max-w-full flex-1">
         <span className="sr-only">{t('chat.assistant')}: </span>
-        <AssistantBody msg={msg} />
+        <AssistantBody msg={msg} chips={chips} onSuggest={onSuggest} />
       </div>
     </li>
   )
