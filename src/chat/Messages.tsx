@@ -6,6 +6,7 @@ import { FolderOpen, Sparkles, Upload } from 'lucide-react'
 import { InlineError, LogoMark } from '@/components/ui'
 import { ORB_ENABLED } from '@/lib/features'
 import { Presence } from './Presence'
+import { boldRuns, replyBlocks } from './replyText'
 import { useChat } from './chatStore'
 import { ActivitySummary, LiveActivity } from './ActivityPanel'
 import { ResultCard } from './ResultCard'
@@ -36,19 +37,38 @@ function Typing() {
   )
 }
 
+/** One line of reply text, with **bold** runs. Only text is ever rendered: no markup from a reply is interpreted. */
+function Inline({ text }: { text: string }) {
+  return (
+    <>
+      {boldRuns(text).map((r, i) => (r.bold ? <strong key={i} className="font-semibold">{r.text}</strong> : <span key={i}>{r.text}</span>))}
+    </>
+  )
+}
+
 const CHIP_ICON = { upload: Upload, library: FolderOpen, send: Sparkles } as const
 
 /** A plain reply: the words, then quick replies (only on the newest message, and only while nothing is running). */
 function ChatReply({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; chips: boolean; onSuggest?: (s: ChatSuggestion) => void }) {
-  const paragraphs = (msg.reply ?? '').split(/\n{2,}/).filter((p) => p.trim())
+  const blocks = replyBlocks(msg.reply)
   return (
     <div data-testid="chat-reply" className="max-w-lg space-y-3">
-      <div className="space-y-2">
-        {paragraphs.map((p, i) => (
-          <p key={i} className="whitespace-pre-wrap break-words text-prose text-ink-0">
-            {p}
-          </p>
-        ))}
+      <div className="space-y-2.5">
+        {blocks.map((b, i) =>
+          b.type === 'ul' ? (
+            <ul key={i} className="list-disc space-y-1 pl-5 text-prose text-ink-0 marker:text-ink-4">
+              {b.items.map((item, j) => (
+                <li key={j}>
+                  <Inline text={item} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p key={i} className="whitespace-pre-wrap break-words text-prose text-ink-0">
+              <Inline text={b.text} />
+            </p>
+          ),
+        )}
       </div>
       {chips && onSuggest && (msg.suggestions?.length ?? 0) > 0 && (
         <ul className="flex flex-wrap gap-2" aria-label="Quick replies">

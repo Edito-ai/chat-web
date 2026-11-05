@@ -59,4 +59,23 @@ describe('chat replies (mock data only)', () => {
     const [m] = applySnapshot([newAssistant('a1', 'job-1', 1)], snap) as ChatAssistantMessage[]
     expect(m?.status).toBe('failed')
   })
+
+  it('never shows JSON, even for a reply an older version stored as JSON', () => {
+    const stored = `{
+  "reply": "Great, I will create a 30-second warm video."
+}`
+    const out = html(reply({ reply: stored }))
+    expect(out).toContain('Great, I will create a 30-second warm video.')
+    expect(out).not.toContain('{')
+    expect(out).not.toContain('&quot;reply&quot;')
+  })
+
+  it('formats bullet lists and bold, and renders nothing else as markup', () => {
+    const text = ['Here is the plan:', '', '- an **opening title**', '- warm coffee visuals', '', '<img src=x onerror=1>'].join('\n')
+    const out = html(reply({ reply: text }))
+    expect(out).toContain('<ul')
+    expect(out).toContain('<strong class="font-semibold">opening title</strong>')
+    expect(out).toContain('&lt;img src=x onerror=1&gt;')
+    expect(out).not.toContain('<img src=x')
+  })
 })
