@@ -2,11 +2,13 @@
 
 import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import clsx from 'clsx'
-import { ArrowUp, Check, FolderOpen, Paperclip, Square, X, AlertCircle } from 'lucide-react'
+import { ArrowUp, Check, FolderOpen, Paperclip, Square, X, AlertCircle, Wand2 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useTypewriter } from './useTypewriter'
 import { IconButton } from '@/components/ui'
 import type { ChatAttachment } from './chatStore'
+import { StylePicker } from './StylePicker'
+import { useStyles } from './styles'
 
 /** A small ring that fills with upload progress; a check when ready, an alert when failed. */
 function ProgressRing({ item }: { item: ChatAttachment }) {
@@ -26,7 +28,7 @@ function ProgressRing({ item }: { item: ChatAttachment }) {
   )
 }
 
-function AttachmentChip({ item, onRemove }: { item: ChatAttachment; onRemove: () => void }) {
+function AttachmentChip({ item, onRemove, onReference }: { item: ChatAttachment; onRemove: () => void; onReference?: () => void }) {
   const { t } = useT()
   const pct = Math.round(item.progress * 100)
   const status =
@@ -36,11 +38,26 @@ function AttachmentChip({ item, onRemove }: { item: ChatAttachment; onRemove: ()
       data-testid={`chat-attachment-${item.id}`}
       className={clsx(
         'flex max-w-full items-center gap-2 rounded-xl border bg-surface-2 py-1 pl-2.5 pr-1 text-label',
-        item.state === 'failed' ? 'border-danger/40' : 'border-line',
+        item.state === 'failed' ? 'border-danger/40' : item.reference ? 'border-accent-line' : 'border-line',
       )}
     >
       <ProgressRing item={item} />
       <span className="min-w-0 truncate text-ink-1">{item.name}</span>
+      {onReference && (
+        <button
+          type="button"
+          data-testid={`chat-reference-${item.id}`}
+          aria-pressed={!!item.reference}
+          onClick={onReference}
+          title={t('chat.reference.hint')}
+          className={clsx(
+            'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-caption transition-colors',
+            item.reference ? 'bg-accent/20 text-ink-0' : 'text-ink-3 hover:bg-white/[0.06] hover:text-ink-1',
+          )}
+        >
+          <Wand2 size={12} aria-hidden /> {item.reference ? t('chat.reference.on') : t('chat.reference.off')}
+        </button>
+      )}
       <span className={clsx('shrink-0 font-mono text-caption tabular-nums', item.state === 'failed' ? 'text-danger' : 'text-ink-3')}>
         {status}
       </span>
@@ -58,6 +75,8 @@ export interface ComposerProps {
   hints?: string[]
   attachments: ChatAttachment[]
   onRemoveAttachment: (id: string) => void
+  onToggleReference?: (id: string) => void
+  onAttachReference?: (files: File[]) => void
   onAttachClick: () => void
   onLibraryClick: () => void
   attachDisabled: boolean
@@ -91,12 +110,18 @@ export function Composer(p: ComposerProps) {
   }
   const typed = useTypewriter(p.hints ?? [], p.text === '' && !p.running)
   const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0)
+  const stylesOn = useStyles((s) => s.items) !== null
   return (
     <div className="rounded-[1.75rem] border border-white/15 bg-surface-1/75 backdrop-blur-xl shadow-composer transition-[border-color,box-shadow] duration-200 focus-within:border-accent-line focus-within:shadow-[0_0_0_4px_rgb(255_158_140/0.10),0_20px_50px_-20px_rgb(0_0_0/0.9)]">
       {p.attachments.length > 0 && (
         <ul className="flex flex-wrap gap-2 px-3 pt-3">
           {p.attachments.map((a) => (
-            <AttachmentChip key={a.id} item={a} onRemove={() => p.onRemoveAttachment(a.id)} />
+            <AttachmentChip
+              key={a.id}
+              item={a}
+              onRemove={() => p.onRemoveAttachment(a.id)}
+              onReference={stylesOn && p.onToggleReference ? () => p.onToggleReference!(a.id) : undefined}
+            />
           ))}
         </ul>
       )}
@@ -119,6 +144,7 @@ export function Composer(p: ComposerProps) {
           onClick={p.onLibraryClick}
           className="shrink-0 rounded-full"
         />
+        <StylePicker disabled={p.attachDisabled} onReference={p.onAttachReference} />
         <textarea
           ref={setRef}
           data-testid="chat-input"

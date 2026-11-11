@@ -82,6 +82,16 @@ export interface CreateChatJobInput {
   /** Backend ids of the videos uploaded for THIS message (empty on a follow-up). */
   videoIds: string[]
   prompt: string
+  /** A saved style the edit follows (backend2 only). */
+  styleId?: string
+  /** A video whose LOOK is read into a new saved style and followed (backend2 only). */
+  referenceVideoId?: string
+}
+
+/** Style options a follow-up may carry (backend2 only). */
+export interface StyleOptions {
+  styleId?: string
+  referenceVideoId?: string
 }
 
 /** The seam between the chat screen and whichever backend answers. */
@@ -89,7 +99,7 @@ export interface ChatApi {
   /** Starts a new job; resolves with its first snapshot. */
   createJob(input: CreateChatJobInput, signal?: AbortSignal): Promise<ChatJobSnapshot>
   /** Starts the next turn of a finished job; resolves with the new turn's first snapshot. */
-  followUp(jobId: string, prompt: string, signal?: AbortSignal, videoIds?: string[]): Promise<ChatJobSnapshot>
+  followUp(jobId: string, prompt: string, signal?: AbortSignal, videoIds?: string[], style?: StyleOptions): Promise<ChatJobSnapshot>
   getJob(jobId: string, signal?: AbortSignal): Promise<ChatJobSnapshot>
   cancelJob(jobId: string): Promise<ChatJobSnapshot>
 }

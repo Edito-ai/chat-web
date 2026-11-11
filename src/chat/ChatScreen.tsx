@@ -13,6 +13,7 @@ import type { ChatSuggestion } from './chatTypes'
 import { activeAssistant, lastCompleted } from './chatState'
 import { Bubble } from './Messages'
 import { Composer } from './Composer'
+import { useStyles } from './styles'
 import { LibraryDialog } from './LibraryDialog'
 import { Sidebar } from './Sidebar'
 import { useNow } from './ActivityPanel'
@@ -28,6 +29,7 @@ const PROBLEM_KEY: Record<ChatSendProblem, MessageKey> = {
   noPrompt: 'chat.problem.noPrompt',
   uploading: 'chat.problem.uploading',
   uploadFailed: 'chat.problem.uploadFailed',
+  twoReferences: 'chat.problem.twoReferences',
 }
 
 const EXAMPLES = [1, 2, 3, 4] as const
@@ -95,8 +97,9 @@ export function ChatScreen() {
     if (authStatus !== 'restoring') router.push('/login')
     return false
   }
-  const { attach, removeAttachment, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob, pinChat, deleteChat } =
+  const { attach, removeAttachment, toggleReference, attachReference, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob, pinChat, deleteChat } =
     useChat.getState()
+  const loadStyles = useStyles((s) => s.load)
   const [text, setText] = useState('')
   const [problem, setProblem] = useState<ChatSendProblem | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -121,7 +124,8 @@ export function ChatScreen() {
     if (!signedIn) return
     if (takeFreshStart()) startFresh()
     void loadHistory()
-  }, [startFresh, loadHistory, signedIn])
+    void loadStyles()
+  }, [startFresh, loadHistory, loadStyles, signedIn])
 
   // The starter-credit offer: asked once per login, never polled; any failure just hides the banner.
   const loadFreeCredit = useAccount((s) => s.loadFreeCredit)
@@ -377,6 +381,8 @@ export function ChatScreen() {
               hints={hints}
               attachments={attachments}
               onRemoveAttachment={removeAttachment}
+              onToggleReference={toggleReference}
+              onAttachReference={(files) => (requireAuth() ? void attachReference(files) : undefined)}
               onAttachClick={() => (requireAuth() ? fileRef.current?.click() : undefined)}
               onLibraryClick={() => (requireAuth() ? setLibraryOpen(true) : undefined)}
               attachDisabled={busy || running}

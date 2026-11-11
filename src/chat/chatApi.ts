@@ -117,13 +117,17 @@ export const httpChatApi: ChatApi = {
     return toSnapshot(
       (await apiClient.post(
         '/chat/jobs',
-        { projectId: input.projectId, videoIds: input.videoIds, prompt: input.prompt },
+        {
+          projectId: input.projectId, videoIds: input.videoIds, prompt: input.prompt,
+          ...(input.styleId ? { styleId: input.styleId } : {}),
+          ...(input.referenceVideoId ? { referenceVideoId: input.referenceVideoId } : {}),
+        },
         { signal },
       )) as ChatJobWire,
     )
   },
-  async followUp(jobId, prompt, signal, videoIds) {
-    const body = videoIds && videoIds.length > 0 ? { prompt, videoIds } : { prompt }
+  async followUp(jobId, prompt, signal, videoIds, style) {
+    const body = { prompt, ...(videoIds && videoIds.length > 0 ? { videoIds } : {}), ...(style ?? {}) }
     return toSnapshot((await apiClient.post(`${jobPath(jobId)}/followup`, body, { signal })) as ChatJobWire)
   },
   async getJob(jobId, signal) {

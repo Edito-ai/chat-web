@@ -11,6 +11,7 @@ import {
 } from './chatState'
 import type { ChatJobSnapshot, ChatMessage } from './chatTypes'
 import { getHistoryApi, rebuildMessages, toHistoryItem, type HistoryItem } from './history'
+import { useStyles } from './styles'
 
 /** Time between polls; a failing poll backs off (x2 per miss) up to MAX_BACKOFF_MS. */
 export const POLL_MS = 2000
@@ -29,10 +30,12 @@ export interface ChatAttachment {
   error: string | null
   /** Picked from the library. (Uploads stay in the library too: removing a chip only detaches it.) */
   fromLibrary?: boolean
+  /** Not footage to edit: a video whose look is read into a saved style (backend2). */
+  reference?: boolean
 }
 
 /** Why a send could not start; the screen maps the code to copy. */
-export type ChatSendProblem = 'noVideo' | 'noPrompt' | 'uploading' | 'uploadFailed'
+export type ChatSendProblem = 'noVideo' | 'noPrompt' | 'uploading' | 'uploadFailed' | 'twoReferences'
 
 interface ChatState {
   userId: string | null
@@ -67,6 +70,10 @@ interface ChatState {
   /** Adds library videos to the next message. They all belong to one project; the chat moves there if it has no footage yet. */
   attachFromLibrary: (items: LibraryVideo[]) => void
   removeAttachment: (id: string) => void
+  /** Mark / unmark an attached video as a style reference. */
+  toggleReference: (id: string) => void
+  /** Attach videos that are style references from the start (the "new style from a reference" entry). */
+  attachReference: (files: File[]) => Promise<void>
   send: (prompt: string) => Promise<ChatSendProblem | null>
   cancel: () => Promise<void>
   /** Re-attach to a job that was running when the page closed (and refresh the last video's URL). */
@@ -159,6 +166,7 @@ async function pollJob(jobId: string): Promise<void> {
       absorb(snap)
       if (isTerminal(snap.status)) {
         void useChat.getState().loadHistory()
+        void useStyles.getState().load() // a reference may have just become a saved style
         break
       }
     } catch (e) {
@@ -333,11 +341,23 @@ export const useChat = create<ChatState>()(
         void att
       },
 
+      attachReference: async (files) => {
+        const before = new Set(get().attachments.map((a) => a.id))
+        await get().attach(files.slice(0, 1))
+        set((s) => ({ attachments: s.attachments.map((a) => (before.has(a.id) ? a : { ...a, reference: true })) }))
+      },
+
+      toggleReference: (id) =>
+        set((s) => ({ attachments: s.attachments.map((a) => (a.id === id ? { ...a, reference: !a.reference } : a)) })),
+
       send: async (rawPrompt) => {
-        const prompt = rawPrompt.trim()
         const s0 = get()
+        const refs = s0.attachments.filter((a) => a.reference)
+        // A reference on its own is a request to save its style: no words needed.
+        const prompt = rawPrompt.trim() || (refs.length > 0 && s0.attachments.length === refs.length ? 'Save this style' : '')
         if (s0.busy || activeAssistant(s0.messages)) return null
         if (!prompt) return 'noPrompt'
+        if (refs.length > 1) return 'twoReferences'
         // The conversation goes on when its last turn finished (an edit, or just a reply); new files ride along with it.
         const followUp = s0.jobId !== null && s0.canFollowUp
         if (s0.attachments.some((a) => a.state === 'uploading')) return 'uploading'
@@ -346,10 +366,16 @@ export const useChat = create<ChatState>()(
         set({ busy: true, actionError: null })
         try {
           const api = getChatApi()
-          const attached = s0.attachments.map((a) => a.videoId!)
+          const attached = s0.attachments.filter((a) => !a.reference).map((a) => a.videoId!)
+          const referenceVideoId = refs[0]?.videoId ?? undefined
+          const styleId = referenceVideoId ? undefined : (useStyles.getState().items ? useStyles.getState().selected : null) ?? undefined
+          const style = { ...(styleId ? { styleId } : {}), ...(referenceVideoId ? { referenceVideoId } : {}) }
+          const withStyle = Object.keys(style).length > 0
           let snap: ChatJobSnapshot
           if (followUp) {
-            snap = await api.followUp(s0.jobId!, prompt, undefined, attached)
+            snap = withStyle
+              ? await api.followUp(s0.jobId!, prompt, undefined, attached, style)
+              : await api.followUp(s0.jobId!, prompt, undefined, attached)
           } else {
             // Words only is fine: a conversation needs a home, not footage. Footage can come with a later message.
             let projectId = s0.projectId
@@ -357,9 +383,14 @@ export const useChat = create<ChatState>()(
               projectId = await createChatProject(shapeFor(null, null))
               set({ projectId, userId: currentUserId() })
             }
-            snap = await api.createJob({ projectId, videoIds: attached.length > 0 ? attached : s0.videoIds, prompt })
+            snap = await api.createJob({
+              projectId, videoIds: attached.length > 0 || referenceVideoId ? attached : s0.videoIds, prompt, ...style,
+            })
           }
-          const user: ChatMessage = { id: newId(), role: 'user', text: prompt, attachments: s0.attachments.map((a) => a.name) }
+          const user: ChatMessage = {
+            id: newId(), role: 'user', text: prompt,
+            attachments: s0.attachments.map((a) => (a.reference ? `${a.name} (style reference)` : a.name)),
+          }
           set((s) => ({
             messages: applySnapshot(capMessages([...s.messages, user, newAssistant(newId(), snap.jobId, snap.turn)]), snap),
             attachments: [],
