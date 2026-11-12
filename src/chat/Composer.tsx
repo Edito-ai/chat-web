@@ -125,7 +125,7 @@ export function Composer(p: ComposerProps) {
           ))}
         </ul>
       )}
-      <div className="flex items-end gap-1.5 p-2">
+      <div className="flex flex-wrap items-end gap-1.5 p-2 sm:flex-nowrap">
         <IconButton
           data-testid="chat-attach"
           icon={Paperclip}
@@ -154,14 +154,14 @@ export function Composer(p: ComposerProps) {
           onChange={(e) => p.onText(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder={typed || p.placeholder}
-          className="scroll-thin block max-h-44 min-h-[40px] min-w-0 flex-1 resize-none self-center bg-transparent px-1 py-2.5 text-prose text-ink-0 placeholder:text-ink-4 focus:!outline-none focus-visible:!outline-none"
+          className="scroll-thin order-first block max-h-44 min-h-[44px] w-full min-w-0 basis-full resize-none self-center bg-transparent px-2.5 py-2.5 text-[16px] leading-[1.5] text-ink-0 placeholder:text-ink-4 focus:!outline-none focus-visible:!outline-none sm:order-none sm:min-h-[40px] sm:w-auto sm:basis-0 sm:flex-1 sm:px-1 sm:text-prose"
         />
         {p.running ? (
           <button
             type="button"
             data-testid="chat-stop"
             onClick={p.onStop}
-            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-line-strong bg-surface-3 pl-3.5 pr-4 text-body font-medium text-ink-0 transition-colors hover:bg-surface-4"
+            className="ml-auto inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-line-strong bg-surface-3 pl-3.5 pr-4 text-body font-medium text-ink-0 transition-colors hover:bg-surface-4 sm:ml-0"
           >
             <Square size={12} fill="currentColor" aria-hidden /> {t('chat.stop')}
           </button>
@@ -173,7 +173,7 @@ export function Composer(p: ComposerProps) {
             aria-disabled={!canSend}
             onClick={p.onSend}
             className={clsx(
-              'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 disabled:pointer-events-none disabled:opacity-30',
+              'ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 disabled:pointer-events-none disabled:opacity-30 sm:ml-0',
               canSend ? 'bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white shadow-[0_8px_22px_-8px_rgb(255_90_80/0.8)] hover:-translate-y-px hover:brightness-110' : 'bg-white/[0.08] text-ink-3',
             )}
           >

@@ -189,6 +189,10 @@ export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, no
   const locale = useLocale((s) => s.locale)
   const router = useRouter()
   const groups = groupHistory(items, now)
+  // The signed-in person's footer is there as soon as the page has loaded, also while the session is being checked (the
+  // name and email come from browser storage). Only after mount: the server-rendered page never has them.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   return (
     <div data-testid="chat-sidebar" className="flex h-full min-h-0 flex-col">
       <div className="flex h-14 shrink-0 items-center justify-between px-4">
@@ -272,7 +276,7 @@ export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, no
         )}
       </nav>
 
-      {signedIn && user ? <ProfileMenu user={user} onSignOut={onSignOut} /> : null}
+      {mounted && (signedIn || restoring) && user ? <ProfileMenu user={user} onSignOut={onSignOut} /> : null}
     </div>
   )
 }

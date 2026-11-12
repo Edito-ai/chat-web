@@ -7,6 +7,7 @@ import { EDITOR_URL } from '@/lib/env'
 import { AccountDialogs } from '@/account/components/AccountDialogs'
 import { PlanBadge } from '@/account/components/PlanBadge'
 import { useAccount, type AccountDialog } from '@/account/accountStore'
+import { useAuth } from '@/auth/authStore'
 import { displayName, initialOf, type ProfileUser } from './profile'
 
 const ITEM =
@@ -41,13 +42,14 @@ export function ProfileMenu({ user, onSignOut }: { user: ProfileUser; onSignOut:
   const refresh = useAccount((s) => s.refresh)
   const openDialog = useAccount((s) => s.openDialog)
 
-  // Plan badge: fetched when the sidebar mounts and again whenever the menu opens (a purchase may have finished).
+  // Plan badge: fetched once the session is confirmed and again whenever the menu opens (a purchase may have finished).
+  const authed = useAuth((s) => s.status === 'authenticated')
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    if (authed) void refresh()
+  }, [authed, refresh])
   useEffect(() => {
-    if (open) void refresh()
-  }, [open, refresh])
+    if (open && authed) void refresh()
+  }, [open, authed, refresh])
 
   const items = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])
 

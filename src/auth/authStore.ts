@@ -81,6 +81,16 @@ function isDefinitiveRejection(e: unknown): boolean {
   return e instanceof AuthApiError && e.status !== undefined && [400, 401, 403, 404, 422].includes(e.status)
 }
 
+/** Seconds until a JWT access token expires (0 when it cannot be read, so such a token is never trusted for the quick path). */
+export function secondsLeft(token: string | null): number {
+  try {
+    const payload = JSON.parse(atob((token ?? '').split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof payload.exp === 'number' ? payload.exp - Date.now() / 1000 : 0
+  } catch {
+    return 0
+  }
+}
+
 // Refresh rotates the token and the server revokes the whole chain if a stale one is replayed, so concurrent
 // callers (StrictMode's double effect, two parallel 401s) must share one in-flight request.
 let restorePromise: Promise<void> | null = null
@@ -126,11 +136,33 @@ export const useAuth = create<AuthState>()(
       }
 
       const doRestore = async (): Promise<void> => {
-        set({ status: 'restoring' })
+        // A session that login / the emailed code just started is already good. Going back to 'restoring' here hid the profile
+        // (and everything else that waits for 'authenticated') until /auth/me answered, a second or more after signing in.
+        if (get().status === 'authenticated' && get().user && get().accessToken) return
         if (!get().refreshToken) {
           set({ status: 'unauthenticated', accessToken: null, user: null })
           return
         }
+        // A reload with the stored session: the person and a still-valid token are in browser storage, so show the signed-in
+        // screen at once and check with the server in the background (a server that is down must not sign anyone out).
+        if (get().user && get().accessToken && secondsLeft(get().accessToken) > 20) {
+          set({ status: 'authenticated' })
+          const quick = await loadMe()
+          if (quick.ok) return void set({ user: quick.user, status: 'authenticated' })
+          if (!quick.unauthorized) return
+          if (!(await get().silentRefresh())) {
+            const err = get().error
+            return void set({ error: err && isServerTrouble(err) ? friendlyError(err).message : null })
+          }
+          const again = await loadMe()
+          if (again.ok) return void set({ user: again.user, status: 'authenticated' })
+          return void set(
+            again.unauthorized
+              ? { user: null, accessToken: null, refreshToken: null, status: 'unauthenticated' }
+              : { user: null, accessToken: null, status: 'unauthenticated' },
+          )
+        }
+        set({ status: 'restoring' })
         // Try the stored access token first: a refresh rotates the refresh token, and two tabs doing that at
         // once would trip the server's reuse detection.
         if (get().accessToken) {

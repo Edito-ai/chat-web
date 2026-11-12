@@ -37,13 +37,13 @@ const EXAMPLES = [1, 2, 3, 4] as const
 function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
   const { t } = useT()
   return (
-    <div className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center px-1 py-8 text-center">
+    <div className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center px-1 py-6 text-center sm:py-8">
       <BrandTile size={56} className="animate-rise" />
       <h2 className="mt-6 animate-rise font-display text-[1.65rem] font-bold leading-[1.18] tracking-[-0.02em] text-ink-0 [animation-delay:40ms] sm:text-[2.2rem]">
         {t('chat.empty.title')}
       </h2>
       <p className="mt-3 max-w-md animate-rise text-prose text-ink-2 [animation-delay:80ms]">{t('chat.empty.sub')}</p>
-      <ul className="mt-8 grid w-full animate-rise gap-2.5 text-left [animation-delay:140ms] sm:grid-cols-2">
+      <ul className="mt-6 grid w-full animate-rise grid-cols-1 gap-2 text-left [animation-delay:140ms] sm:mt-8 sm:grid-cols-2 sm:gap-2.5">
         {EXAMPLES.map((n) => (
           <li key={n}>
             <button
@@ -51,13 +51,13 @@ function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
               data-testid={`chat-example-${n}`}
               aria-label={t(`chat.example.${n}.title` as MessageKey)}
               onClick={() => onPick(t(`chat.example.${n}.prompt` as MessageKey))}
-              className="group flex h-full w-full flex-col gap-1 rounded-2xl border border-white/10 text-left bg-surface-1/60 px-4 py-3.5 backdrop-blur transition-all hover:-translate-y-px hover:border-accent-line hover:bg-surface-2/80"
+              className="group flex h-full w-full flex-col gap-0.5 rounded-2xl border border-white/10 bg-surface-1/60 px-3.5 py-2.5 text-left backdrop-blur transition-all hover:-translate-y-px hover:border-accent-line hover:bg-surface-2/80 active:scale-[0.99] sm:gap-1 sm:px-4 sm:py-3.5"
             >
               <span className="flex items-center justify-between gap-2 text-body font-semibold text-ink-0">
                 {t(`chat.example.${n}.title` as MessageKey)}
                 <ArrowUpRight size={14} aria-hidden className="shrink-0 text-accent opacity-0 transition-opacity group-hover:opacity-100" />
               </span>
-              <span className="line-clamp-2 text-label text-ink-3 transition-colors group-hover:text-ink-2">{t(`chat.example.${n}.prompt` as MessageKey)}</span>
+              <span className="line-clamp-1 text-label text-ink-3 transition-colors group-hover:text-ink-2 sm:line-clamp-2">{t(`chat.example.${n}.prompt` as MessageKey)}</span>
             </button>
           </li>
         ))}
