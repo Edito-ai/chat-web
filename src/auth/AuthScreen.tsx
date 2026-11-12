@@ -5,6 +5,7 @@ import { Button, InlineError, LogoMark, Wordmark } from '@/components/ui'
 import { BrandTile } from '@/components/BrandTile'
 import { API_BASE } from '@/lib/env'
 import { useAuth } from './authStore'
+import { clearPendingCode, loadPendingCode, savePendingCode } from './pendingCode'
 
 type Mode = 'login' | 'signup' | 'code'
 
@@ -45,8 +46,19 @@ export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 
     if (verificationEmail) {
       setEmail(verificationEmail)
       setMode('code')
+      savePendingCode(verificationEmail)
     }
   }, [verificationEmail])
+
+  // Back from the mail app (on a phone the tab is often reloaded meanwhile): the code step, not an empty form.
+  useEffect(() => {
+    const pending = loadPendingCode()
+    if (pending && !useAuth.getState().verificationEmail) {
+      setEmail(pending)
+      setCode('')
+      setMode('code')
+    }
+  }, [])
 
   useEffect(() => {
     if (mode !== 'signup' || legal) return
@@ -56,6 +68,7 @@ export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 
   }, [mode, legal])
 
   const go = (m: Mode) => {
+    if (m !== 'code') clearPendingCode() // leaving the code step on purpose: do not bring it back on the next visit
     clearError()
     setNotice(null)
     setMode(m)
@@ -65,12 +78,18 @@ export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 
     e.preventDefault()
     setNotice(null)
     try {
-      if (mode === 'login') await login(email.trim(), password)
-      else if (mode === 'signup') {
+      if (mode === 'login') {
+        await login(email.trim(), password)
+        clearPendingCode()
+      } else if (mode === 'signup') {
         await signup(email.trim(), password, name.trim(), legal && agreed ? legal : undefined)
+        savePendingCode(email.trim()) // the account exists and a code is on its way: survive a reload while they read their mail
         setCode('')
         setMode('code')
-      } else await loginWithCode(email.trim(), code.trim())
+      } else {
+        await loginWithCode(email.trim(), code.trim())
+        clearPendingCode()
+      }
     } catch {
       // the store holds the message
     }
@@ -79,6 +98,7 @@ export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 
   const resend = async () => {
     try {
       await requestLoginCode(email.trim())
+      savePendingCode(email.trim()) // a fresh code: the step is good for another while
       setNotice(t('auth.resent'))
     } catch {
       // the store holds the message
