@@ -17,7 +17,7 @@ import { useStyles } from './styles'
 import { LibraryDialog } from './LibraryDialog'
 import { Sidebar } from './Sidebar'
 import { useNow } from './ActivityPanel'
-import { FreeCreditBanner } from './FreeCreditBanner'
+import { NeedPlanNotice } from './NeedPlanNotice'
 import { takeFreshStart } from './freshStart'
 import { TID } from './testIds'
 import { isSubscriptionRequired } from '@/account/lib/freeCredit'
@@ -127,13 +127,6 @@ export function ChatScreen() {
     void loadHistory()
     void loadStyles()
   }, [startFresh, loadHistory, loadStyles, signedIn])
-
-  // The starter-credit offer: asked once per login, never polled; any failure just hides the banner.
-  const loadFreeCredit = useAccount((s) => s.loadFreeCredit)
-  const creditLoad = useAccount((s) => s.creditLoad)
-  useEffect(() => {
-    if (signedIn && creditLoad === 'idle') void loadFreeCredit()
-  }, [signedIn, creditLoad, loadFreeCredit])
 
   useEffect(() => {
     try {
@@ -274,7 +267,7 @@ export function ChatScreen() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <FreeCreditBanner nudge={needCredit} />
+        <NeedPlanNotice show={needCredit} />
 
         <header className="flex h-14 shrink-0 items-center gap-1 px-3 sm:gap-2 sm:px-4">
           <IconButton

@@ -44,11 +44,18 @@ function rawRequest(path: string, options: RequestInit, accessToken: string | nu
   return fetchOrExplain(`${API_BASE}${path}`, { ...options, headers, credentials: 'omit' })
 }
 
+let onAccessPending: ((contact: unknown) => void) | null = null
+/** The access store registers here (so this file never imports it): called when the server says the account is not approved. */
+export function setAccessPendingHandler(fn: ((contact: unknown) => void) | null): void {
+  onAccessPending = fn
+}
+
 async function parseOrThrow(res: Response): Promise<any> {
   if (res.status === 204) return undefined
   const isJson = res.headers.get('content-type')?.includes('application/json')
   const body = isJson ? await res.json().catch(() => undefined) : undefined
   if (!res.ok) {
+    if (res.status === 403 && body?.code === 'access_pending') onAccessPending?.(body.contact)
     const reason = body?.error ?? body?.detail ?? res.statusText
     throw new ApiError(
       res.status,
