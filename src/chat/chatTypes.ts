@@ -38,6 +38,25 @@ export interface ChatSuggestion {
   prompt?: string | null
 }
 
+/** One caption style on offer (backend2): a still of the user's own video in that style. */
+export interface LookOption {
+  id: string
+  label: string
+  desc: string
+  /** The style the editor recommends; the one taken when the user does not choose in time. */
+  best: boolean
+  imageUrl: string
+}
+
+/** The caption styles the backend is waiting on right now. `secondsLeft` was true at `receivedAt` (epoch ms): count down from there. */
+export interface LookChoice {
+  open: boolean
+  secondsLeft: number
+  seconds: number
+  receivedAt: number
+  options: LookOption[]
+}
+
 /** One poll of a job, already normalised by the adapter. */
 export interface ChatJobSnapshot {
   jobId: string
@@ -75,6 +94,8 @@ export interface ChatJobSnapshot {
   durationSec?: number | null
   /** The turn's transcript (thoughts, narration, tool steps); empty from older backends. */
   activity?: ActivityEvent[]
+  /** Caption styles waiting for a pick (backend2 only); null/absent when none are on offer. */
+  lookChoice?: LookChoice | null
 }
 
 export interface CreateChatJobInput {
@@ -102,6 +123,8 @@ export interface ChatApi {
   followUp(jobId: string, prompt: string, signal?: AbortSignal, videoIds?: string[], style?: StyleOptions): Promise<ChatJobSnapshot>
   getJob(jobId: string, signal?: AbortSignal): Promise<ChatJobSnapshot>
   cancelJob(jobId: string): Promise<ChatJobSnapshot>
+  /** The user picked one of the offered caption styles (backend2 only). */
+  chooseLook?(jobId: string, lookId: string): Promise<void>
 }
 
 export interface ChatUserMessage {
@@ -132,6 +155,8 @@ export interface ChatAssistantMessage {
   durationSec?: number | null
   /** The turn's transcript, when the backend reported one. */
   activity?: ActivityEvent[]
+  /** Caption styles waiting for the user's pick, while the turn is running. */
+  lookChoice?: LookChoice | null
   /** `chat` = this turn is a plain reply, with no video behind it. */
   kind?: string
   suggestions?: ChatSuggestion[]

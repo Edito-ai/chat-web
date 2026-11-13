@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/apiClient'
-import type { ActivityEvent, ChatApi, ChatJobSnapshot, ChatJobStatus, StageEvent, ChatSuggestion } from './chatTypes'
+import type { ActivityEvent, ChatApi, ChatJobSnapshot, ChatJobStatus, LookChoice, StageEvent, ChatSuggestion } from './chatTypes'
 
 /** The adapter the chat store talks to: the real `/chat/*` backend. Tests inject their own via `setChatApi`. */
 
@@ -44,6 +44,13 @@ export interface ChatJobWire {
   }[]
   createdAt?: string
   updatedAt?: string
+  /** Caption styles on offer right now (backend2). */
+  lookChoice?: {
+    open?: boolean
+    secondsLeft?: number
+    seconds?: number
+    options?: { id?: string; label?: string; desc?: string; best?: boolean; imageUrl?: string }[]
+  } | null
 }
 
 const ms = (iso: string | undefined | null): number | null => {
@@ -64,6 +71,17 @@ export function toActivity(raw: ChatJobWire['activity']): ActivityEvent[] {
     out.push({ id: e.id, kind, title: e.title, detail: e.detail ?? null, state, at, endedAt: ms(e.endedAt) })
   }
   return out
+}
+
+/** Wire look choice -> the typed one; malformed options are dropped, and fewer than two means there is nothing to choose. */
+export function toLookChoice(raw: ChatJobWire['lookChoice'], receivedAt = Date.now()): LookChoice | null {
+  if (!raw || raw.open !== true) return null
+  const options = (raw.options ?? [])
+    .filter((o) => typeof o.id === 'string' && typeof o.label === 'string' && typeof o.imageUrl === 'string')
+    .map((o) => ({ id: o.id!, label: o.label!, desc: o.desc ?? '', best: o.best === true, imageUrl: o.imageUrl! }))
+  if (options.length < 2) return null
+  const secondsLeft = typeof raw.secondsLeft === 'number' ? Math.max(0, raw.secondsLeft) : 0
+  return { open: true, secondsLeft, seconds: typeof raw.seconds === 'number' ? raw.seconds : secondsLeft, receivedAt, options }
 }
 
 const TERMINAL: Record<string, ChatJobStatus> = { complete: 'complete', failed: 'failed', cancelled: 'cancelled' }
@@ -107,6 +125,7 @@ export function toSnapshot(w: ChatJobWire): ChatJobSnapshot {
     updatedAt: ms(w.updatedAt),
     durationSec: w.turns?.find((t) => t.turn === (w.turn ?? 1))?.durationSec ?? null,
     activity: toActivity(w.activity),
+    lookChoice: status === 'running' ? toLookChoice(w.lookChoice) : null,
   }
 }
 
@@ -135,6 +154,9 @@ export const httpChatApi: ChatApi = {
   },
   async cancelJob(jobId) {
     return toSnapshot((await apiClient.post(`${jobPath(jobId)}/cancel`)) as ChatJobWire)
+  },
+  async chooseLook(jobId, lookId) {
+    await apiClient.post(`${jobPath(jobId)}/look`, { look: lookId })
   },
 }
 

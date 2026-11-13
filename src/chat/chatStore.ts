@@ -76,6 +76,8 @@ interface ChatState {
   attachReference: (files: File[]) => Promise<void>
   send: (prompt: string) => Promise<ChatSendProblem | null>
   cancel: () => Promise<void>
+  /** The user picked a caption style from the top 3 on offer: it leaves the screen at once, the server carries on with it. */
+  chooseLook: (jobId: string, lookId: string) => Promise<void>
   /** Re-attach to a job that was running when the page closed (and refresh the last video's URL). */
   resume: () => Promise<void>
   /** Opening the app starts an empty chat: stops watching the previous one but never cancels it (it keeps running and stays in the sidebar). */
@@ -405,6 +407,18 @@ export const useChat = create<ChatState>()(
           set({ busy: false })
         }
         return null
+      },
+
+      chooseLook: async (jobId, lookId) => {
+        set((s) => ({
+          messages: s.messages.map((m): ChatMessage => (m.role === 'assistant' && m.jobId === jobId ? { ...m, lookChoice: null } : m)),
+        }))
+        try {
+          await getChatApi().chooseLook?.(jobId, lookId)
+        } catch (e) {
+          // Too late (the best one was already taken) or the network blinked: the edit goes on either way.
+          console.warn('[chat] chooseLook failed', e)
+        }
       },
 
       cancel: async () => {

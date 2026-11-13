@@ -84,6 +84,24 @@ function seed(s: string) {
     })
     return { ...base, messages: [user('u1', prompt), { ...done, activity: finishedActivity }, user('u2', 'Make the captions bigger.'), follow] }
   }
+  if (s === 'looks') {
+    // Stills of a real run (backend2 must be running on :4100 and still have this job folder).
+    const still = (id: string) => `http://127.0.0.1:4100/files/1113-211843-4eb8/look/${id}.jpg`
+    return {
+      ...base,
+      messages: [user('u1', prompt), asst({
+        stage: 'planning', progress: 0.34, message: 'Choosing the caption style', timings: timings.slice(0, 2),
+        lookChoice: {
+          open: true, secondsLeft: 47, seconds: 60, receivedAt: Date.now(),
+          options: [
+            { id: 'depth', label: 'Behind you', desc: "The big word sits behind the speaker's head. Bold and punchy.", best: true, imageUrl: still('depth') },
+            { id: 'mix', label: 'Mixed', desc: 'A different caption look every few scenes, as the editor planned it.', best: false, imageUrl: still('mix') },
+            { id: 'bar', label: 'Bar', desc: 'Words on a colour bar above the speaker. Clear and easy to read.', best: false, imageUrl: still('bar') },
+          ],
+        },
+      })],
+    }
+  }
   if (s === 'empty') return { ...base, messages: [], jobId: null, projectId: null }
   if (s === 'talk' || s === 'typing') {
     const ask = 'make a 30 second promo for my cafe'

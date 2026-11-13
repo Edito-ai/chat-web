@@ -7,6 +7,7 @@ import { useT, type MessageKey } from '@/i18n'
 import { buildTimeline, estimateRemainingMs, formatElapsed, hintIndex, percent, totalElapsedMs, type TimelineStep } from './activity'
 import { WORKING_SCENE_ENABLED } from '@/lib/features'
 import { WorkingScene } from './WorkingScene'
+import { LookChoice } from './LookChoice'
 import { knownStage } from './chatState'
 import type { ChatAssistantMessage } from './chatTypes'
 import { buildTranscript } from './buildTranscript'
@@ -142,6 +143,8 @@ export function LiveActivity({ msg }: { msg: ChatAssistantMessage }) {
       ) : (
         <p className="shimmer-text text-prose font-medium">{label}</p>
       )}
+
+      <LookChoice msg={msg} />
 
       <div className="mt-4 border-t border-white/10 pt-4">
         <div className="flex items-center gap-3">
