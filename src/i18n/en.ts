@@ -410,6 +410,19 @@ export const en = {
   'acct.legal.loading': 'Loading...',
   'acct.legal.error': 'Could not load the document: {reason}',
   'acct.legal.empty': 'No documents are published yet.',
+  'plan.need.region': 'Plan needed',
+  'plan.need': 'You need a plan to make this video. Message us and we will set one up.',
+  'plan.need.whatsappText': 'Hi, I need a plan on Broll. My account is {email}.',
+  'access.title': 'Get access to Broll',
+  'access.body': 'Your account is created. A member of our team opens new accounts by hand, so you can start editing once yours is approved. To get access, mail us or call or message us.',
+  'access.mail': 'Mail',
+  'access.call': 'Call',
+  'access.message': 'WhatsApp',
+  'access.whatsappText': 'Hi, I signed up on Broll with {email}. Please approve my account.',
+  'access.check': 'I have been approved, check again',
+  'access.stillWaiting': 'Not approved yet. We check again every few seconds.',
+  'access.signOut': 'Sign out',
+  'access.signedInAs': 'Signed in as {email}',
 } as const
 
 export type MessageKey = keyof typeof en
