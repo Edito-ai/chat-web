@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
-import { BarChart3, ChevronsUpDown, CreditCard, ExternalLink, LifeBuoy, LogOut, Scale, ShieldCheck, SquareArrowOutUpRight, type LucideIcon } from 'lucide-react'
+import { BarChart3, ChevronsUpDown, CreditCard, ExternalLink, LifeBuoy, LogOut, ShieldCheck, SquareArrowOutUpRight, Trash2, type LucideIcon } from 'lucide-react'
 import { useT } from '@/i18n'
 import { EDITOR_URL } from '@/lib/env'
 import { AccountDialogs } from '@/account/components/AccountDialogs'
@@ -9,6 +9,7 @@ import { PlanBadge } from '@/account/components/PlanBadge'
 import { useAccount, type AccountDialog } from '@/account/accountStore'
 import { useAuth } from '@/auth/authStore'
 import { displayName, initialOf, type ProfileUser } from './profile'
+import { DeleteAccountDialog } from './DeleteAccountDialog'
 
 const ITEM =
   'flex min-h-[36px] w-full items-center gap-2.5 rounded-lg px-3 text-left text-body text-ink-1 transition-colors hover:bg-white/[0.06] hover:text-ink-0 focus-visible:bg-white/[0.08] focus-visible:text-ink-0 focus-visible:outline-none'
@@ -28,12 +29,14 @@ function Sep() {
 
 /**
  * The signed-in person at the foot of the sidebar: initial circle, name, email, and the account menu (plan badge,
- * usage, plan and billing, pricing, help, legal, language, editor link, admin, sign out). Arrow keys move through the
+ * usage, plan and billing, pricing, help, editor link, admin, sign out, delete account, and a small Legal & Terms link at the
+ * very bottom). Arrow keys move through the
  * items, Home/End jump, Esc closes and returns focus to the footer button.
  */
 export function ProfileMenu({ user, onSignOut }: { user: ProfileUser; onSignOut: () => void }) {
   const { t } = useT()
   const [open, setOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -112,7 +115,6 @@ export function ProfileMenu({ user, onSignOut }: { user: ProfileUser; onSignOut:
           <MenuButton icon={CreditCard} label={t('acct.menu.billing')} testId="chat-menu-billing" onClick={() => pick('billing')} />
           <Sep />
           <MenuButton icon={LifeBuoy} label={t('acct.menu.help')} testId="chat-menu-help" onClick={() => pick('help')} />
-          <MenuButton icon={Scale} label={t('acct.menu.legal')} testId="chat-menu-legal" onClick={() => pick('legal')} />
           {EDITOR_URL ? (
             <>
               <Sep />
@@ -160,7 +162,38 @@ export function ProfileMenu({ user, onSignOut }: { user: ProfileUser; onSignOut:
               onSignOut()
             }}
           />
+          <MenuButton
+            icon={Trash2}
+            label={t('acct.menu.delete')}
+            testId="chat-menu-delete"
+            onClick={() => {
+              setOpen(false)
+              setDeleting(true)
+            }}
+          />
+          <Sep />
+          <button
+            type="button"
+            role="menuitem"
+            tabIndex={-1}
+            data-testid="chat-menu-legal"
+            onClick={() => pick('legal')}
+            className="block w-full rounded-lg px-3 py-1.5 text-center text-caption text-ink-4 transition-colors hover:text-ink-2 focus-visible:text-ink-2 focus-visible:outline-none"
+          >
+            {t('acct.menu.legalSmall')}
+          </button>
         </div>
+      ) : null}
+      {deleting ? (
+        <DeleteAccountDialog
+          email={user.email}
+          onClose={() => setDeleting(false)}
+          onDeleted={() => {
+            setDeleting(false)
+            useAccount.getState().reset()
+            onSignOut()
+          }}
+        />
       ) : null}
       <button
         ref={buttonRef}

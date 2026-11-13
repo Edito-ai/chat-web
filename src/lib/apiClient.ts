@@ -80,6 +80,7 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
 }
 
 type Opts = { signal?: AbortSignal; headers?: Record<string, string> }
+type BodyOpts = Opts & { body?: unknown }
 const json = (body: unknown) => (body === undefined ? undefined : JSON.stringify(body))
 
 export const apiClient = {
@@ -88,7 +89,7 @@ export const apiClient = {
     request(path, { method: 'POST', body: json(body), signal: opts?.signal, headers: opts?.headers }),
   put: (path: string, body?: unknown, opts?: Opts) =>
     request(path, { method: 'PUT', body: json(body), signal: opts?.signal, headers: opts?.headers }),
-  delete: (path: string, opts?: Opts) => request(path, { method: 'DELETE', signal: opts?.signal }),
+  delete: (path: string, opts?: BodyOpts) => request(path, { method: 'DELETE', body: json(opts?.body), signal: opts?.signal, headers: opts?.headers }),
   upload: (path: string, formData: FormData, opts?: Opts) =>
     request(path, { method: 'POST', body: formData, signal: opts?.signal }),
 }
