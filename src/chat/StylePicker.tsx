@@ -2,20 +2,26 @@
 
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { Check, Palette, Plus, Trash2 } from 'lucide-react'
+import { Check, Link2, Palette, Plus } from 'lucide-react'
 import { useT } from '@/i18n'
+import { looksLikeLink } from './chatStore'
 import { useStyles } from './styles'
 
 /**
- * The style the next edit follows: "Auto" (designed from the video) or one of the person's saved styles. Saved styles
- * come from reference videos: mark an attached video as a reference and it is read into a new style.
+ * The template the next edit follows: "Auto" (designed from the video) or one from the stock every user shares. New
+ * templates come from references: a link (Instagram, YouTube ...) or an uploaded video, read into a template for everyone.
  */
-export function StylePicker({ disabled, onReference }: { disabled: boolean; onReference?: (files: File[]) => void }) {
+export function StylePicker({ disabled, onReference, onReferenceLink }: {
+  disabled: boolean
+  onReference?: (files: File[]) => void
+  onReferenceLink?: (url: string) => void
+}) {
   const { t } = useT()
   const items = useStyles((s) => s.items)
   const selected = useStyles((s) => s.selected)
-  const { select, remove } = useStyles.getState()
+  const { select } = useStyles.getState()
   const [open, setOpen] = useState(false)
+  const [link, setLink] = useState('')
   const box = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -105,17 +111,41 @@ export function StylePicker({ disabled, onReference }: { disabled: boolean; onRe
                   </span>
                   {s.id === selected && <Check size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden />}
                 </button>
-                <button
-                  type="button"
-                  aria-label={t('chat.style.delete', { name: s.name })}
-                  onClick={() => void remove(s.id)}
-                  className="mt-0.5 shrink-0 rounded-md p-1 text-ink-4 opacity-0 transition-opacity hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
-                >
-                  <Trash2 size={14} aria-hidden />
-                </button>
               </div>
             ))}
           </div>
+          {onReferenceLink && (
+            <form
+              className="flex items-center gap-2 border-t border-line px-3.5 py-2.5"
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (!looksLikeLink(link)) return
+                onReferenceLink(link.trim())
+                setLink('')
+                setOpen(false)
+              }}
+            >
+              <Link2 size={16} className="shrink-0 text-accent" aria-hidden />
+              <input
+                data-testid="chat-style-link"
+                type="url"
+                inputMode="url"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                placeholder={t('chat.look.linkPlaceholder')}
+                aria-label={t('chat.look.linkPlaceholder')}
+                className="min-w-0 flex-1 bg-transparent text-label text-ink-0 placeholder:text-ink-4 focus:!outline-none"
+              />
+              <button
+                type="submit"
+                data-testid="chat-style-link-use"
+                disabled={!looksLikeLink(link)}
+                className="shrink-0 rounded-full bg-accent px-3 py-1 text-caption font-medium text-white disabled:opacity-40"
+              >
+                {t('chat.look.linkUse')}
+              </button>
+            </form>
+          )}
           {onReference && (
             <>
               <input

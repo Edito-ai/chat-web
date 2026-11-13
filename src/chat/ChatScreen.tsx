@@ -74,6 +74,7 @@ export function ChatScreen() {
   const { t } = useT()
   const messages = useChat((s) => s.messages)
   const attachments = useChat((s) => s.attachments)
+  const referenceLink = useChat((s) => s.referenceLink)
   const busy = useChat((s) => s.busy)
   const actionError = useChat((s) => s.actionError)
   const lostJobId = useChat((s) => s.pollLostJobId)
@@ -97,7 +98,7 @@ export function ChatScreen() {
     if (authStatus !== 'restoring') router.push('/login')
     return false
   }
-  const { attach, removeAttachment, toggleReference, attachReference, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob, pinChat, deleteChat } =
+  const { attach, removeAttachment, toggleReference, attachReference, setReferenceLink, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob, pinChat, deleteChat } =
     useChat.getState()
   const loadStyles = useStyles((s) => s.load)
   const [text, setText] = useState('')
@@ -383,6 +384,8 @@ export function ChatScreen() {
               onRemoveAttachment={removeAttachment}
               onToggleReference={toggleReference}
               onAttachReference={(files) => (requireAuth() ? void attachReference(files) : undefined)}
+              referenceLink={referenceLink}
+              onReferenceLink={(url) => (url === null || requireAuth() ? setReferenceLink(url) : undefined)}
               onAttachClick={() => (requireAuth() ? fileRef.current?.click() : undefined)}
               onLibraryClick={() => (requireAuth() ? setLibraryOpen(true) : undefined)}
               attachDisabled={busy || running}

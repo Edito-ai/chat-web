@@ -90,13 +90,13 @@ function seed(s: string) {
     return {
       ...base,
       messages: [user('u1', prompt), asst({
-        stage: 'planning', progress: 0.34, message: 'Choosing the caption style', timings: timings.slice(0, 2),
+        stage: 'planning', progress: 0.34, message: 'Choosing a template', timings: timings.slice(0, 2),
         lookChoice: {
           open: true, secondsLeft: 47, seconds: 60, receivedAt: Date.now(),
           options: [
-            { id: 'depth', label: 'Behind you', desc: "The big word sits behind the speaker's head. Bold and punchy.", best: true, imageUrl: still('depth') },
-            { id: 'mix', label: 'Mixed', desc: 'A different caption look every few scenes, as the editor planned it.', best: false, imageUrl: still('mix') },
-            { id: 'bar', label: 'Bar', desc: 'Words on a colour bar above the speaker. Clear and easy to read.', best: false, imageUrl: still('bar') },
+            { id: 'depth', label: 'Bold cut-out, yellow', desc: 'Speaker cut out on black, heavy yellow capitals, fast cuts.', best: true, imageUrl: still('depth') },
+            { id: 'mix', label: 'Retro footage, yellow', desc: 'Retro desktop windows, yellow type with a script accent.', best: false, imageUrl: still('mix') },
+            { id: 'bar', label: 'Clean footage, blue', desc: 'White cards, black type, calm pace.', best: false, imageUrl: still('bar') },
           ],
         },
       })],

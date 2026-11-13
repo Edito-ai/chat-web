@@ -37,6 +37,9 @@ export interface ChatAttachment {
 /** Why a send could not start; the screen maps the code to copy. */
 export type ChatSendProblem = 'noVideo' | 'noPrompt' | 'uploading' | 'uploadFailed' | 'twoReferences'
 
+/** True for text that can be sent as a reference link. The server decides whether it really is a video. */
+export const looksLikeLink = (v: string): boolean => /^(https?:\/\/)?[^\s/]+\.[^\s/]{2,}(\/\S*)?$/i.test(v.trim())
+
 interface ChatState {
   userId: string | null
   projectId: string | null
@@ -48,6 +51,8 @@ interface ChatState {
   videoIds: string[]
   messages: ChatMessage[]
   attachments: ChatAttachment[]
+  /** A link (Instagram reel, YouTube short ...) whose look the next message copies; null = none. */
+  referenceLink: string | null
   /** Reading the picked files / creating the project / creating the job. */
   busy: boolean
   /** The last thing that went wrong outside a job (upload, create). Any thrown value. */
@@ -76,8 +81,15 @@ interface ChatState {
   attachReference: (files: File[]) => Promise<void>
   send: (prompt: string) => Promise<ChatSendProblem | null>
   cancel: () => Promise<void>
-  /** The user picked a caption style from the top 3 on offer: it leaves the screen at once, the server carries on with it. */
-  chooseLook: (jobId: string, lookId: string) => Promise<void>
+  setReferenceLink: (url: string | null) => void
+  /** The user picked a template on offer (or `null` = none of them): it leaves the screen at once, the server carries on. */
+  chooseLook: (jobId: string, lookId: string | null) => Promise<void>
+  /** The user started giving a reference in the chooser (typing a link): the server waits longer. */
+  holdLook: (jobId: string) => Promise<void>
+  /** Copy the template of the video behind a link. Resolves with the reason when the link cannot be used (the chooser stays open). */
+  lookFromLink: (jobId: string, url: string) => Promise<string | null>
+  /** Upload a reference video and copy its template. Resolves with the reason when it fails (the chooser stays open). */
+  lookFromFile: (jobId: string, file: File, onProgress?: (fraction: number) => void) => Promise<string | null>
   /** Re-attach to a job that was running when the page closed (and refresh the last video's URL). */
   resume: () => Promise<void>
   /** Opening the app starts an empty chat: stops watching the previous one but never cancels it (it keeps running and stays in the sidebar). */
@@ -128,6 +140,13 @@ function absorb(snap: ChatJobSnapshot): void {
     canFollowUp: snap.canFollowUp,
     videoIds: snap.videoIds.length > 0 ? snap.videoIds : s.videoIds,
     projectId: snap.projectId ?? s.projectId,
+  }))
+}
+
+/** The template chooser of a job leaves the screen (an answer was accepted). */
+function closeLook(jobId: string): void {
+  useChat.setState((s) => ({
+    messages: s.messages.map((m): ChatMessage => (m.role === 'assistant' && m.jobId === jobId ? { ...m, lookChoice: null } : m)),
   }))
 }
 
@@ -190,7 +209,7 @@ async function pollJob(jobId: string): Promise<void> {
 }
 
 const EMPTY_CHAT = {
-  messages: [] as ChatMessage[], attachments: [] as ChatAttachment[], projectId: null, jobId: null,
+  messages: [] as ChatMessage[], attachments: [] as ChatAttachment[], referenceLink: null as string | null, projectId: null, jobId: null,
   canFollowUp: false, videoIds: [] as string[], actionError: null, pollLostJobId: null,
 }
 
@@ -204,6 +223,7 @@ export const useChat = create<ChatState>()(
       videoIds: [],
       messages: [],
       attachments: [],
+      referenceLink: null,
       busy: false,
       actionError: null,
       pollLostJobId: null,
@@ -355,11 +375,13 @@ export const useChat = create<ChatState>()(
       send: async (rawPrompt) => {
         const s0 = get()
         const refs = s0.attachments.filter((a) => a.reference)
+        const refLink = s0.referenceLink?.trim() || null
         // A reference on its own is a request to save its style: no words needed.
-        const prompt = rawPrompt.trim() || (refs.length > 0 && s0.attachments.length === refs.length ? 'Save this style' : '')
+        const prompt =
+          rawPrompt.trim() || ((refs.length > 0 || refLink) && s0.attachments.length === refs.length ? 'Save this style' : '')
         if (s0.busy || activeAssistant(s0.messages)) return null
         if (!prompt) return 'noPrompt'
-        if (refs.length > 1) return 'twoReferences'
+        if (refs.length + (refLink ? 1 : 0) > 1) return 'twoReferences'
         // The conversation goes on when its last turn finished (an edit, or just a reply); new files ride along with it.
         const followUp = s0.jobId !== null && s0.canFollowUp
         if (s0.attachments.some((a) => a.state === 'uploading')) return 'uploading'
@@ -370,8 +392,12 @@ export const useChat = create<ChatState>()(
           const api = getChatApi()
           const attached = s0.attachments.filter((a) => !a.reference).map((a) => a.videoId!)
           const referenceVideoId = refs[0]?.videoId ?? undefined
-          const styleId = referenceVideoId ? undefined : (useStyles.getState().items ? useStyles.getState().selected : null) ?? undefined
-          const style = { ...(styleId ? { styleId } : {}), ...(referenceVideoId ? { referenceVideoId } : {}) }
+          const referenceUrl = refLink ?? undefined
+          const styleId =
+            referenceVideoId || referenceUrl ? undefined : (useStyles.getState().items ? useStyles.getState().selected : null) ?? undefined
+          const style = {
+            ...(styleId ? { styleId } : {}), ...(referenceVideoId ? { referenceVideoId } : {}), ...(referenceUrl ? { referenceUrl } : {}),
+          }
           const withStyle = Object.keys(style).length > 0
           let snap: ChatJobSnapshot
           if (followUp) {
@@ -386,16 +412,20 @@ export const useChat = create<ChatState>()(
               set({ projectId, userId: currentUserId() })
             }
             snap = await api.createJob({
-              projectId, videoIds: attached.length > 0 || referenceVideoId ? attached : s0.videoIds, prompt, ...style,
+              projectId, videoIds: attached.length > 0 || referenceVideoId || referenceUrl ? attached : s0.videoIds, prompt, ...style,
             })
           }
           const user: ChatMessage = {
             id: newId(), role: 'user', text: prompt,
-            attachments: s0.attachments.map((a) => (a.reference ? `${a.name} (style reference)` : a.name)),
+            attachments: [
+              ...s0.attachments.map((a) => (a.reference ? `${a.name} (style reference)` : a.name)),
+              ...(refLink ? [`${refLink} (style reference)`] : []),
+            ],
           }
           set((s) => ({
             messages: applySnapshot(capMessages([...s.messages, user, newAssistant(newId(), snap.jobId, snap.turn)]), snap),
             attachments: [],
+            referenceLink: null,
             userId: currentUserId(),
           }))
           absorb(snap)
@@ -414,11 +444,54 @@ export const useChat = create<ChatState>()(
           messages: s.messages.map((m): ChatMessage => (m.role === 'assistant' && m.jobId === jobId ? { ...m, lookChoice: null } : m)),
         }))
         try {
-          await getChatApi().chooseLook?.(jobId, lookId)
+          await getChatApi().answerLook?.(jobId, lookId === null ? { skip: true } : { look: lookId })
         } catch (e) {
           // Too late (the best one was already taken) or the network blinked: the edit goes on either way.
           console.warn('[chat] chooseLook failed', e)
         }
+      },
+
+      setReferenceLink: (url) => set({ referenceLink: url && url.trim() ? url.trim() : null, actionError: null }),
+
+      holdLook: async (jobId) => {
+        await getChatApi().answerLook?.(jobId, { hold: true })?.catch(() => undefined)
+      },
+
+      lookFromLink: async (jobId, url) => {
+        try {
+          // The server fetches the video before it answers, so a link that does not work comes back as an error here.
+          await getChatApi().answerLook?.(jobId, { url: url.trim() })
+        } catch (e) {
+          return e instanceof Error ? e.message : String(e)
+        }
+        closeLook(jobId)
+        return null
+      },
+
+      lookFromFile: async (jobId, file, onProgress) => {
+        const api = getChatApi()
+        const hold = () => api.answerLook?.(jobId, { hold: true }).catch(() => undefined)
+        try {
+          if (!looksLikeVideo(file)) return `Not a video: ${file.name}`
+          void hold()
+          const probe = await probeVideo(file)
+          const projectId = get().projectId ?? (await createChatProject(shapeFor(probe.width, probe.height)))
+          let held = Date.now()
+          const videoId = await uploadVideo(projectId, file, probe, {
+            onProgress: (f) => {
+              onProgress?.(f)
+              if (Date.now() - held > 60_000) {
+                held = Date.now()
+                void hold() // a long upload: keep the chooser from timing out
+              }
+            },
+          })
+          await api.answerLook?.(jobId, { referenceVideoId: videoId })
+        } catch (e) {
+          return e instanceof Error ? e.message : String(e)
+        }
+        closeLook(jobId)
+        return null
       },
 
       cancel: async () => {

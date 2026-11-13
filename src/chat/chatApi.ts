@@ -44,7 +44,7 @@ export interface ChatJobWire {
   }[]
   createdAt?: string
   updatedAt?: string
-  /** Caption styles on offer right now (backend2). */
+  /** Templates on offer right now (backend2). */
   lookChoice?: {
     open?: boolean
     secondsLeft?: number
@@ -73,13 +73,12 @@ export function toActivity(raw: ChatJobWire['activity']): ActivityEvent[] {
   return out
 }
 
-/** Wire look choice -> the typed one; malformed options are dropped, and fewer than two means there is nothing to choose. */
+/** Wire template choice -> the typed one; malformed options are dropped. No options is still a choice: the link / upload box. */
 export function toLookChoice(raw: ChatJobWire['lookChoice'], receivedAt = Date.now()): LookChoice | null {
   if (!raw || raw.open !== true) return null
   const options = (raw.options ?? [])
     .filter((o) => typeof o.id === 'string' && typeof o.label === 'string' && typeof o.imageUrl === 'string')
     .map((o) => ({ id: o.id!, label: o.label!, desc: o.desc ?? '', best: o.best === true, imageUrl: o.imageUrl! }))
-  if (options.length < 2) return null
   const secondsLeft = typeof raw.secondsLeft === 'number' ? Math.max(0, raw.secondsLeft) : 0
   return { open: true, secondsLeft, seconds: typeof raw.seconds === 'number' ? raw.seconds : secondsLeft, receivedAt, options }
 }
@@ -140,6 +139,7 @@ export const httpChatApi: ChatApi = {
           projectId: input.projectId, videoIds: input.videoIds, prompt: input.prompt,
           ...(input.styleId ? { styleId: input.styleId } : {}),
           ...(input.referenceVideoId ? { referenceVideoId: input.referenceVideoId } : {}),
+          ...(input.referenceUrl ? { referenceUrl: input.referenceUrl } : {}),
         },
         { signal },
       )) as ChatJobWire,
@@ -155,8 +155,8 @@ export const httpChatApi: ChatApi = {
   async cancelJob(jobId) {
     return toSnapshot((await apiClient.post(`${jobPath(jobId)}/cancel`)) as ChatJobWire)
   },
-  async chooseLook(jobId, lookId) {
-    await apiClient.post(`${jobPath(jobId)}/look`, { look: lookId })
+  async answerLook(jobId, answer) {
+    await apiClient.post(`${jobPath(jobId)}/look`, answer)
   },
 }
 

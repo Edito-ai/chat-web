@@ -21,11 +21,11 @@ describe('toLookChoice', () => {
     expect(lc?.options[0]?.best).toBe(true)
   })
 
-  it('is null when closed, absent, malformed, or when there is nothing to choose between', () => {
+  it('is null when closed or absent; malformed templates are dropped; an empty stock still opens the link box', () => {
     expect(toLookChoice(null)).toBeNull()
     expect(toLookChoice({ ...open, open: false })).toBeNull()
-    expect(toLookChoice({ ...open, options: [opts[0]!] })).toBeNull()
-    expect(toLookChoice({ ...open, options: [opts[0]!, { id: 'x' }] })).toBeNull()
+    expect(toLookChoice({ ...open, options: [opts[0]!, { id: 'x' }] })?.options.map((o) => o.id)).toEqual(['depth'])
+    expect(toLookChoice({ ...open, options: [] })?.options).toEqual([])
   })
 
   it('only comes through for a running job', () => {
@@ -63,6 +63,16 @@ describe('LookChoice card', () => {
     }
     expect(out.match(/>Best</g)).toHaveLength(1)
     expect(out).toMatch(/The best one is picked in \d+s/)
+  })
+
+  it('always offers a link box, an upload and a skip under the templates, also when the stock is empty', () => {
+    for (const m of [msg(), msg({ lookChoice: toLookChoice({ ...open, options: [] }, Date.now()) })]) {
+      const out = html(m)
+      for (const id of ['chat-look-link', 'chat-look-link-use', 'chat-look-upload', 'chat-look-skip']) expect(out).toContain(`data-testid="${id}"`)
+    }
+    const empty = html(msg({ lookChoice: toLookChoice({ ...open, options: [] }, Date.now()) }))
+    expect(empty).not.toContain('>Best<')
+    expect(empty).toMatch(/Carrying on without a template in \d+s/)
   })
 
   it('renders nothing when no styles are on offer', () => {
