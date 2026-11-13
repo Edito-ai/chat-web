@@ -16,7 +16,7 @@ import { useAuth } from '@/auth/authStore'
 import { setChatApi } from '../chatApi'
 import { stopPolling, useChat } from '../chatStore'
 import { useStyles, type StyleItem } from '../styles'
-import type { ChatApi, ChatJobSnapshot } from '../chatTypes'
+import type { ChatApi, ChatJobSnapshot, LookAnswer } from '../chatTypes'
 
 const running = (jobId: string, turn = 1): ChatJobSnapshot => ({
   jobId, turn, status: 'running', stage: 'planning', progress: 0.1, result: null, canFollowUp: false,
@@ -87,6 +87,40 @@ describe('styles in the chat', () => {
     useChat.getState().toggleReference(ref!.id)
     expect(await useChat.getState().send('')).toBeNull()
     expect(api.createJob).toHaveBeenCalledWith({ projectId: 'proj-1', videoIds: [], prompt: 'Save this style', referenceVideoId: 'remote-reel.mp4' })
+  })
+
+  it('a reference link is sent as referenceUrl, wins over the picked template, and is cleared after sending', async () => {
+    const api = fakeApi()
+    setChatApi(api)
+    useStyles.getState().select('s1')
+    await attach('me.mp4')
+    useChat.getState().setReferenceLink(' https://www.instagram.com/reel/AbC/ ')
+    expect(await useChat.getState().send('make mine like this')).toBeNull()
+    expect(api.createJob).toHaveBeenCalledWith({
+      projectId: 'proj-1', videoIds: ['remote-me.mp4'], prompt: 'make mine like this', referenceUrl: 'https://www.instagram.com/reel/AbC/',
+    })
+    expect(useChat.getState().referenceLink).toBeNull()
+    expect(useChat.getState().messages[0]).toMatchObject({ attachments: ['me.mp4', 'https://www.instagram.com/reel/AbC/ (style reference)'] })
+  })
+
+  it('a link and a reference video together are refused: one reference at a time', async () => {
+    setChatApi(fakeApi())
+    const [ref] = await attach('reel.mp4')
+    useChat.getState().toggleReference(ref!.id)
+    useChat.getState().setReferenceLink('https://youtu.be/x')
+    expect(await useChat.getState().send('go')).toBe('twoReferences')
+  })
+
+  it('the chooser: a template id, a skip and a link each reach the server; a refused link comes back as its reason', async () => {
+    const answerLook = vi.fn(async (_id: string, a: LookAnswer) => {
+      if ('url' in a && a.url.includes('private')) throw new Error('This video needs a login')
+    })
+    setChatApi({ ...fakeApi(), answerLook })
+    await useChat.getState().chooseLook('job-1', 't1')
+    await useChat.getState().chooseLook('job-1', null)
+    expect(await useChat.getState().lookFromLink('job-1', ' https://youtu.be/ok ')).toBeNull()
+    expect(await useChat.getState().lookFromLink('job-1', 'https://insta/private')).toBe('This video needs a login')
+    expect(answerLook.mock.calls.map((c) => c[1])).toEqual([{ look: 't1' }, { skip: true }, { url: 'https://youtu.be/ok' }, { url: 'https://insta/private' }])
   })
 
   it('refuses two references in one message', async () => {

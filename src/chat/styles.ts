@@ -3,8 +3,9 @@ import { persist } from 'zustand/middleware'
 import { ApiError, apiClient } from '@/lib/apiClient'
 
 /**
- * Saved editing styles (backend2 `/styles`). A style is read off a reference video the person likes; an edit can then
- * follow it. The old backend has no `/styles`: there `items` stays null and the style controls are not shown.
+ * Templates (backend2 `/styles`): ONE stock shared by every user. A template is read off a reference video (an upload or
+ * a link) anyone gave; an edit can then follow it. The old backend has no `/styles`: there `items` stays null and the
+ * template controls are not shown.
  */
 export interface StyleItem {
   id: string
@@ -13,7 +14,7 @@ export interface StyleItem {
   source: string
   description: string
   summary: string
-  sheetUrl: string
+  sheetUrl?: string
   colours: { a: string; b: string; text?: string }
 }
 
@@ -24,7 +25,6 @@ interface StylesState {
   selected: string | null
   load: () => Promise<void>
   select: (id: string | null) => void
-  remove: (id: string) => Promise<void>
 }
 
 export async function fetchStyles(): Promise<StyleItem[] | null> {
@@ -53,15 +53,6 @@ export const useStyles = create<StylesState>()(
         }
       },
       select: (id) => set({ selected: id }),
-      remove: async (id) => {
-        const before = get().items
-        set({ items: (before ?? []).filter((s) => s.id !== id), selected: get().selected === id ? null : get().selected })
-        try {
-          await apiClient.delete(`/styles/${encodeURIComponent(id)}`)
-        } catch {
-          set({ items: before })
-        }
-      },
     }),
     { name: 'edito.chat-web.styles.v1', partialize: (s) => ({ selected: s.selected }) },
   ),

@@ -38,17 +38,20 @@ export interface ChatSuggestion {
   prompt?: string | null
 }
 
-/** One caption style on offer (backend2): a still of the user's own video in that style. */
+/** One template on offer (backend2): a still of the user's own video in that template. */
 export interface LookOption {
   id: string
   label: string
   desc: string
-  /** The style the editor recommends; the one taken when the user does not choose in time. */
+  /** The template the editor recommends; the one taken when the user does not choose in time. */
   best: boolean
   imageUrl: string
 }
 
-/** The caption styles the backend is waiting on right now. `secondsLeft` was true at `receivedAt` (epoch ms): count down from there. */
+/**
+ * The templates the backend is waiting on right now, from the stock every user shares. `options` may be empty (an empty
+ * stock): the link / upload box under them is still shown. `secondsLeft` was true at `receivedAt` (epoch ms): count down from there.
+ */
 export interface LookChoice {
   open: boolean
   secondsLeft: number
@@ -56,6 +59,9 @@ export interface LookChoice {
   receivedAt: number
   options: LookOption[]
 }
+
+/** The user's answer to the template chooser: one of the offered templates, none, a link to copy, an uploaded reference, or "wait for me". */
+export type LookAnswer = { look: string } | { skip: true } | { url: string } | { referenceVideoId: string } | { hold: true }
 
 /** One poll of a job, already normalised by the adapter. */
 export interface ChatJobSnapshot {
@@ -94,7 +100,7 @@ export interface ChatJobSnapshot {
   durationSec?: number | null
   /** The turn's transcript (thoughts, narration, tool steps); empty from older backends. */
   activity?: ActivityEvent[]
-  /** Caption styles waiting for a pick (backend2 only); null/absent when none are on offer. */
+  /** Templates waiting for a pick (backend2 only); null/absent when none are on offer. */
   lookChoice?: LookChoice | null
 }
 
@@ -105,14 +111,17 @@ export interface CreateChatJobInput {
   prompt: string
   /** A saved style the edit follows (backend2 only). */
   styleId?: string
-  /** A video whose LOOK is read into a new saved style and followed (backend2 only). */
+  /** A video whose LOOK is read into a new template and followed (backend2 only). */
   referenceVideoId?: string
+  /** The same, given as a link (an Instagram reel, a YouTube short ...). */
+  referenceUrl?: string
 }
 
 /** Style options a follow-up may carry (backend2 only). */
 export interface StyleOptions {
   styleId?: string
   referenceVideoId?: string
+  referenceUrl?: string
 }
 
 /** The seam between the chat screen and whichever backend answers. */
@@ -123,8 +132,8 @@ export interface ChatApi {
   followUp(jobId: string, prompt: string, signal?: AbortSignal, videoIds?: string[], style?: StyleOptions): Promise<ChatJobSnapshot>
   getJob(jobId: string, signal?: AbortSignal): Promise<ChatJobSnapshot>
   cancelJob(jobId: string): Promise<ChatJobSnapshot>
-  /** The user picked one of the offered caption styles (backend2 only). */
-  chooseLook?(jobId: string, lookId: string): Promise<void>
+  /** The user's answer to the template chooser (backend2 only). Rejects with the server's reason, e.g. a link that cannot be opened. */
+  answerLook?(jobId: string, answer: LookAnswer): Promise<void>
 }
 
 export interface ChatUserMessage {
@@ -155,7 +164,7 @@ export interface ChatAssistantMessage {
   durationSec?: number | null
   /** The turn's transcript, when the backend reported one. */
   activity?: ActivityEvent[]
-  /** Caption styles waiting for the user's pick, while the turn is running. */
+  /** Templates waiting for the user's pick, while the turn is running. */
   lookChoice?: LookChoice | null
   /** `chat` = this turn is a plain reply, with no video behind it. */
   kind?: string

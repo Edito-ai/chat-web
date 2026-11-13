@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import clsx from 'clsx'
-import { ArrowUp, Check, FolderOpen, Paperclip, Square, X, AlertCircle, Wand2 } from 'lucide-react'
+import { ArrowUp, Check, FolderOpen, Link2, Paperclip, Square, X, AlertCircle, Wand2 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useTypewriter } from './useTypewriter'
 import { IconButton } from '@/components/ui'
@@ -77,6 +77,9 @@ export interface ComposerProps {
   onRemoveAttachment: (id: string) => void
   onToggleReference?: (id: string) => void
   onAttachReference?: (files: File[]) => void
+  /** A link whose look the next message copies (shown as a chip); null = none. */
+  referenceLink?: string | null
+  onReferenceLink?: (url: string | null) => void
   onAttachClick: () => void
   onLibraryClick: () => void
   attachDisabled: boolean
@@ -109,12 +112,22 @@ export function Composer(p: ComposerProps) {
     }
   }
   const typed = useTypewriter(p.hints ?? [], p.text === '' && !p.running)
-  const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0)
+  const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0 || !!p.referenceLink)
   const stylesOn = useStyles((s) => s.items) !== null
   return (
     <div className="rounded-[1.75rem] border border-white/15 bg-surface-1/75 backdrop-blur-xl shadow-composer transition-[border-color,box-shadow] duration-200 focus-within:border-accent-line focus-within:shadow-[0_0_0_4px_rgb(255_158_140/0.10),0_20px_50px_-20px_rgb(0_0_0/0.9)]">
-      {p.attachments.length > 0 && (
+      {(p.attachments.length > 0 || p.referenceLink) && (
         <ul className="flex flex-wrap gap-2 px-3 pt-3">
+          {p.referenceLink && (
+            <li data-testid="chat-reference-link" className="flex max-w-full items-center gap-2 rounded-xl border border-accent-line bg-surface-2 py-1 pl-2.5 pr-1 text-label">
+              <Link2 size={14} className="shrink-0 text-accent" aria-hidden />
+              <span className="min-w-0 max-w-[16rem] truncate text-ink-1">{p.referenceLink.replace(/^https?:\/\/(www\.)?/, '')}</span>
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-caption text-ink-0">
+                <Wand2 size={12} aria-hidden /> {t('chat.reference.on')}
+              </span>
+              <IconButton icon={X} size="sm" aria-label={t('chat.remove', { name: p.referenceLink })} onClick={() => p.onReferenceLink?.(null)} className="h-6 w-6" />
+            </li>
+          )}
           {p.attachments.map((a) => (
             <AttachmentChip
               key={a.id}
@@ -144,7 +157,7 @@ export function Composer(p: ComposerProps) {
           onClick={p.onLibraryClick}
           className="shrink-0 rounded-full"
         />
-        <StylePicker disabled={p.attachDisabled} onReference={p.onAttachReference} />
+        <StylePicker disabled={p.attachDisabled} onReference={p.onAttachReference} onReferenceLink={p.onReferenceLink ?? undefined} />
         <textarea
           ref={setRef}
           data-testid="chat-input"
