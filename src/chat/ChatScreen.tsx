@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import clsx from 'clsx'
 import { useRouter } from 'next/navigation'
-import { BrandTile } from '@/components/BrandTile'
-import { ArrowUpRight, Menu, PanelLeftOpen, SquarePen, X } from 'lucide-react'
+import { Menu, PanelLeftOpen, SquarePen, X } from 'lucide-react'
 import { useT, type MessageKey } from '@/i18n'
 import { Button, IconButton, InlineError, Logo } from '@/components/ui'
 import { useAuth } from '@/auth/authStore'
@@ -33,38 +32,6 @@ const PROBLEM_KEY: Record<ChatSendProblem, MessageKey> = {
 }
 
 const EXAMPLES = [1, 2, 3, 4] as const
-
-function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
-  const { t } = useT()
-  return (
-    <div className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center px-1 py-6 text-center sm:py-8">
-      <BrandTile size={56} className="animate-rise" />
-      <h2 className="mt-6 animate-rise font-display text-[1.65rem] font-bold leading-[1.18] tracking-[-0.02em] text-ink-0 [animation-delay:40ms] sm:text-[2.2rem]">
-        {t('chat.empty.title')}
-      </h2>
-      <p className="mt-3 max-w-md animate-rise text-prose text-ink-2 [animation-delay:80ms]">{t('chat.empty.sub')}</p>
-      <ul className="mt-6 grid w-full animate-rise grid-cols-1 gap-2 text-left [animation-delay:140ms] sm:mt-8 sm:grid-cols-2 sm:gap-2.5">
-        {EXAMPLES.map((n) => (
-          <li key={n}>
-            <button
-              type="button"
-              data-testid={`chat-example-${n}`}
-              aria-label={t(`chat.example.${n}.title` as MessageKey)}
-              onClick={() => onPick(t(`chat.example.${n}.prompt` as MessageKey))}
-              className="group flex h-full w-full flex-col gap-0.5 rounded-2xl border border-white/10 bg-surface-1/60 px-3.5 py-2.5 text-left backdrop-blur transition-all hover:-translate-y-px hover:border-accent-line hover:bg-surface-2/80 active:scale-[0.99] sm:gap-1 sm:px-4 sm:py-3.5"
-            >
-              <span className="flex items-center justify-between gap-2 text-body font-semibold text-ink-0">
-                {t(`chat.example.${n}.title` as MessageKey)}
-                <ArrowUpRight size={14} aria-hidden className="shrink-0 text-accent opacity-0 transition-opacity group-hover:opacity-100" />
-              </span>
-              <span className="line-clamp-1 text-label text-ink-3 transition-colors group-hover:text-ink-2 sm:line-clamp-2">{t(`chat.example.${n}.prompt` as MessageKey)}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
 
 /**
  * Chat-style edit screen: a left sidebar with recent chats, and the conversation. Add footage, describe the edit,
@@ -114,6 +81,7 @@ export function ChatScreen() {
   const now = useNow(history.length > 0, 60_000)
 
   const running = activeAssistant(messages) !== null
+  const empty = messages.length === 0
   const hasVideo = lastCompleted(messages) !== null
   const uploading = attachments.some((a) => a.state === 'uploading')
   // While nothing is happening the empty box types example prompts: first the starter ideas, then follow-up changes.
@@ -316,28 +284,28 @@ export function ChatScreen() {
           ) : null}
         </header>
 
-        <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto min-h-full w-full max-w-3xl px-4 py-4">
-            {messages.length === 0 ? (
-              <EmptyState
-                onPick={(prompt) => {
-                  setText(prompt)
-                  setProblem(null)
-                  textareaRef.current?.focus()
-                }}
-              />
-            ) : (
+        {!empty && (
+          <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto min-h-full w-full max-w-3xl px-4 py-4">
               <ol data-testid="chat-log" role="log" aria-label={t('chat.log.aria')} className="space-y-6 pb-4">
                 {messages.map((m, i) => (
                   <Bubble key={m.id} msg={m} chips={i === messages.length - 1 && !running} onSuggest={onSuggest} />
                 ))}
               </ol>
-            )}
-            <div ref={endRef} />
+              <div ref={endRef} />
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-4">
+        {/* New chat: only the box, in the middle of the screen. After the first message it sits at the bottom. */}
+        <div
+          data-testid="chat-composer-dock"
+          data-centered={empty}
+          className={clsx(
+            'px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-4',
+            empty ? 'flex flex-1 flex-col justify-center pb-[14vh]' : 'shrink-0',
+          )}
+        >
           <div className="mx-auto w-full max-w-3xl space-y-2">
             {showTopError && (
               <div className="flex items-start justify-between gap-2">
