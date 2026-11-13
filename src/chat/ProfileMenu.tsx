@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { TERMS_URL } from '@/lib/links'
 import { BarChart3, ChevronsUpDown, CreditCard, ExternalLink, LifeBuoy, LogOut, ShieldCheck, SquareArrowOutUpRight, Trash2, type LucideIcon } from 'lucide-react'
 import { useT } from '@/i18n'
 import { EDITOR_URL } from '@/lib/env'
@@ -172,16 +173,18 @@ export function ProfileMenu({ user, onSignOut }: { user: ProfileUser; onSignOut:
             }}
           />
           <Sep />
-          <button
-            type="button"
+          <a
             role="menuitem"
             tabIndex={-1}
             data-testid="chat-menu-legal"
-            onClick={() => pick('legal')}
+            href={TERMS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setOpen(false)}
             className="block w-full rounded-lg px-3 py-1.5 text-center text-caption text-ink-4 transition-colors hover:text-ink-2 focus-visible:text-ink-2 focus-visible:outline-none"
           >
             {t('acct.menu.legalSmall')}
-          </button>
+          </a>
         </div>
       ) : null}
       {deleting ? (

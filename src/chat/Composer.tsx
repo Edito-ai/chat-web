@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import clsx from 'clsx'
-import { ArrowUp, Check, FolderOpen, Link2, Paperclip, Square, X, AlertCircle, Wand2 } from 'lucide-react'
+import { ArrowUp, Check, Link2, Paperclip, Square, X, AlertCircle, Wand2 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useTypewriter } from './useTypewriter'
 import { IconButton } from '@/components/ui'
@@ -81,7 +81,6 @@ export interface ComposerProps {
   referenceLink?: string | null
   onReferenceLink?: (url: string | null) => void
   onAttachClick: () => void
-  onLibraryClick: () => void
   attachDisabled: boolean
   running: boolean
   sendDisabled: boolean
@@ -146,15 +145,6 @@ export function Composer(p: ComposerProps) {
           aria-label={t('chat.attach')}
           disabled={p.attachDisabled}
           onClick={p.onAttachClick}
-          className="shrink-0 rounded-full"
-        />
-        <IconButton
-          data-testid="chat-library"
-          icon={FolderOpen}
-          size="lg"
-          aria-label={t('chat.library.open')}
-          disabled={p.attachDisabled}
-          onClick={p.onLibraryClick}
           className="shrink-0 rounded-full"
         />
         <StylePicker disabled={p.attachDisabled} onReference={p.onAttachReference} onReferenceLink={p.onReferenceLink ?? undefined} />

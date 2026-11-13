@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { TERMS_URL } from '@/lib/links'
 import { Loader2 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { Button, InlineError, LogoMark, Wordmark } from '@/components/ui'
@@ -187,7 +188,12 @@ export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 
           {consentNeeded && (
             <label className="flex items-start gap-2 text-label text-ink-2">
               <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#FF7A5C]" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-              <span>{t('auth.consent')}</span>
+              <span>
+                {t('auth.consent')}{' '}
+                <a href={TERMS_URL} target="_blank" rel="noopener noreferrer" data-testid="auth-terms-link" className="underline decoration-white/30 underline-offset-2 hover:text-ink-0">
+                  {t('auth.consent.read')}
+                </a>
+              </span>
             </label>
           )}
 

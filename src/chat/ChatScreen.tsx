@@ -5,7 +5,6 @@ import { Menu, PanelLeftOpen, SquarePen, X } from 'lucide-react'
 import { useT, type MessageKey } from '@/i18n'
 import { Button, IconButton, InlineError, Logo } from '@/components/ui'
 import { useAuth } from '@/auth/authStore'
-import { useAccount } from '@/account/accountStore'
 import { AccountDialogs } from '@/account/components/AccountDialogs'
 import { useChat, type ChatSendProblem } from './chatStore'
 import type { ChatSuggestion } from './chatTypes'
@@ -13,7 +12,7 @@ import { activeAssistant, lastCompleted } from './chatState'
 import { Bubble } from './Messages'
 import { Composer } from './Composer'
 import { useStyles } from './styles'
-import { LibraryDialog } from './LibraryDialog'
+import { LibraryPage } from './LibraryPage'
 import { Sidebar } from './Sidebar'
 import { useNow } from './ActivityPanel'
 import { NeedPlanNotice } from './NeedPlanNotice'
@@ -51,7 +50,6 @@ export function ChatScreen() {
   const videoIds = useChat((s) => s.videoIds)
   const projectId = useChat((s) => s.projectId)
   const user = useAuth((s) => s.user)
-  const openDialog = useAccount((s) => s.openDialog)
   const signOut = () => {
     useChat.getState().reset()
     useAuth.getState().logout()
@@ -71,7 +69,8 @@ export function ChatScreen() {
   const [text, setText] = useState('')
   const [problem, setProblem] = useState<ChatSendProblem | null>(null)
   const [dragging, setDragging] = useState(false)
-  const [libraryOpen, setLibraryOpen] = useState(false)
+  /** The main area shows the chat, or the Library page opened from the sidebar. */
+  const [view, setView] = useState<'chat' | 'library'>('chat')
   /** Mobile drawer / desktop collapse. */
   const [drawer, setDrawer] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -82,6 +81,7 @@ export function ChatScreen() {
 
   const running = activeAssistant(messages) !== null
   const empty = messages.length === 0
+  const library = view === 'library'
   const hasVideo = lastCompleted(messages) !== null
   const uploading = attachments.some((a) => a.state === 'uploading')
   // While nothing is happening the empty box types example prompts: first the starter ideas, then follow-up changes.
@@ -135,7 +135,7 @@ export function ChatScreen() {
   const onSuggest = (chip: ChatSuggestion) => {
     if (running || busy || !requireAuth()) return
     if (chip.action === 'upload') fileRef.current?.click()
-    else if (chip.action === 'library') setLibraryOpen(true)
+    else if (chip.action === 'library') setView('library')
     else if (chip.prompt) void send(chip.prompt).then(setProblem)
   }
 
@@ -148,12 +148,14 @@ export function ChatScreen() {
 
   const startNew = () => {
     setDrawer(false)
+    setView('chat')
     setText('')
     setProblem(null)
     void newChat().then(() => textareaRef.current?.focus())
   }
   const open = (jobId: string) => {
     setDrawer(false)
+    setView('chat')
     setProblem(null)
     void openJob(jobId)
   }
@@ -172,6 +174,11 @@ export function ChatScreen() {
       now={now}
       disabled={busy}
       onNew={startNew}
+      onLibrary={() => {
+        setDrawer(false)
+        if (requireAuth()) setView('library')
+      }}
+      libraryActive={view === 'library'}
       onOpen={open}
       onRetry={() => void loadHistory()}
       onPin={(id, pinned) => void pinChat(id, pinned)}
@@ -260,7 +267,7 @@ export function ChatScreen() {
           <span className="md:hidden">
             <Logo size={24} />
           </span>
-          <h1 className="hidden min-w-0 flex-1 truncate text-body font-medium text-ink-2 md:block md:pl-1">{t('chat.title')}</h1>
+          <h1 className="hidden min-w-0 flex-1 truncate text-body font-medium text-ink-2 md:block md:pl-1">{t(library ? 'nav.library' : 'chat.title')}</h1>
           <Button
             data-testid="chat-new"
             variant="ghost"
@@ -284,7 +291,18 @@ export function ChatScreen() {
           ) : null}
         </header>
 
-        {!empty && (
+        {library && (
+          <LibraryPage
+            lockProjectId={videoIds.length > 0 || attachments.length > 0 ? (projectId ?? null) : null}
+            onPick={(items) => {
+              useChat.getState().attachFromLibrary(items)
+              setView('chat')
+              requestAnimationFrame(() => textareaRef.current?.focus())
+            }}
+          />
+        )}
+
+        {!library && !empty && (
           <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto min-h-full w-full max-w-3xl px-4 py-4">
               <ol data-testid="chat-log" role="log" aria-label={t('chat.log.aria')} className="space-y-6 pb-4">
@@ -303,7 +321,7 @@ export function ChatScreen() {
           data-centered={empty}
           className={clsx(
             'px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-4',
-            empty ? 'flex flex-1 flex-col justify-center pb-[14vh]' : 'shrink-0',
+            library ? 'hidden' : empty ? 'flex flex-1 flex-col justify-center pb-[14vh]' : 'shrink-0',
           )}
         >
           <div className="mx-auto w-full max-w-3xl space-y-2">
@@ -348,38 +366,26 @@ export function ChatScreen() {
               referenceLink={referenceLink}
               onReferenceLink={(url) => (url === null || requireAuth() ? setReferenceLink(url) : undefined)}
               onAttachClick={() => (requireAuth() ? fileRef.current?.click() : undefined)}
-              onLibraryClick={() => (requireAuth() ? setLibraryOpen(true) : undefined)}
               attachDisabled={busy || running}
               running={running}
               sendDisabled={sendDisabled}
               onSend={() => void submit()}
               onStop={() => void cancel()}
             />
+            {/* Disclaimer under the box: hidden for now. Bring it back with the link pointing at TERMS_URL (the website).
             <p data-testid="chat-disclaimer" className="px-3 pt-0.5 text-center text-caption leading-snug text-ink-4">
               {t('chat.disclaimer.pre')}
-              <button
-                type="button"
-                data-testid="chat-terms-link"
-                onClick={() => openDialog('legal')}
-                className="rounded underline decoration-white/25 underline-offset-2 transition-colors hover:text-ink-2 hover:decoration-white/50"
-              >
+              <a data-testid="chat-terms-link" href={TERMS_URL} target="_blank" rel="noopener noreferrer" className="rounded underline decoration-white/25 underline-offset-2 transition-colors hover:text-ink-2 hover:decoration-white/50">
                 {t('chat.disclaimer.link')}
-              </button>
+              </a>
               {t('chat.disclaimer.post')}
             </p>
+            */}
           </div>
         </div>
       </div>
 
-      {libraryOpen && (
-        <LibraryDialog
-          onClose={() => setLibraryOpen(false)}
-          onPick={useChat.getState().attachFromLibrary}
-          lockProjectId={videoIds.length > 0 || attachments.length > 0 ? (projectId ?? null) : null}
-        />
-      )}
-
-      {/* Signed-in users get the dialogs from the profile menu; guests still need Terms to open from the disclaimer. */}
+      {/* Signed-in users get the dialogs from the profile menu. */}
       {!user && <AccountDialogs />}
 
       {dragging && (

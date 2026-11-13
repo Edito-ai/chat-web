@@ -3,6 +3,7 @@ import type { MessageKey } from './en'
 export const hi: Record<MessageKey, string> = {
   'app.name': 'Broll',
   'common.retry': 'फिर कोशिश करें',
+  'common.clear': 'हटाएँ',
   'common.close': 'बंद करें',
   'common.details': 'विवरण',
   'common.loading': 'लोड हो रहा है...',
@@ -20,6 +21,7 @@ export const hi: Record<MessageKey, string> = {
   'auth.passwordHint': 'कम से कम 8 अक्षर, एक अक्षर और एक अंक के साथ।',
   'auth.code': 'वेरिफ़िकेशन कोड',
   'auth.consent': 'मैं नियम और गोपनीयता नीति से सहमत हूँ',
+  'auth.consent.read': '(पढ़ें)',
   'auth.login': 'साइन इन',
   'auth.signup': 'खाता बनाएँ',
   'auth.loginShort': 'लॉगिन',
@@ -81,6 +83,7 @@ export const hi: Record<MessageKey, string> = {
   'chat.dropHint': 'वीडियो जोड़ने के लिए यहाँ छोड़ें',
   'nav.aria': 'चैट इतिहास',
   'nav.recent': 'हाल की',
+  'nav.library': 'लाइब्रेरी',
   'nav.account': 'अकाउंट मेन्यू',
   'nav.group.today': 'आज',
   'nav.group.yesterday': 'कल',

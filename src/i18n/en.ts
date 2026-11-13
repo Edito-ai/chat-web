@@ -2,6 +2,7 @@
 export const en = {
   'app.name': 'Broll',
   'common.retry': 'Retry',
+  'common.clear': 'Clear',
   'common.close': 'Close',
   'common.details': 'Details',
   'common.loading': 'Loading...',
@@ -19,6 +20,7 @@ export const en = {
   'auth.passwordHint': 'At least 8 characters, with a letter and a number.',
   'auth.code': 'Verification code',
   'auth.consent': 'I agree to the Terms and the Privacy Policy',
+  'auth.consent.read': '(read them)',
   'auth.login': 'Sign in',
   'auth.signup': 'Create account',
   'auth.loginShort': 'Login',
@@ -80,6 +82,7 @@ export const en = {
   'chat.dropHint': 'Drop videos to add them',
   'nav.aria': 'Chat history',
   'nav.recent': 'Recent',
+  'nav.library': 'Library',
   'nav.account': 'Account menu',
   'nav.group.today': 'Today',
   'nav.group.yesterday': 'Yesterday',
