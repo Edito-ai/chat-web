@@ -68,6 +68,26 @@ const runningActivity: ActivityEvent[] = [
   act('tool:render', 'tool', 'Rendering your video', 16, null, { detail: '1080p' }),
 ]
 
+// backend2: a step line, then what the step found (narrate.py), with the before / after sheets of a real local job
+const B2 = 'http://127.0.0.1:4100/files/1114-220217-4648/frames'
+const b2Activity: ActivityEvent[] = [
+  act('tool:step:ingest', 'tool', 'Reading the file', 0, 1),
+  act('tool:step:transcribe', 'tool', 'Listening to the speaker', 1, 64),
+  act('thought:transcribe', 'thought', 'I heard 9 spoken lines (hi). 2 of them sound like a retake, a count-in or filler: "Two three go." and more. In the frames I see 1 person; showing solar street light; with solar panel, inverter box around; text on screen: "GKM ENERGY".', 64, 64),
+  act('tool:step:cut', 'tool', 'Cutting out pauses and retakes', 64, 89),
+  act('thought:cut', 'thought', 'I cut 4.4 s of pauses and unwanted takes; the video now runs as 2 joined parts.', 89, 89),
+  act('tool:step:measure', 'tool', 'Finding the face and colours', 89, 105),
+  act('thought:measure', 'thought', 'The speaker is in a wide shot. I found solar street light in 15 of 15 sampled frames, so captions will stay off it.', 105, 105),
+  act('tool:step:treat', 'tool', 'Deciding how much editing it needs', 105, 110),
+  act('thought:treat', 'thought', 'Decision: a clean edit. Product demo with held objects and showroom background; clean edit fits. Only the cut and plain captions; no effects.', 110, 110),
+  act('tool:step:beats', 'tool', 'Writing the caption screens', 110, 120),
+  act('thought:beats', 'thought', 'I wrote 12 caption screens, starting with "Ye hai solar street light".', 120, 120),
+  act('tool:step:layout', 'tool', 'Placing the text around the speaker', 120, 121),
+  act('thought:layout', 'thought', 'I placed every caption around the face and the product, then rendered.', 121, 121),
+  act('tool:step:final', 'tool', 'Rendering the final video', 121, 214),
+  act('thought:final', 'thought', 'I checked the finished video: the captions sit in clear areas and do not cover the face or the product.', 214, 214),
+]
+
 function seed(s: string) {
   const base = { projectId: 'proj', jobId: 'p-run', canFollowUp: false, videoIds: ['v'], attachments: [], busy: false, actionError: null, pollLostJobId: null }
   const prompt = 'Make a punchy 45-second reel with bold captions and fast cuts.'
@@ -76,6 +96,20 @@ function seed(s: string) {
     reply: 'Your video is ready. This draft does not include background music, sound effects and some graphics.',
     result: { videoUrl: sample, downloadUrl: sample, fileName: 'Punchy reel.mp4' },
   })
+  if (s === 'edit' || s === 'edit-live') {
+    const analysis = { seen: null, beforeSheet: `${B2}/before_sheet.jpg`, plannedSheet: `${B2}/plan_sheet.jpg`, afterSheet: `${B2}/after_sheet.jpg`, review: null }
+    const reply = [
+      'Kept it clean: pauses and retakes trimmed, plain captions on your real footage, since you are showing the solar street light in the showroom.',
+      'Done: 12 scenes in the clean theme (talk), 25 s.',
+    ].join('\n\n')
+    if (s === 'edit') {
+      return { ...base, messages: [user('u1', 'edit this video'), asst({ status: 'complete', stage: null, progress: 1, durationSec: 214, finishedAt: t0 + 214_000, reply, result: { videoUrl: sample, downloadUrl: sample, fileName: 'IMG_9486-edit.mp4' }, activity: b2Activity, analysis })] }
+    }
+    const now = Date.now()
+    const live = b2Activity.slice(0, 9).map((e) => ({ ...e, at: now - 120_000 + (e.at - t0), endedAt: e.endedAt === null ? null : now - 120_000 + (e.endedAt - t0) }))
+    live.push(act('tool:step:beats', 'tool', 'Writing the caption screens', 0, null, { at: now - 4_000 }))
+    return { ...base, messages: [user('u1', 'edit this video'), asst({ stage: 'rendering', progress: 0.78, startedAt: now - 120_000, timings: undefined, activity: live, analysis: { ...analysis, afterSheet: null } })] }
+  }
   if (s === 'transcript') {
     const now = Date.now()
     const follow = asst({

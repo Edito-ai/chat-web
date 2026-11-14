@@ -116,7 +116,7 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
       return {
         ...a, status: 'complete', result: snap.result ?? null, reply: snap.reply ?? a.reply,
         durationSec: snap.durationSec ?? a.durationSec ?? null, timings: snap.stageTimings, activity: snap.activity,
-        startedAt: snap.startedAt ?? null, finishedAt: snap.updatedAt ?? null,
+        startedAt: snap.startedAt ?? null, finishedAt: snap.updatedAt ?? null, analysis: snap.analysis ?? null,
         kind: snap.kind ?? a.kind, suggestions: snap.suggestions ?? a.suggestions,
       }
     }
@@ -124,6 +124,7 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
       return {
         ...a, status: snap.status, stage: snap.stage, progress: snap.progress, message: snap.message,
         timings: snap.stageTimings, activity: snap.activity, startedAt: snap.startedAt ?? null, kind: snap.kind ?? a.kind,
+        analysis: snap.analysis ?? null,
       }
     }
     return a.status === 'failed' ? { ...a, error: snap.error } : a
