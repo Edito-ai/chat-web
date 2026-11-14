@@ -3,6 +3,12 @@ import type { VideoProbe } from './probe'
 import type { ProjectShape } from './projectShape'
 
 /**
+ * The chat's own upload store on the backend. A video sent in a chat is not an item of a project's media library, so these
+ * routes live apart from the editor's (`/projects`, `/uploads`), which belong to that library.
+ */
+const STORE = '/chat/store'
+
+/**
  * The chat's upload path to the backend, trimmed from the editor's: create a project, upload each video into it
  * (one request for small files, chunked straight-to-R2 for big ones), and the asset id that comes back IS the
  * `videoId` for POST /chat/jobs. No thumbnails, peaks or checksums: the chat never shows a library.
@@ -16,7 +22,7 @@ const MAX_ATTEMPTS = 3
 const RETRY_BASE_MS = 1000
 
 export async function createChatProject(shape: ProjectShape): Promise<string> {
-  const project = await apiClient.post('/projects', {
+  const project = await apiClient.post(`${STORE}/projects`, {
     name: `Chat edit ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
     location: 'Chat',
     width: shape.width,
@@ -31,7 +37,7 @@ export async function createChatProject(shape: ProjectShape): Promise<string> {
 
 /** Best effort: removes an uploaded asset the user took out of the message. */
 export async function deleteAsset(assetId: string): Promise<void> {
-  await apiClient.delete(`/media/${encodeURIComponent(assetId)}`).catch(() => undefined)
+  await apiClient.delete(`${STORE}/media/${encodeURIComponent(assetId)}`).catch(() => undefined)
 }
 
 export interface UploadOptions {
@@ -63,7 +69,7 @@ export async function uploadVideo(projectId: string, file: File, probe: VideoPro
     }
   }
   // Retries exhausted (or cancelled): release the R2 session so it does not sit billing until the 24h sweep.
-  if (session) void apiClient.delete(`/uploads/${session.uploadId}`).catch(() => undefined)
+  if (session) void apiClient.delete(`${STORE}/uploads/${session.uploadId}`).catch(() => undefined)
   throw lastError
 }
 
@@ -89,7 +95,7 @@ async function uploadSingle(projectId: string, file: File, probe: VideoProbe, op
   if (m.height !== undefined) form.set('height', String(m.height))
   form.set('hasAudio', String(m.hasAudio))
   form.set('file', file, file.name)
-  const body = await apiClient.upload(`/projects/${encodeURIComponent(projectId)}/media`, form, { signal: opts.signal })
+  const body = await apiClient.upload(`${STORE}/projects/${encodeURIComponent(projectId)}/media`, form, { signal: opts.signal })
   opts.onProgress?.(1)
   return body.id as string
 }
@@ -117,7 +123,7 @@ async function uploadChunked(
     resume ??
     (await apiClient
       .post(
-        `/projects/${encodeURIComponent(projectId)}/uploads`,
+        `${STORE}/projects/${encodeURIComponent(projectId)}/uploads`,
         {
           filename: file.name,
           mimeType: file.type || 'application/octet-stream',
@@ -132,14 +138,14 @@ async function uploadChunked(
   const { uploadId, totalChunks, chunkSize } = session
 
   // The parts at R2 are the state: ask which exist rather than trusting anything remembered here.
-  const status = resume ? await apiClient.get(`/uploads/${uploadId}`, { signal }) : null
+  const status = resume ? await apiClient.get(`${STORE}/uploads/${uploadId}`, { signal }) : null
   const already = new Set<number>(status?.received ?? [])
   const parts: { partNumber: number; etag: string }[] = []
   let uploaded = already.size * chunkSize
 
   for (let index = 0; index < totalChunks; index++) {
     if (already.has(index)) continue
-    const issued = await apiClient.get(`/uploads/${uploadId}/parts/${index}/url`, { signal })
+    const issued = await apiClient.get(`${STORE}/uploads/${uploadId}/parts/${index}/url`, { signal })
     parts.push(await putPart(issued.url, issued.partNumber, file.slice(index * chunkSize, (index + 1) * chunkSize), signal))
     uploaded += Math.min(chunkSize, file.size - index * chunkSize)
     onProgress?.(Math.min(1, uploaded / file.size))
@@ -147,10 +153,10 @@ async function uploadChunked(
   // Completion needs every part's ETag; the status route only lists which exist, so a resumed upload re-PUTs
   // the ones already received (same part number just overwrites) to read the ETag back.
   for (const index of already) {
-    const issued = await apiClient.get(`/uploads/${uploadId}/parts/${index}/url`, { signal })
+    const issued = await apiClient.get(`${STORE}/uploads/${uploadId}/parts/${index}/url`, { signal })
     parts.push(await putPart(issued.url, issued.partNumber, file.slice(index * chunkSize, (index + 1) * chunkSize), signal))
   }
   parts.sort((a, b) => a.partNumber - b.partNumber)
-  const created = await apiClient.post(`/uploads/${uploadId}/complete`, { parts }, { signal })
+  const created = await apiClient.post(`${STORE}/uploads/${uploadId}/complete`, { parts }, { signal })
   return created.id as string
 }
