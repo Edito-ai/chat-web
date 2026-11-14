@@ -10,6 +10,7 @@ import { boldRuns, replyBlocks } from './replyText'
 import { useChat } from './chatStore'
 import { ActivitySummary, LiveActivity } from './ActivityPanel'
 import { ResultCard } from './ResultCard'
+import { ClipsBoard } from './ClipsBoard'
 import type { ChatAssistantMessage, ChatMessage, ChatSuggestion } from './chatTypes'
 
 function ErrorCard({ msg }: { msg: ChatAssistantMessage }) {
@@ -104,6 +105,14 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
   if (msg.kind === 'chat') {
     if (msg.status === 'complete') return <ChatReply msg={msg} chips={chips} onSuggest={onSuggest} />
     if (msg.status === 'queued' || msg.status === 'running') return lostJobId === msg.jobId ? <ErrorCard msg={{ ...msg, error: null }} /> : <Typing />
+  }
+  if (msg.status === 'complete' && msg.kind === 'clips') {
+    return (
+      <div className="space-y-2">
+        <ActivitySummary msg={msg} />
+        <ClipsBoard msg={msg} />
+      </div>
+    )
   }
   if (msg.status === 'complete') {
     return (

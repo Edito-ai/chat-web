@@ -55,11 +55,13 @@ export function applySnapshot(messages: readonly ChatMessage[], snap: ChatJobSna
       durationSec: snap.durationSec ?? m.durationSec ?? null,
       activity: snap.activity && snap.activity.length > 0 ? snap.activity : m.activity,
       lookChoice: terminal ? null : (snap.lookChoice ?? null),
+      ...(snap.clips ? { clips: snap.clips } : {}),
+      ...(snap.source !== undefined ? { source: snap.source } : {}),
     }
     if (snap.status === 'complete') {
       if (snap.result) return { ...base, status: 'complete', progress: 1, result: snap.result, error: null }
       // A plain reply has no video behind it, and that is a finished turn. Any other "complete" without one is a fault.
-      if (snap.kind === 'chat') return { ...base, status: 'complete', progress: 1, result: null, error: null }
+      if (snap.kind === 'chat' || snap.kind === 'clips') return { ...base, status: 'complete', progress: 1, result: null, error: null }
       return { ...base, status: 'failed', progress, result: null, error: snap.error ?? 'missing_result' }
     }
     if (snap.status === 'failed') {

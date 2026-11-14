@@ -30,6 +30,7 @@ const PROBLEM_KEY: Record<ChatSendProblem, MessageKey> = {
   uploading: 'chat.problem.uploading',
   uploadFailed: 'chat.problem.uploadFailed',
   twoReferences: 'chat.problem.twoReferences',
+  noStream: 'chat.problem.noStream',
 }
 
 const EXAMPLES = [1, 2, 3, 4] as const
@@ -75,6 +76,11 @@ export function ChatScreen() {
   const messages = useChat((s) => s.messages)
   const attachments = useChat((s) => s.attachments)
   const referenceLink = useChat((s) => s.referenceLink)
+  const clipsMode = useChat((s) => s.clipsMode)
+  const clipsOptions = useChat((s) => s.clipsOptions)
+  const { setClipsMode, setClipsOptions } = useChat.getState()
+  // Clipping is a backend2 feature; the same backend serves the templates, so their presence tells which backend answers.
+  const clipsOn = useStyles((s) => s.items) !== null
   const busy = useChat((s) => s.busy)
   const actionError = useChat((s) => s.actionError)
   const lostJobId = useChat((s) => s.pollLostJobId)
@@ -378,7 +384,7 @@ export function ChatScreen() {
                 if (problem) setProblem(null)
               }}
               textareaRef={textareaRef}
-              placeholder={t(hasVideo ? 'chat.composer.placeholderFollowUp' : 'chat.composer.placeholder')}
+              placeholder={t(clipsMode ? 'chat.clips.placeholder' : hasVideo ? 'chat.composer.placeholderFollowUp' : 'chat.composer.placeholder')}
               hints={hints}
               attachments={attachments}
               onRemoveAttachment={removeAttachment}
@@ -393,6 +399,10 @@ export function ChatScreen() {
               sendDisabled={sendDisabled}
               onSend={() => void submit()}
               onStop={() => void cancel()}
+              clipsMode={clipsMode}
+              clipsOptions={clipsOptions}
+              onClipsMode={clipsOn ? (on) => (requireAuth() ? setClipsMode(on) : undefined) : undefined}
+              onClipsOptions={setClipsOptions}
             />
             <p data-testid="chat-disclaimer" className="px-3 pt-0.5 text-center text-caption leading-snug text-ink-4">
               {t('chat.disclaimer.pre')}

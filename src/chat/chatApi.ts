@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/apiClient'
+import { toClips, toClipsSource } from './clips'
 import type { ActivityEvent, ChatApi, ChatJobSnapshot, ChatJobStatus, LookChoice, StageEvent, ChatSuggestion } from './chatTypes'
 
 /** The adapter the chat store talks to: the real `/chat/*` backend. Tests inject their own via `setChatApi`. */
@@ -51,6 +52,9 @@ export interface ChatJobWire {
     seconds?: number
     options?: { id?: string; label?: string; desc?: string; best?: boolean; imageUrl?: string }[]
   } | null
+  /** Stream clipping (kind `clips`): the clips, best first, and the footage they came from. */
+  clips?: unknown[]
+  source?: unknown
 }
 
 const ms = (iso: string | undefined | null): number | null => {
@@ -125,6 +129,7 @@ export function toSnapshot(w: ChatJobWire): ChatJobSnapshot {
     durationSec: w.turns?.find((t) => t.turn === (w.turn ?? 1))?.durationSec ?? null,
     activity: toActivity(w.activity),
     lookChoice: status === 'running' ? toLookChoice(w.lookChoice) : null,
+    ...(w.kind === 'clips' ? { clips: toClips(w.clips), source: toClipsSource(w.source) } : {}),
   }
 }
 
@@ -140,6 +145,9 @@ export const httpChatApi: ChatApi = {
           ...(input.styleId ? { styleId: input.styleId } : {}),
           ...(input.referenceVideoId ? { referenceVideoId: input.referenceVideoId } : {}),
           ...(input.referenceUrl ? { referenceUrl: input.referenceUrl } : {}),
+          ...(input.kind === 'clips'
+            ? { kind: 'clips', ...(input.sourceUrl ? { sourceUrl: input.sourceUrl } : {}), ...(input.clips ? { clips: input.clips } : {}) }
+            : {}),
         },
         { signal },
       )) as ChatJobWire,

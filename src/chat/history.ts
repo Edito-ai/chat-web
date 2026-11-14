@@ -112,12 +112,13 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
   return out.map((m): ChatMessage => {
     if (m.role !== 'assistant' || m.turn !== current) return m
     const a: ChatAssistantMessage = m
-    if (snap.status === 'complete' && (snap.result || snap.kind === 'chat')) {
+    if (snap.status === 'complete' && (snap.result || snap.kind === 'chat' || snap.kind === 'clips')) {
       return {
         ...a, status: 'complete', result: snap.result ?? null, reply: snap.reply ?? a.reply,
         durationSec: snap.durationSec ?? a.durationSec ?? null, timings: snap.stageTimings, activity: snap.activity,
         startedAt: snap.startedAt ?? null, finishedAt: snap.updatedAt ?? null,
         kind: snap.kind ?? a.kind, suggestions: snap.suggestions ?? a.suggestions,
+        ...(snap.clips ? { clips: snap.clips, source: snap.source ?? null } : {}),
       }
     }
     if (snap.status === 'running' || snap.status === 'queued') {

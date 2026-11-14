@@ -2,11 +2,12 @@
 
 import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import clsx from 'clsx'
-import { ArrowUp, Check, FolderOpen, Link2, Paperclip, Square, X, AlertCircle, Wand2 } from 'lucide-react'
+import { ArrowUp, Check, FolderOpen, Link2, Paperclip, Scissors, Square, X, AlertCircle, Wand2 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useTypewriter } from './useTypewriter'
 import { IconButton } from '@/components/ui'
 import type { ChatAttachment } from './chatStore'
+import type { ClipOptions } from './chatTypes'
 import { StylePicker } from './StylePicker'
 import { useStyles } from './styles'
 
@@ -87,6 +88,59 @@ export interface ComposerProps {
   sendDisabled: boolean
   onSend: () => void
   onStop: () => void
+  /** Clip mode (backend2): the next message cuts the best clips out of a long stream. Absent = no Clips button. */
+  clipsMode?: boolean
+  clipsOptions?: ClipOptions
+  onClipsMode?: (on: boolean) => void
+  onClipsOptions?: (o: Partial<ClipOptions>) => void
+}
+
+const COUNTS = [5, 8, 12, 15, 20] as const
+const LENGTHS = [
+  { minSec: 15, maxSec: 30 },
+  { minSec: 20, maxSec: 75 },
+  { minSec: 45, maxSec: 120 },
+] as const
+
+/** The clip-mode strip above the text box: what will happen, how many clips, how long each. */
+function ClipsBar({ options, onOptions, onOff }: { options: ClipOptions; onOptions: (o: Partial<ClipOptions>) => void; onOff: () => void }) {
+  const { t } = useT()
+  const len = LENGTHS.findIndex((l) => l.minSec === options.minSec && l.maxSec === options.maxSec)
+  const select = 'rounded-lg border border-line bg-surface-2 px-2 py-1 text-caption text-ink-0'
+  return (
+    <div data-testid="chat-clips-bar" className="flex flex-wrap items-center gap-2 px-3 pt-3 text-label">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/20 px-2.5 py-1 text-caption text-ink-0">
+        <Scissors size={12} aria-hidden /> {t('chat.clips.on')}
+      </span>
+      <label className="inline-flex items-center gap-1.5 text-caption text-ink-3">
+        {t('chat.clips.count')}
+        <select
+          data-testid="chat-clips-count"
+          value={options.count}
+          onChange={(e) => onOptions({ count: Number(e.target.value) })}
+          className={select}
+        >
+          {[...new Set([...COUNTS, options.count])].sort((a, b) => a - b).map((n) => (
+            <option key={n} value={n}>{n}</option>
+          ))}
+        </select>
+      </label>
+      <label className="inline-flex items-center gap-1.5 text-caption text-ink-3">
+        {t('chat.clips.length')}
+        <select
+          data-testid="chat-clips-length"
+          value={len < 0 ? 1 : len}
+          onChange={(e) => onOptions(LENGTHS[Number(e.target.value)] ?? LENGTHS[1])}
+          className={select}
+        >
+          {LENGTHS.map((l, i) => (
+            <option key={i} value={i}>{t('chat.clips.seconds', { min: l.minSec, max: l.maxSec })}</option>
+          ))}
+        </select>
+      </label>
+      <IconButton icon={X} size="sm" aria-label={t('chat.clips.off')} onClick={onOff} className="ml-auto h-6 w-6" />
+    </div>
+  )
 }
 
 /** Pill-shaped composer: attach chips on top, auto-growing textarea, attach on the left, send/stop on the right. */
@@ -113,9 +167,13 @@ export function Composer(p: ComposerProps) {
   }
   const typed = useTypewriter(p.hints ?? [], p.text === '' && !p.running)
   const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0 || !!p.referenceLink)
+  const typedHint = p.clipsMode ? '' : typed
   const stylesOn = useStyles((s) => s.items) !== null
   return (
     <div className="rounded-[1.75rem] border border-white/15 bg-surface-1/75 backdrop-blur-xl shadow-composer transition-[border-color,box-shadow] duration-200 focus-within:border-accent-line focus-within:shadow-[0_0_0_4px_rgb(255_158_140/0.10),0_20px_50px_-20px_rgb(0_0_0/0.9)]">
+      {p.clipsMode && p.clipsOptions && p.onClipsOptions && (
+        <ClipsBar options={p.clipsOptions} onOptions={p.onClipsOptions} onOff={() => p.onClipsMode?.(false)} />
+      )}
       {(p.attachments.length > 0 || p.referenceLink) && (
         <ul className="flex flex-wrap gap-2 px-3 pt-3">
           {p.referenceLink && (
@@ -157,7 +215,25 @@ export function Composer(p: ComposerProps) {
           onClick={p.onLibraryClick}
           className="shrink-0 rounded-full"
         />
-        <StylePicker disabled={p.attachDisabled} onReference={p.onAttachReference} onReferenceLink={p.onReferenceLink ?? undefined} />
+        {!p.clipsMode && (
+          <StylePicker disabled={p.attachDisabled} onReference={p.onAttachReference} onReferenceLink={p.onReferenceLink ?? undefined} />
+        )}
+        {p.onClipsMode && (
+          <button
+            type="button"
+            data-testid="chat-clips-toggle"
+            aria-pressed={!!p.clipsMode}
+            title={t('chat.clips.modeHint')}
+            disabled={p.attachDisabled}
+            onClick={() => p.onClipsMode?.(!p.clipsMode)}
+            className={clsx(
+              'inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3 text-label font-medium transition-colors disabled:opacity-40',
+              p.clipsMode ? 'bg-accent/20 text-ink-0' : 'text-ink-2 hover:bg-white/[0.06] hover:text-ink-0',
+            )}
+          >
+            <Scissors size={16} strokeWidth={1.75} aria-hidden /> {t('chat.clips.mode')}
+          </button>
+        )}
         <textarea
           ref={setRef}
           data-testid="chat-input"
@@ -166,7 +242,7 @@ export function Composer(p: ComposerProps) {
           rows={1}
           onChange={(e) => p.onText(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={typed || p.placeholder}
+          placeholder={typedHint || p.placeholder}
           className="scroll-thin order-first block max-h-44 min-h-[44px] w-full min-w-0 basis-full resize-none self-center bg-transparent px-2.5 py-2.5 text-[16px] leading-[1.5] text-ink-0 placeholder:text-ink-4 focus:!outline-none focus-visible:!outline-none sm:order-none sm:min-h-[40px] sm:w-auto sm:basis-0 sm:flex-1 sm:px-1 sm:text-prose"
         />
         {p.running ? (
