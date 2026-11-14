@@ -12,6 +12,7 @@ import {
 import type { ChatJobSnapshot, ChatMessage } from './chatTypes'
 import { getHistoryApi, rebuildMessages, toHistoryItem, type HistoryItem } from './history'
 import { useStyles } from './styles'
+import { getMusicApi, type MusicChoice } from './music'
 
 /** Time between polls; a failing poll backs off (x2 per miss) up to MAX_BACKOFF_MS. */
 export const POLL_MS = 2000
@@ -80,6 +81,8 @@ interface ChatState {
   /** Attach videos that are style references from the start (the "new style from a reference" entry). */
   attachReference: (files: File[]) => Promise<void>
   send: (prompt: string) => Promise<ChatSendProblem | null>
+  /** Changes the music of the finished video (backend2): a new turn that only re-mixes the sound. `label` is the line shown as the person's message. */
+  changeMusic: (choice: MusicChoice, label: string) => Promise<void>
   cancel: () => Promise<void>
   setReferenceLink: (url: string | null) => void
   /** The user picked a template on offer (or `null` = none of them): it leaves the screen at once, the server carries on. */
@@ -492,6 +495,28 @@ export const useChat = create<ChatState>()(
         }
         closeLook(jobId)
         return null
+      },
+
+      changeMusic: async (choice, label) => {
+        const s0 = get()
+        // Only a finished chat can change its music, and never while another turn is running.
+        if (s0.busy || !s0.jobId || !s0.canFollowUp || activeAssistant(s0.messages)) return
+        set({ busy: true, actionError: null })
+        try {
+          const snap = await getMusicApi().set(s0.jobId, choice)
+          const user: ChatMessage = { id: newId(), role: 'user', text: label, attachments: [] }
+          set((s) => ({
+            messages: applySnapshot(capMessages([...s.messages, user, newAssistant(newId(), snap.jobId, snap.turn)]), snap),
+            userId: currentUserId(),
+          }))
+          absorb(snap)
+          if (!isTerminal(snap.status)) void pollJob(snap.jobId)
+          void get().loadHistory()
+        } catch (e) {
+          set({ actionError: e })
+        } finally {
+          set({ busy: false })
+        }
       },
 
       cancel: async () => {

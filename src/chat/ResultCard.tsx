@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { Download, MinusCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 import { formatElapsed, splitReply } from './activity'
+import { activeAssistant, lastCompleted } from './chatState'
+import { useChat } from './chatStore'
+import { MusicPanel } from './MusicPanel'
 import type { ChatAssistantMessage } from './chatTypes'
 
 /** The finished video: player, the assistant's sentence, what the draft leaves out (chips), Download. */
@@ -12,6 +15,8 @@ export function ResultCard({ msg }: { msg: ChatAssistantMessage & { result: NonN
   const { result } = msg
   const { text, notIncluded } = splitReply(msg.reply)
   const [duration, setDuration] = useState<number | null>(null)
+  // The music card belongs to the newest finished video of the open chat, and only while nothing else is running.
+  const musicOn = useChat((s) => s.canFollowUp && s.jobId === msg.jobId && lastCompleted(s.messages)?.id === msg.id && !activeAssistant(s.messages))
   return (
     <div className="w-full max-w-xl animate-rise overflow-hidden rounded-2xl border border-line-strong bg-surface-1 shadow-lift">
       <video
@@ -74,6 +79,7 @@ export function ResultCard({ msg }: { msg: ChatAssistantMessage & { result: NonN
           </a>
         </div>
       </div>
+      {musicOn && <MusicPanel jobId={msg.jobId} turn={msg.turn} />}
     </div>
   )
 }
