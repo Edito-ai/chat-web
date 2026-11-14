@@ -112,8 +112,21 @@ export function ChatScreen() {
     }
   }
 
+  // Follow the newest message only while the person is already at the bottom (or has just sent something). Reading back up
+  // the chat is not yanked down every time a step updates.
+  const logRef = useRef<HTMLDivElement | null>(null)
+  const atBottom = useRef(true)
+  const onLogScroll = () => {
+    const el = logRef.current
+    if (el) atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 160
+  }
   useEffect(() => {
-    if (messages.length > 0 || attachments.length > 0) endRef.current?.scrollIntoView?.({ block: 'end' })
+    const last = messages[messages.length - 1]
+    const sentNow = last?.role === 'user'
+    if (sentNow) atBottom.current = true
+    if ((messages.length > 0 || attachments.length > 0) && (atBottom.current || sentNow)) {
+      endRef.current?.scrollIntoView?.({ block: 'end' })
+    }
   }, [messages, attachments.length])
 
   useEffect(() => {
@@ -303,7 +316,7 @@ export function ChatScreen() {
         )}
 
         {!library && !empty && (
-          <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
+          <div ref={logRef} onScroll={onLogScroll} className="scroll-thin min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto min-h-full w-full max-w-3xl px-4 py-4">
               <ol data-testid="chat-log" role="log" aria-label={t('chat.log.aria')} className="space-y-6 pb-4">
                 {messages.map((m, i) => (

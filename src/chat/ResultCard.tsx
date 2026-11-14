@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import clsx from 'clsx'
-import { Download, MinusCircle } from 'lucide-react'
+import { ChevronRight, Download, MinusCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 import { formatElapsed, splitReply } from './activity'
 import { boldRuns, replyBlocks } from './replyText'
@@ -40,7 +40,8 @@ export function ReplyText({ text }: { text: string }) {
   )
 }
 
-/** The footage before the edit and the finished edit, as frame sheets, side by side by a toggle. No card around them. */
+/** The frames of the footage before the edit, the final look and the finished edit. Shut by default: one quiet line, which
+ * opens the sheets below it and shuts them again. Nothing about it moves the rest of the chat. */
 export function SeenFrames({ analysis }: { analysis: ChatAnalysis }) {
   const { t } = useT()
   const sheets = [
@@ -49,31 +50,42 @@ export function SeenFrames({ analysis }: { analysis: ChatAnalysis }) {
     { id: 'planned', label: t('chat.saw.planned'), url: analysis.afterSheet ? null : analysis.plannedSheet },
     { id: 'after', label: t('chat.saw.after'), url: analysis.afterSheet },
   ].filter((s): s is { id: string; label: string; url: string } => !!s.url)
-  // the newest sheet shows by itself as it arrives, until the person picks one
+  const [open, setOpen] = useState(false)
   const [pick, setPick] = useState<string | null>(null)
   if (sheets.length === 0) return null
   const current = sheets.find((s) => s.id === pick) ?? sheets[sheets.length - 1]!
   return (
-    <section data-testid="chat-frames" aria-label={t('chat.saw.title')} className="space-y-2">
-      <div className="flex items-center gap-3">
-        <span className="text-label text-ink-3">{t('chat.saw.title')}</span>
-        {sheets.length > 1 &&
-          sheets.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setPick(s.id)}
-              aria-pressed={current.id === s.id}
-              className={clsx('text-label transition-colors', current.id === s.id ? 'text-ink-0 underline underline-offset-4' : 'text-ink-3 hover:text-ink-1')}
-            >
-              {s.label}
-            </button>
-          ))}
-      </div>
-      <a href={current.url} target="_blank" rel="noopener noreferrer" title={t('chat.saw.open')} className="block">
-        {/* eslint-disable-next-line @next/next/no-img-element -- a server-made contact sheet, not a static asset */}
-        <img src={current.url} alt={current.label} loading="lazy" className="w-full rounded-xl" />
-      </a>
+    <section data-testid="chat-frames" aria-label={t('chat.saw.title')} className="w-full max-w-xl">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="-ml-1 inline-flex min-h-[28px] items-center gap-1.5 rounded-md px-1 text-label text-ink-3 transition-colors hover:text-ink-1"
+      >
+        <ChevronRight size={13} aria-hidden className={clsx('transition-transform duration-200', open && 'rotate-90')} />
+        {t('chat.saw.title')}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          <div className="flex items-center gap-3">
+            {sheets.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setPick(s.id)}
+                aria-pressed={current.id === s.id}
+                className={clsx('text-label transition-colors', current.id === s.id ? 'text-ink-0 underline underline-offset-4' : 'text-ink-3 hover:text-ink-1')}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <a href={current.url} target="_blank" rel="noopener noreferrer" title={t('chat.saw.open')} className="block max-w-md">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a server-made contact sheet, not a static asset */}
+            <img src={current.url} alt={current.label} loading="lazy" className="w-full rounded-xl" />
+          </a>
+        </div>
+      )}
     </section>
   )
 }
