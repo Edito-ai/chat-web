@@ -155,7 +155,7 @@ describe('chat store: clipping', () => {
     const trim = vi.fn((_j: string, _c: string, _p: unknown) => new Promise<ChatJobSnapshot>((res) => {
       release = () => res(toSnapshot(clipsWire('complete', [wireClip('c01', 12, 30, { version: 1 })]) as never))
     }))
-    setClipsApi({ trim, lines: async () => ({ lines: [], durationSec: null }) } satisfies ClipsApi)
+    setClipsApi({ trim, lines: async () => ({ lines: [], durationSec: null }), studio: vi.fn(), setLook: vi.fn() } satisfies ClipsApi)
     const p = useChat.getState().trimClip('clip-job', 'c01', { start: 12, end: 30 })
     const during = (useChat.getState().messages[0] as ChatAssistantMessage).clips![0]!
     expect(during.state).toBe('cutting')
@@ -164,7 +164,7 @@ describe('chat store: clipping', () => {
     expect(trim).toHaveBeenCalledWith('clip-job', 'c01', { start: 12, end: 30 })
     expect((useChat.getState().messages[0] as ChatAssistantMessage).clips![0]).toMatchObject({ start: 12, end: 30, version: 1, state: 'ready' })
 
-    setClipsApi({ trim: async () => { throw new ApiError(400, 'A clip must be at least 3 seconds long.') }, lines: async () => ({ lines: [], durationSec: null }) })
+    setClipsApi({ trim: async () => { throw new ApiError(400, 'A clip must be at least 3 seconds long.') }, lines: async () => ({ lines: [], durationSec: null }), studio: vi.fn(), setLook: vi.fn() })
     expect(await useChat.getState().trimClip('clip-job', 'c01', { start: 12, end: 13 })).toContain('3 seconds')
     expect((useChat.getState().messages[0] as ChatAssistantMessage).clips![0]).toMatchObject({ start: 12, end: 30, state: 'ready' })
   })
@@ -198,8 +198,12 @@ describe('ClipsBoard', () => {
     await act(async () => { root.render(createElement(ClipsBoard, { msg: msg(clips) })) })
     expect(host.textContent).toContain('Found 2 clips in your 2 h stream.')
     expect(host.textContent).toContain('my stream')
-    expect(host.querySelectorAll('[data-testid^="chat-clip-c"]').length).toBe(3)
-    expect((q('chat-clip-video-c01') as HTMLVideoElement).getAttribute('src')).toContain('c01-0.mp4')
+    expect(host.querySelectorAll('li[data-testid^="chat-clip-c"]').length).toBe(3)
+    // the clip opens in its own page (the studio)
+    expect((q('chat-clip-open-c01') as HTMLAnchorElement).getAttribute('href')).toBe('/clips/clip-job/c01')
+    expect((q('chat-clip-open-c01')!.querySelector('img') as HTMLImageElement).getAttribute('src')).toContain('c01-0.jpg')
+    expect(q('chat-clip-captions-c01')).not.toBeNull()
+    expect(q('chat-clip-captions-c03')).toBeNull() // a failed clip cannot be captioned
     expect((q('chat-clip-download-c01') as HTMLAnchorElement).getAttribute('download')).toBe('Title c01.mp4')
     expect(q('chat-clip-c02')!.textContent).toContain('1:01:40')
     expect(q('chat-clip-c03')!.textContent).toContain('could not be cut')
@@ -235,3 +239,57 @@ describe('ClipsBoard', () => {
     expect(q('chat-clip-trimmer-c01')).toBeNull() // closed after a good apply
   })
 })
+
+const styledWire = (state: string, extra: Record<string, unknown> = {}) => ({
+  state, version: 1, error: null, captions: true, noWords: false,
+  videoUrl: state === 'ready' ? 'http://x/files/j/clips/c01-s1.mp4' : null,
+  downloadUrl: state === 'ready' ? 'http://x/files/j/clips/c01-s1.mp4?download=1' : null, downloadFilename: 'Title c01 (styled).mp4', ...extra,
+})
+const studioWire = (styled: unknown) => ({
+  clip: wireClip('c01', 10, 40, { styled }), look: { captions: { on: true, template: 'bold' }, music: { source: 'none', volume: 0.12 }, sfx: { on: false } },
+  templates: [{ id: 'bold', name: 'Bold Pop', desc: 'x', upper: true, style: { color: '#fff', accent: '#ff0', bg: null } }],
+  music: { suggestions: [], uploads: [], volume: { default: 0.12, max: 0.4 }, upload: { maxBytes: 80_000_000 } }, sourceTitle: 's', projectId: 'p',
+})
+
+describe('one-click captions', () => {
+  const clipMsg = () => useChat.setState({
+    jobId: 'clip-job',
+    messages: [{ id: 'a', role: 'assistant', jobId: 'clip-job', turn: 1, status: 'complete', stage: null, progress: 1, message: null,
+                 reply: 'x', result: null, error: null, kind: 'clips', clips: toClips([wireClip('c01', 10, 40)]) }],
+  })
+  const clipNow = () => (useChat.getState().messages[0] as ChatAssistantMessage).clips![0]!
+
+  it('maps the styled version of a clip', () => {
+    expect(toClips([wireClip('c01', 1, 5, { styled: styledWire('ready') })])[0]!.styled).toMatchObject({ state: 'ready', captions: true })
+    expect(toClips([wireClip('c01', 1, 5, { styled: { state: 'weird' } })])[0]!.styled).toBeNull()
+    expect(toClips([wireClip('c01', 1, 5)])[0]!.styled).toBeNull()
+  })
+
+  it('asks for captions only, follows the render, and the clip gets its captioned download', async () => {
+    clipMsg()
+    const { toStudio } = await import('../clips')
+    const setLook = vi.fn(async () => toStudio(studioWire(styledWire('rendering')))!)
+    let polls = 0
+    const studio = vi.fn(async () => toStudio(studioWire(styledWire(++polls < 2 ? 'rendering' : 'ready')))!)
+    setClipsApi({ trim: vi.fn(), lines: vi.fn(), setLook, studio } as unknown as ClipsApi)
+    const p = useChat.getState().captionClip('clip-job', 'c01')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(setLook).toHaveBeenCalledWith('clip-job', 'c01', { captions: { on: true } })
+    expect(clipNow().styled?.state).toBe('rendering')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(await p).toBeNull()
+    expect(clipNow().styled).toMatchObject({ state: 'ready', downloadUrl: 'http://x/files/j/clips/c01-s1.mp4?download=1' })
+  })
+
+  it('says why when the render fails or the server refuses', async () => {
+    clipMsg()
+    const { toStudio } = await import('../clips')
+    setClipsApi({ trim: vi.fn(), lines: vi.fn(), studio: vi.fn(),
+                  setLook: vi.fn(async () => toStudio(studioWire(styledWire('failed', { error: 'ffmpeg broke' })))!) } as unknown as ClipsApi)
+    expect(await useChat.getState().captionClip('clip-job', 'c01')).toBe('ffmpeg broke')
+    setClipsApi({ trim: vi.fn(), lines: vi.fn(), studio: vi.fn(),
+                  setLook: async () => { throw new ApiError(409, '409 This clip is being cut right now.') } } as unknown as ClipsApi)
+    expect(await useChat.getState().captionClip('clip-job', 'c01')).toContain('being cut')
+  })
+})
+

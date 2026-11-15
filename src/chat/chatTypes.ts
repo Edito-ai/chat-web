@@ -84,6 +84,22 @@ export interface ClipItem {
   thumbUrl: string | null
   downloadUrl: string | null
   downloadFilename: string
+  /** The clip with its look applied (captions / music / effects), once one was asked for. */
+  styled: ClipStyled | null
+}
+
+/** A clip with captions, music or effects: being rendered, ready (with its links) or failed (with the reason). */
+export interface ClipStyled {
+  state: 'rendering' | 'ready' | 'failed'
+  version: number
+  error: string | null
+  /** The captions are burnt in (false when captions were off, or the clip has no words). */
+  captions: boolean
+  /** The clip has no speech, so there was nothing to caption. */
+  noWords: boolean
+  videoUrl: string | null
+  downloadUrl: string | null
+  downloadFilename: string
 }
 
 /** The footage a clipping chat was made from. */

@@ -2,7 +2,8 @@
 
 import clsx from 'clsx'
 import { useEffect, useRef, useState } from 'react'
-import { Download, Loader2, Minus, Plus, Scissors } from 'lucide-react'
+import Link from 'next/link'
+import { Captions, Download, Loader2, Minus, Play, Plus, Scissors, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { useT } from '@/i18n'
 import { useChat } from './chatStore'
@@ -43,7 +44,16 @@ export function ClipsBoard({ msg }: { msg: ChatAssistantMessage }) {
 function ClipCard({ jobId, clip, rank, sourceSec }: { jobId: string; clip: ClipItem; rank: number; sourceSec: number | null }) {
   const { t } = useT()
   const [trimming, setTrimming] = useState(false)
+  const [captionProblem, setCaptionProblem] = useState<string | null>(null)
   const cutting = clip.state === 'cutting'
+  const styled = clip.styled
+  const styling = styled?.state === 'rendering'
+  const studioHref = `/clips/${encodeURIComponent(jobId)}/${encodeURIComponent(clip.id)}`
+  const caption = async () => {
+    setCaptionProblem(null)
+    const why = await useChat.getState().captionClip(jobId, clip.id)
+    if (why) setCaptionProblem(why)
+  }
   return (
     <li
       data-testid={`chat-clip-${clip.id}`}
@@ -51,17 +61,24 @@ function ClipCard({ jobId, clip, rank, sourceSec }: { jobId: string; clip: ClipI
     >
       <div className="relative bg-black">
         {clip.videoUrl ? (
-          <video
-            key={clip.videoUrl}
-            data-testid={`chat-clip-video-${clip.id}`}
-            aria-label={t('chat.clips.play', { title: clip.title })}
-            src={clip.videoUrl}
-            poster={clip.thumbUrl ?? undefined}
-            controls
-            playsInline
-            preload="none"
-            className={clsx('aspect-video w-full object-contain', cutting && 'opacity-40')}
-          />
+          <Link
+            href={studioHref}
+            data-testid={`chat-clip-open-${clip.id}`}
+            aria-label={t('chat.clips.open', { title: clip.title })}
+            className={clsx('group relative block aspect-video w-full', cutting && 'pointer-events-none opacity-40')}
+          >
+            {clip.thumbUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- a still served by the API, not a static asset
+              <img src={clip.thumbUrl} alt="" className="h-full w-full object-contain" />
+            ) : (
+              <span className="block h-full w-full bg-surface-2" />
+            )}
+            <span className="absolute inset-0 grid place-items-center bg-black/20 transition-colors group-hover:bg-black/40">
+              <span className="grid h-12 w-12 place-items-center rounded-full bg-white/90 text-black shadow-lift transition-transform group-hover:scale-105">
+                <Play size={20} fill="currentColor" aria-hidden />
+              </span>
+            </span>
+          </Link>
         ) : (
           <div className="grid aspect-video w-full place-items-center px-4 text-center text-label text-ink-3">
             {clip.state === 'failed' ? t('chat.clips.failed') : t('chat.clips.cutting')}
@@ -104,6 +121,26 @@ function ClipCard({ jobId, clip, rank, sourceSec }: { jobId: string; clip: ClipI
               <Download size={14} aria-hidden /> {t('chat.clips.download')}
             </a>
           )}
+          {clip.state === 'ready' && styled?.state === 'ready' && styled.captions && styled.downloadUrl ? (
+            <a
+              href={styled.downloadUrl}
+              download={styled.downloadFilename}
+              data-testid={`chat-clip-download-styled-${clip.id}`}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-accent-line bg-accent/15 px-3 text-label font-semibold text-ink-0 transition-colors hover:bg-accent/25"
+            >
+              <Captions size={14} aria-hidden /> {t('chat.clips.downloadCaptioned')}
+            </a>
+          ) : clip.state === 'ready' ? (
+            <Button
+              variant="secondary"
+              icon={styling ? Loader2 : Captions}
+              disabled={styling}
+              data-testid={`chat-clip-captions-${clip.id}`}
+              onClick={() => void caption()}
+            >
+              {styling ? t('chat.clips.captioning') : t('chat.clips.captions')}
+            </Button>
+          ) : null}
           {clip.state !== 'failed' && (
             <Button
               variant="secondary"
@@ -117,6 +154,23 @@ function ClipCard({ jobId, clip, rank, sourceSec }: { jobId: string; clip: ClipI
             </Button>
           )}
         </div>
+        {clip.state === 'ready' && (
+          <Link
+            href={studioHref}
+            data-testid={`chat-clip-studio-${clip.id}`}
+            className="inline-flex items-center gap-1.5 text-label font-medium text-accent hover:underline"
+          >
+            <Sparkles size={13} aria-hidden /> {t('chat.clips.studio')}
+          </Link>
+        )}
+        {(captionProblem || styled?.state === 'failed') && (
+          <p role="alert" className="text-label text-danger">
+            {captionProblem ?? styled?.error ?? t('chat.clips.styleFailed')}
+          </p>
+        )}
+        {styled?.state === 'ready' && styled.noWords && styled.captions === false && (
+          <p className="text-label text-ink-3">{t('chat.clips.noWords')}</p>
+        )}
         {trimming && !cutting && (
           <ClipTrim jobId={jobId} clip={clip} sourceSec={sourceSec} onDone={() => setTrimming(false)} />
         )}

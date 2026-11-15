@@ -11,6 +11,10 @@ import {
 } from './chatState'
 import type { ChatJobSnapshot, ChatMessage, ClipItem, ClipOptions } from './chatTypes'
 import { clampOptions, DEFAULT_CLIP_OPTIONS, getClipsApi, LONG_STREAM_SEC, splitLink, type ClipPatch } from './clips'
+
+/** How often a clip's render (captions / music / effects) is checked, and for how long at most. */
+export const STYLE_POLL_MS = 2000
+const STYLE_MAX_POLLS = 150
 import { getHistoryApi, rebuildMessages, toHistoryItem, type HistoryItem } from './history'
 import { useStyles } from './styles'
 import { getMusicApi, type MusicChoice } from './music'
@@ -62,6 +66,10 @@ interface ChatState {
   setClipsOptions: (o: Partial<ClipOptions>) => void
   /** New bounds / title for one clip of a clipping chat. Resolves with the reason when it fails. */
   trimClip: (jobId: string, clipId: string, patch: ClipPatch) => Promise<string | null>
+  /** One click: burn captions into a clip (default style) and follow the render. Resolves with the reason when it fails. */
+  captionClip: (jobId: string, clipId: string) => Promise<string | null>
+  /** A clip changed somewhere else (the studio page): the chat shows the new version. */
+  patchClip: (jobId: string, clip: ClipItem) => void
   /** Reading the picked files / creating the project / creating the job. */
   busy: boolean
   /** The last thing that went wrong outside a job (upload, create). Any thrown value. */
@@ -165,6 +173,17 @@ function closeLook(jobId: string): void {
 function setClips(jobId: string, clips: ClipItem[]): void {
   useChat.setState((s) => ({
     messages: s.messages.map((m): ChatMessage => (m.role === 'assistant' && m.jobId === jobId && m.kind === 'clips' ? { ...m, clips } : m)),
+  }))
+}
+
+/** One clip of a clipping chat replaced by a newer copy of it. */
+function replaceClip(jobId: string, clip: ClipItem): void {
+  useChat.setState((s) => ({
+    messages: s.messages.map((m): ChatMessage =>
+      m.role === 'assistant' && m.jobId === jobId && m.kind === 'clips' && m.clips
+        ? { ...m, clips: m.clips.map((c) => (c.id === clip.id ? clip : c)) }
+        : m,
+    ),
   }))
 }
 
@@ -308,6 +327,25 @@ export const useChat = create<ChatState>()(
           return e instanceof Error ? e.message : String(e)
         }
       },
+
+      captionClip: async (jobId, clipId) => {
+        try {
+          const api = getClipsApi()
+          let st = await api.setLook(jobId, clipId, { captions: { on: true } })
+          replaceClip(jobId, st.clip)
+          for (let i = 0; i < STYLE_MAX_POLLS && st.clip.styled?.state === 'rendering'; i++) {
+            await new Promise((r) => setTimeout(r, STYLE_POLL_MS))
+            st = await api.studio(jobId, clipId)
+            replaceClip(jobId, st.clip)
+          }
+          if (st.clip.styled?.state === 'failed') return st.clip.styled.error ?? 'failed'
+          return null
+        } catch (e) {
+          return e instanceof Error ? e.message : String(e)
+        }
+      },
+
+      patchClip: (jobId, clip) => replaceClip(jobId, clip),
 
       loadHistory: async () => {
         if (!currentUserId()) return
