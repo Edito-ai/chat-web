@@ -52,7 +52,7 @@ export function ThinkingTrail({ msg }: { msg: ChatAssistantMessage }) {
         onClick={() => setOpen((v) => !v)}
         disabled={running}
         aria-expanded={shown}
-        className="-ml-1 inline-flex min-h-[28px] items-center gap-1.5 rounded-md px-1 text-label text-ink-3 transition-colors enabled:hover:text-ink-1 disabled:cursor-default"
+        className="-ml-1 inline-flex min-h-[28px] items-center gap-1.5 rounded-md px-1 text-body text-ink-3 transition-colors enabled:hover:text-ink-1 disabled:cursor-default"
       >
         {!running && <ChevronRight size={13} aria-hidden className={clsx('transition-transform duration-200', open && 'rotate-90')} />}
         <span className={clsx(running && 'shimmer-text font-medium')}>{header}</span>
@@ -71,7 +71,7 @@ export function ThinkingTrail({ msg }: { msg: ChatAssistantMessage }) {
               </li>
             ) : (
               b.tools.map((tool) => (
-                <li key={tool.id} className="flex items-baseline gap-2 text-label text-ink-3">
+                <li key={tool.id} className="flex items-baseline gap-2 text-body text-ink-3">
                   <span
                     aria-hidden
                     className={clsx(
@@ -91,7 +91,7 @@ export function ThinkingTrail({ msg }: { msg: ChatAssistantMessage }) {
             ),
           )}
           {running && lines.length === 0 && (
-            <li className="text-label text-ink-3">{msg.message ?? t(`chat.stage.${knownStage(msg.stage) ?? 'working'}` as MessageKey)}</li>
+            <li className="text-body text-ink-3">{msg.message ?? t(`chat.stage.${knownStage(msg.stage) ?? 'working'}` as MessageKey)}</li>
           )}
         </ol>
       )}

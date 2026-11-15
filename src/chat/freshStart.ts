@@ -4,11 +4,21 @@
  */
 let done = false
 
-/** True the first time it is asked in this page load (the caller then starts the fresh chat), false afterwards. */
+/** A reload of the same tab keeps the chat that was open (the store restores it). Only a fresh open starts a new one. */
+function isReload(): boolean {
+  try {
+    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+    return nav?.type === 'reload'
+  } catch {
+    return false
+  }
+}
+
+/** True the first time it is asked in this page load (the caller then starts the fresh chat), false afterwards or on a reload. */
 export function takeFreshStart(): boolean {
   if (done) return false
   done = true
-  return true
+  return !isReload()
 }
 
 /** For screens that seed a chat on purpose (the dev preview): the seeded chat must survive the open. */

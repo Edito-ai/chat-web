@@ -30,6 +30,8 @@ export interface ChatJobWire {
   turns?: {
     turn: number
     prompt: string
+    /** Names of what that message carried (videos, pictures); shown on the message after a reload. */
+    attachments?: string[]
     kind?: string
     reply?: string | null
     state: string

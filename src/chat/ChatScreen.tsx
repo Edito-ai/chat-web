@@ -51,7 +51,6 @@ export function ChatScreen() {
   const history = useChat((s) => s.history)
   const historyState = useChat((s) => s.historyState)
   const currentJobId = useChat((s) => s.jobId)
-  const videoIds = useChat((s) => s.videoIds)
   const projectId = useChat((s) => s.projectId)
   const user = useAuth((s) => s.user)
   const signOut = () => {
@@ -312,7 +311,8 @@ export function ChatScreen() {
 
         {library && (
           <LibraryPage
-            lockProjectId={videoIds.length > 0 || attachments.length > 0 ? (projectId ?? null) : null}
+            // a chat's earlier footage does not lock the library: only what is picked for the next message does
+            lockProjectId={attachments.length > 0 ? (projectId ?? null) : null}
             onPick={(items) => {
               useChat.getState().attachFromLibrary(items)
               setView('chat')

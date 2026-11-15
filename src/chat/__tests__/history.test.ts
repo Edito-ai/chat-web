@@ -117,3 +117,13 @@ describe('stage timeline', () => {
     expect(splitReply(null).text).toBe('')
   })
 })
+
+describe('history order follows the last activity', () => {
+  it('a chat that got a new turn (or a re-edit) moves to the top of its group', () => {
+    const older = { ...item('older-made', at(0, 9)), updatedAt: at(0, 9) }
+    const retouched = { ...item('made-earlier', at(3, 9)), updatedAt: at(0, 11) }
+    const g = groupHistory([older, retouched], NOW)
+    expect(g.map((x) => x.id)).toEqual(['today'])
+    expect(g[0]!.items.map((i) => i.jobId)).toEqual(['made-earlier', 'older-made'])
+  })
+})
