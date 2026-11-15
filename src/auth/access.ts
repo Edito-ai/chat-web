@@ -6,7 +6,7 @@ export interface AccessContact {
   email: string
   phone: string
 }
-export const DEFAULT_CONTACT: AccessContact = { email: 'hello@trybroll.com', phone: '8595051170' }
+export const DEFAULT_CONTACT: AccessContact = { email: 'hello@trybroll.com', phone: '8595851170' }
 
 /** `unknown` = not asked yet (or the server could not say: the server enforces access either way). */
 export type AccessStatus = 'unknown' | 'approved' | 'pending'
