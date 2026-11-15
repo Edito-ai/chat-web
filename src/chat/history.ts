@@ -75,10 +75,11 @@ export function groupHistory(
   now: number,
 ): { id: HistoryGroupId; items: HistoryItem[] }[] {
   const pinned = items.filter((i) => i.pinned)
-  const rest = items.filter((i) => !i.pinned).sort((a, b) => b.createdAt - a.createdAt)
+  // a chat moves up when it was last touched (a new turn, a re-edit), not when it was first made
+  const rest = items.filter((i) => !i.pinned).sort((a, b) => b.updatedAt - a.updatedAt)
   return GROUP_ORDER.map((id) => ({
     id,
-    items: id === 'pinned' ? pinned : rest.filter((i) => groupOf(i.createdAt, now) === id),
+    items: id === 'pinned' ? pinned : rest.filter((i) => groupOf(i.updatedAt, now) === id),
   })).filter((g) => g.items.length > 0)
 }
 
@@ -91,7 +92,7 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
   const current = w.turn ?? 1
   const out: ChatMessage[] = []
   for (const t of w.turns ?? []) {
-    out.push({ id: `${w.id}:${t.turn}:u`, role: 'user', text: t.prompt, attachments: [] })
+    out.push({ id: `${w.id}:${t.turn}:u`, role: 'user', text: t.prompt, attachments: t.attachments ?? [] })
     out.push({
       ...newAssistant(`${w.id}:${t.turn}:a`, w.id, t.turn),
       status: t.state === 'complete' ? 'complete' : t.state === 'cancelled' ? 'cancelled' : 'failed',
