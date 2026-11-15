@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { API_BASE } from '@/lib/env'
-import { fetchOrExplain } from '@/lib/apiClient'
+import { apiClient, fetchOrExplain } from '@/lib/apiClient'
 import { friendlyError, isServerTrouble } from '@/lib/friendlyError'
 
 export interface AuthUser {
@@ -11,7 +11,41 @@ export interface AuthUser {
   emailVerifiedAt?: string | null
   /** From /auth/me; only decides whether the Admin entry shows, the backend re-checks every admin route. */
   isAdmin?: boolean
+  /** The phone number, masked by the server (`••••••1234`). Null/absent = never given. */
+  phone?: string | null
+  /** True until the onboarding screen was completed with a phone number (also for accounts older than the screen). */
+  needsOnboarding?: boolean
 }
+
+/** An address whose code (or Google account) was confirmed but that has no account yet: onboarding creates it. */
+export interface PendingSignup {
+  signupToken: string
+  email: string
+  name: string | null
+  via: 'email' | 'google'
+}
+
+/** What happened to the starter credit when onboarding was submitted. */
+export interface OnboardingCredit {
+  status: 'granted' | 'already_claimed' | 'phone_in_use' | 'off'
+  usd: number
+  tokens: number
+}
+
+/** The answers of the onboarding screen, as the backend takes them (`POST /auth/signup/complete`, `PATCH /auth/onboarding`). */
+export interface OnboardingPayload {
+  name: string
+  phone: string
+  contentTypes?: string[]
+  professionTypes?: string[]
+  referralSources?: string[]
+  socialPlatforms?: string[]
+  socialHandle?: string
+  followersCount?: number
+}
+
+/** `signedIn`: a session started. `signup`: nobody has this address yet, the onboarding screen comes next. */
+export type SignInResult = 'signedIn' | 'signup'
 
 type Status = 'restoring' | 'authenticated' | 'unauthenticated'
 
@@ -23,18 +57,23 @@ interface AuthState {
   refreshToken: string | null
   loading: boolean
   error: string | null
-  /** Set when a correct password hit an unverified account; the backend has already mailed a code. */
-  verificationEmail: string | null
+  /** A confirmed address with no account yet (set by the code step or Google); persisted so a reload does not lose it. */
+  pendingSignup: PendingSignup | null
+  /** Set when onboarding just finished: the success popup shows until `dismissCelebration`. */
+  celebration: OnboardingCredit | null
 
-  signup: (
-    email: string,
-    password: string,
-    name: string,
-    legalConsent?: { termsVersion: string; privacyVersion: string },
-  ) => Promise<void>
-  login: (email: string, password: string) => Promise<void>
-  loginWithCode: (email: string, code: string) => Promise<void>
+  /** Sends the sign-in code (an address with no account gets one too: it signs up after onboarding). */
   requestLoginCode: (email: string) => Promise<void>
+  loginWithCode: (email: string, code: string) => Promise<SignInResult>
+  /** `idToken` is the credential from Google Identity Services. */
+  loginWithGoogle: (idToken: string) => Promise<SignInResult>
+  /** Creates the account from the onboarding answers (new address) and signs in. */
+  completeSignup: (payload: OnboardingPayload, legalConsent?: { termsVersion: string; privacyVersion: string }) => Promise<void>
+  /** Onboarding of an account that already exists (it was made before the screen existed). */
+  submitOnboarding: (payload: OnboardingPayload) => Promise<void>
+  dismissCelebration: () => void
+  /** Leave the onboarding screen without finishing: back to the sign-in screen. */
+  cancelSignup: () => void
   logout: () => void
   restoreSession: () => Promise<void>
   silentRefresh: () => Promise<boolean>
@@ -47,6 +86,7 @@ export class AuthApiError extends Error {
     message: string,
     public details?: unknown,
     public status?: number,
+    public code?: string,
   ) {
     super(message)
     this.name = 'AuthApiError'
@@ -72,7 +112,7 @@ async function authFetch(path: string, body: unknown, accessToken?: string | nul
   })
   const isJson = res.headers.get('content-type')?.includes('application/json')
   const data = isJson ? await res.json().catch(() => undefined) : undefined
-  if (!res.ok) throw new AuthApiError(extractErrorMessage(data, `Request failed (${res.status})`), data?.details, res.status)
+  if (!res.ok) throw new AuthApiError(extractErrorMessage(data, `Request failed (${res.status})`), data?.details, res.status, data?.code)
   return data
 }
 
@@ -193,8 +233,27 @@ export const useAuth = create<AuthState>()(
           refreshToken: data.refreshToken,
           status: 'authenticated',
           loading: false,
-          verificationEmail: null,
+          pendingSignup: null,
         })
+
+      /** The answer of the code / Google step: a session, or "nobody has this address yet". */
+      const afterIdentity = (data: any): SignInResult => {
+        if (data?.needsSignup === true && typeof data.signupToken === 'string') {
+          set({
+            loading: false,
+            pendingSignup: { signupToken: data.signupToken, email: String(data.email ?? ''), name: data.name ?? null, via: data.via === 'google' ? 'google' : 'email' },
+          })
+          return 'signup'
+        }
+        startSession(data)
+        return 'signedIn'
+      }
+
+      /** A rejected sign-up token (too old / tampered) ends the onboarding: back to the sign-in screen with the reason. */
+      const signupFailed = (e: unknown, fallback: string) => {
+        const expired = e instanceof AuthApiError && e.code === 'signup_expired'
+        set({ loading: false, error: e instanceof Error ? e.message : fallback, ...(expired ? { pendingSignup: null } : {}) })
+      }
 
       return {
         status: 'restoring',
@@ -203,36 +262,13 @@ export const useAuth = create<AuthState>()(
         refreshToken: null,
         loading: false,
         error: null,
-        verificationEmail: null,
-
-        signup: async (email, password, name, legalConsent) => {
-          set({ loading: true, error: null })
-          try {
-            // No tokens come back: the account stays signed out until the emailed code is redeemed.
-            await authFetch('/auth/signup', { email, password, name, ...(legalConsent ? { legalConsent } : {}) })
-            set({ loading: false })
-          } catch (e) {
-            set({ loading: false, error: e instanceof Error ? e.message : 'Sign up failed' })
-            throw e
-          }
-        },
-
-        login: async (email, password) => {
-          set({ loading: true, error: null, verificationEmail: null })
-          try {
-            startSession(await authFetch('/auth/login', { email, password }))
-          } catch (e) {
-            const reason = e instanceof AuthApiError ? (e.details as { reason?: string } | undefined)?.reason : undefined
-            if (reason === 'email_not_verified') set({ loading: false, error: null, verificationEmail: email })
-            else set({ loading: false, error: e instanceof Error ? e.message : 'Log in failed' })
-            throw e
-          }
-        },
+        pendingSignup: null,
+        celebration: null,
 
         requestLoginCode: async (email) => {
           set({ loading: true, error: null })
           try {
-            await authFetch('/auth/otp/request', { email })
+            await authFetch('/auth/otp/request', { email, allowSignup: true })
             set({ loading: false })
           } catch (e) {
             set({ loading: false, error: e instanceof Error ? e.message : 'Failed to send code' })
@@ -243,16 +279,61 @@ export const useAuth = create<AuthState>()(
         loginWithCode: async (email, code) => {
           set({ loading: true, error: null })
           try {
-            startSession(await authFetch('/auth/otp/verify', { email, code }))
+            return afterIdentity(await authFetch('/auth/otp/verify', { email, code, allowSignup: true }))
           } catch (e) {
             set({ loading: false, error: e instanceof Error ? e.message : 'Invalid or expired code' })
             throw e
           }
         },
 
+        loginWithGoogle: async (idToken) => {
+          set({ loading: true, error: null })
+          try {
+            return afterIdentity(await authFetch('/auth/google', { idToken }))
+          } catch (e) {
+            set({ loading: false, error: e instanceof Error ? e.message : 'Google sign-in failed' })
+            throw e
+          }
+        },
+
+        completeSignup: async (payload, legalConsent) => {
+          const pending = get().pendingSignup
+          if (!pending) throw new Error('Your sign-up expired. Start again.')
+          set({ loading: true, error: null })
+          try {
+            const data = await authFetch('/auth/signup/complete', {
+              signupToken: pending.signupToken, ...payload, ...(legalConsent ? { legalConsent } : {}),
+            })
+            startSession(data)
+            set({ celebration: data.credit ?? { status: 'off', usd: 0, tokens: 0 } })
+          } catch (e) {
+            signupFailed(e, 'Could not create your account')
+            throw e
+          }
+        },
+
+        submitOnboarding: async (payload) => {
+          set({ loading: true, error: null })
+          try {
+            const data = (await apiClient.patch('/auth/onboarding', payload)) as { user?: AuthUser; credit?: OnboardingCredit | null }
+            set((s) => ({
+              loading: false,
+              user: data.user ? { ...(s.user ?? data.user), ...data.user } : s.user,
+              celebration: data.credit ?? { status: 'off', usd: 0, tokens: 0 },
+            }))
+          } catch (e) {
+            set({ loading: false, error: e instanceof Error ? e.message : 'Could not save your answers' })
+            throw e
+          }
+        },
+
+        dismissCelebration: () => set({ celebration: null }),
+
+        cancelSignup: () => set({ pendingSignup: null, error: null, loading: false }),
+
         logout: () => {
           const { refreshToken, accessToken } = get()
-          set({ user: null, accessToken: null, refreshToken: null, status: 'unauthenticated', error: null, verificationEmail: null })
+          set({ user: null, accessToken: null, refreshToken: null, status: 'unauthenticated', error: null, pendingSignup: null, celebration: null })
           // Best effort: the session is already cleared locally either way.
           if (accessToken) authFetch('/auth/logout', refreshToken ? { refreshToken } : {}, accessToken).catch(() => {})
         },
@@ -276,7 +357,7 @@ export const useAuth = create<AuthState>()(
     },
     {
       name: 'edito.chat-web.auth.v1',
-      partialize: (s) => ({ user: s.user, accessToken: s.accessToken, refreshToken: s.refreshToken }),
+      partialize: (s) => ({ user: s.user, accessToken: s.accessToken, refreshToken: s.refreshToken, pendingSignup: s.pendingSignup }),
     },
   ),
 )

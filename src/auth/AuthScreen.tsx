@@ -1,60 +1,45 @@
-import { useEffect, useState, type FormEvent } from 'react'
+'use client'
+
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { ArrowLeft, Loader2, MailCheck } from 'lucide-react'
 import { TERMS_URL } from '@/lib/links'
-import { Loader2 } from 'lucide-react'
 import { useT } from '@/i18n'
-import { Button, InlineError, LogoMark, Wordmark } from '@/components/ui'
+import { Button, InlineError } from '@/components/ui'
 import { BrandTile } from '@/components/BrandTile'
-import { API_BASE } from '@/lib/env'
+import { GOOGLE_CLIENT_ID } from '@/lib/env'
+import { AuthShell } from './AuthShell'
 import { useAuth } from './authStore'
+import { GoogleButton } from './google'
 import { clearPendingCode, loadPendingCode, savePendingCode } from './pendingCode'
 
-type Mode = 'login' | 'signup' | 'code'
+type Mode = 'start' | 'code'
 
-interface LegalVersions {
-  termsVersion: string
-  privacyVersion: string
-}
+/** A new code for the same address is not sent sooner than this (the server holds the same line). */
+export const RESEND_SECONDS = 45
+const CODE_LENGTH = 6
 
-/** Public `GET /legal`: the Terms/Privacy versions the consent box refers to. Best effort. */
-async function fetchLegalVersions(signal: AbortSignal): Promise<LegalVersions | null> {
-  const res = await fetch(`${API_BASE}/legal`, { signal, credentials: 'omit' })
-  if (!res.ok) return null
-  const body = await res.json()
-  const docs: { slug: string; version: string }[] = Array.isArray(body) ? body : (body?.documents ?? [])
-  const terms = docs.find((d) => d.slug === 'terms')
-  const privacy = docs.find((d) => d.slug === 'privacy')
-  return terms && privacy ? { termsVersion: terms.version, privacyVersion: privacy.version } : null
-}
-
+/**
+ * Sign in or sign up, one screen: "Continue with Google", or an email address and the 6-digit code mailed to it. There is no
+ * password. A person nobody knows yet is taken to the onboarding screen (see `Onboarding`) once the code / Google is confirmed;
+ * the account is created when they finish it.
+ */
 export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'signup' }) {
   const { t } = useT()
-  const { login, signup, loginWithCode, requestLoginCode, clearError } = useAuth.getState()
+  const { loginWithCode, loginWithGoogle, requestLoginCode, clearError } = useAuth.getState()
   const loading = useAuth((s) => s.loading)
   const error = useAuth((s) => s.error)
-  const verificationEmail = useAuth((s) => s.verificationEmail)
 
-  const [mode, setMode] = useState<Mode>(initialMode)
-  const [name, setName] = useState('')
+  const [mode, setMode] = useState<Mode>('start')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
-  const [agreed, setAgreed] = useState(false)
-  const [legal, setLegal] = useState<LegalVersions | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-
-  // A correct password on an unverified account: the backend already mailed a code, go straight to entering it.
-  useEffect(() => {
-    if (verificationEmail) {
-      setEmail(verificationEmail)
-      setMode('code')
-      savePendingCode(verificationEmail)
-    }
-  }, [verificationEmail])
+  const [resendIn, setResendIn] = useState(0)
+  const verifying = useRef(false)
 
   // Back from the mail app (on a phone the tab is often reloaded meanwhile): the code step, not an empty form.
   useEffect(() => {
     const pending = loadPendingCode()
-    if (pending && !useAuth.getState().verificationEmail) {
+    if (pending) {
       setEmail(pending)
       setCode('')
       setMode('code')
@@ -62,170 +47,196 @@ export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 
   }, [])
 
   useEffect(() => {
-    if (mode !== 'signup' || legal) return
-    const ctl = new AbortController()
-    fetchLegalVersions(ctl.signal).then(setLegal).catch(() => undefined)
-    return () => ctl.abort()
-  }, [mode, legal])
+    if (resendIn <= 0) return
+    const timer = setTimeout(() => setResendIn((s) => s - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [resendIn])
 
-  const go = (m: Mode) => {
-    if (m !== 'code') clearPendingCode() // leaving the code step on purpose: do not bring it back on the next visit
-    clearError()
+  const sendCode = async (e?: FormEvent) => {
+    e?.preventDefault()
     setNotice(null)
-    setMode(m)
-  }
-
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setNotice(null)
-    try {
-      if (mode === 'login') {
-        await login(email.trim(), password)
-        clearPendingCode()
-      } else if (mode === 'signup') {
-        await signup(email.trim(), password, name.trim(), legal && agreed ? legal : undefined)
-        savePendingCode(email.trim()) // the account exists and a code is on its way: survive a reload while they read their mail
-        setCode('')
-        setMode('code')
-      } else {
-        await loginWithCode(email.trim(), code.trim())
-        clearPendingCode()
-      }
-    } catch {
-      // the store holds the message
-    }
-  }
-
-  const resend = async () => {
     try {
       await requestLoginCode(email.trim())
-      savePendingCode(email.trim()) // a fresh code: the step is good for another while
-      setNotice(t('auth.resent'))
+      savePendingCode(email.trim()) // a code is on its way: survive a reload while they read their mail
+      setCode('')
+      setMode('code')
+      setResendIn(RESEND_SECONDS)
     } catch {
       // the store holds the message
     }
   }
 
-  const consentNeeded = mode === 'signup' && legal !== null
-  const canSubmit =
-    !loading &&
-    (mode === 'login'
-      ? email && password
-      : mode === 'signup'
-        ? email && password && name.trim() && (!consentNeeded || agreed)
-        : email && code.trim().length >= 4)
+  const verify = useCallback(
+    async (value: string) => {
+      if (verifying.current) return
+      verifying.current = true
+      setNotice(null)
+      try {
+        await loginWithCode(email.trim(), value)
+        clearPendingCode()
+      } catch {
+        setCode('') // a wrong code is typed again from the start
+      } finally {
+        verifying.current = false
+      }
+    },
+    [email, loginWithCode],
+  )
+
+  const resend = async () => {
+    if (resendIn > 0) return
+    setNotice(null)
+    try {
+      await requestLoginCode(email.trim())
+      savePendingCode(email.trim())
+      setNotice(t('auth.resent'))
+      setResendIn(RESEND_SECONDS)
+    } catch {
+      // the store holds the message
+    }
+  }
+
+  const onGoogle = useCallback(
+    async (idToken: string) => {
+      setNotice(null)
+      try {
+        await loginWithGoogle(idToken)
+        clearPendingCode()
+      } catch {
+        // the store holds the message
+      }
+    },
+    [loginWithGoogle],
+  )
+
+  const back = () => {
+    clearPendingCode() // leaving the code step on purpose: do not bring it back on the next visit
+    clearError()
+    setNotice(null)
+    setCode('')
+    setMode('start')
+  }
+
+  const onCode = (v: string) => {
+    const digits = v.replace(/\D/g, '').slice(0, CODE_LENGTH)
+    setCode(digits)
+    if (error) clearError()
+    if (digits.length === CODE_LENGTH) void verify(digits)
+  }
+
+  const emailOk = /^\S+@\S+\.\S+$/.test(email.trim())
+  const title = mode === 'code' ? t('auth.title.code') : t(`auth.title.${initialMode}`)
+  const sub = mode === 'code' ? t('auth.sub.code', { email: email.trim() }) : t(`auth.sub.${initialMode}`)
 
   return (
-    <main className="relative isolate flex min-h-full w-full flex-col overflow-hidden bg-[linear-gradient(to_top_right,#0e1020_0%,#2b3a5e_24%,#8a1c3a_44%,#c0202f_56%,#e4776d_76%,#ffc4ae_100%)] text-ink-1">
-      <div aria-hidden className="absolute -right-32 -top-32 -z-10 h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(closest-side,rgb(255_226_210/0.5),transparent)] blur-2xl" />
-      <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(120%_90%_at_0%_100%,rgb(5_6_14/0.5),transparent_60%)]" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-24 -left-16 -z-10 hidden animate-orb-idle opacity-[0.10] lg:block">
-        <LogoMark size={520} className="bg-white" />
-      </div>
+    <AuthShell>
+      <div className="space-y-6">
+        <BrandTile size={60} className="mx-auto" />
+        <div className="space-y-1.5 text-center">
+          <h1 data-testid="auth-title" className="font-display text-[1.45rem] font-bold leading-tight tracking-[-0.02em] text-ink-0">
+            {title}
+          </h1>
+          <p className="text-body text-ink-3">{sub}</p>
+        </div>
 
-      <header className="relative flex items-center justify-between px-5 py-5 sm:px-8 sm:py-6">
-        <span className="text-white">
-          <Wordmark height={20} />
-        </span>
-      </header>
-
-      <div className="relative flex flex-1 flex-col items-center justify-center px-5 pb-8">
-        <div className="w-full max-w-sm space-y-6 rounded-3xl border border-white/15 bg-[#090c1a]/80 p-6 shadow-[0_40px_100px_-30px_rgb(0_0_0/0.9)] backdrop-blur-xl sm:p-8">
-          <BrandTile size={60} className="mx-auto" />
-          <div className="space-y-1.5 text-center">
-            <h1 data-testid="auth-title" className="font-display text-[1.45rem] font-bold leading-tight tracking-[-0.02em] text-ink-0">{t(`auth.title.${mode}`)}</h1>
-            <p className="text-body text-ink-3">{mode === 'code' ? t('auth.sub.code', { email }) : t(`auth.sub.${mode}`)}</p>
-          </div>
-
-        <form onSubmit={onSubmit} className="space-y-3" noValidate>
-          {mode === 'signup' && (
-            <label className="block space-y-1">
-              <span className="text-label text-ink-2">{t('auth.name')}</span>
-              <input className="field" name="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
-            </label>
-          )}
-          {mode !== 'code' && (
-            <>
+        {mode === 'start' ? (
+          <div className="space-y-4">
+            {GOOGLE_CLIENT_ID && (
+              <>
+                <GoogleButton onCredential={(tok) => void onGoogle(tok)} disabled={loading} />
+                <div className="flex items-center gap-3 text-caption uppercase tracking-[0.14em] text-ink-4">
+                  <span className="h-px flex-1 bg-white/10" />
+                  {t('auth.or')}
+                  <span className="h-px flex-1 bg-white/10" />
+                </div>
+              </>
+            )}
+            <form onSubmit={(e) => void sendCode(e)} className="space-y-3" noValidate>
               <label className="block space-y-1">
                 <span className="text-label text-ink-2">{t('auth.email')}</span>
                 <input
                   className="field"
                   name="email"
                   type="email"
+                  inputMode="email"
                   autoComplete="email"
+                  autoFocus
+                  placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    if (error) clearError()
+                  }}
                 />
               </label>
-              <label className="block space-y-1">
-                <span className="text-label text-ink-2">{t('auth.password')}</span>
-                <input
-                  className="field"
-                  name="password"
-                  type="password"
-                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                {mode === 'signup' && <span className="block text-caption text-ink-4">{t('auth.passwordHint')}</span>}
-              </label>
-            </>
-          )}
-          {mode === 'code' && (
+              {error && <InlineError message={error} />}
+              <Button type="submit" variant="primary" className="h-11 w-full" disabled={loading || !emailOk} data-testid="auth-submit">
+                {loading && <Loader2 size={14} className="animate-spin" aria-hidden />}
+                {t('auth.sendCode')}
+              </Button>
+            </form>
+          </div>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (code.length === CODE_LENGTH) void verify(code)
+            }}
+            className="space-y-4"
+            noValidate
+          >
+            <div className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-accent/15 text-accent">
+              <MailCheck size={20} aria-hidden />
+            </div>
             <label className="block space-y-1">
-              <span className="text-label text-ink-2">{t('auth.code')}</span>
+              <span className="sr-only">{t('auth.code')}</span>
               <input
-                className="field tracking-[0.3em]"
+                className="field h-14 text-center font-mono text-[1.6rem] tracking-[0.55em]"
                 name="code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={8}
+                autoFocus
+                maxLength={CODE_LENGTH}
+                placeholder="······"
+                aria-label={t('auth.code')}
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => onCode(e.target.value)}
               />
             </label>
-          )}
-          {consentNeeded && (
-            <label className="flex items-start gap-2 text-label text-ink-2">
-              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#FF7A5C]" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-              <span>
-                {t('auth.consent')}{' '}
-                <a href={TERMS_URL} target="_blank" rel="noopener noreferrer" data-testid="auth-terms-link" className="underline decoration-white/30 underline-offset-2 hover:text-ink-0">
-                  {t('auth.consent.read')}
-                </a>
-              </span>
-            </label>
-          )}
+            {error && <InlineError message={error} />}
+            {notice && (
+              <p role="status" className="text-center text-label text-success">
+                {notice}
+              </p>
+            )}
+            <Button type="submit" variant="primary" className="h-11 w-full" disabled={loading || code.length !== CODE_LENGTH} data-testid="auth-submit">
+              {loading && <Loader2 size={14} className="animate-spin" aria-hidden />}
+              {t('auth.verify')}
+            </Button>
+            <div className="flex flex-col items-center gap-1 text-label">
+              <button
+                type="button"
+                data-testid="auth-resend"
+                disabled={resendIn > 0 || loading}
+                className="rounded px-1 py-1 text-ink-1 underline-offset-2 enabled:hover:underline disabled:text-ink-4"
+                onClick={() => void resend()}
+              >
+                {resendIn > 0 ? t('auth.resendIn', { s: resendIn }) : t('auth.resend')}
+              </button>
+              <button type="button" className="inline-flex items-center gap-1 rounded px-1 py-1 text-ink-3 underline-offset-2 hover:text-ink-1 hover:underline" onClick={back}>
+                <ArrowLeft size={12} aria-hidden /> {t('auth.back')}
+              </button>
+            </div>
+          </form>
+        )}
 
-          {error && <InlineError message={error} />}
-          {notice && <p role="status" className="text-label text-success">{notice}</p>}
-
-          <Button type="submit" variant="primary" className="h-11 w-full" disabled={!canSubmit} data-testid="auth-submit">
-            {loading && <Loader2 size={14} className="animate-spin" aria-hidden />}
-            {t(mode === 'login' ? 'auth.login' : mode === 'signup' ? 'auth.signup' : 'auth.verify')}
-          </Button>
-        </form>
-
-        <div className="flex flex-col items-center gap-1 text-label">
-          {mode === 'code' && (
-            <button type="button" className="self-center rounded px-1 py-1 text-ink-1 underline-offset-2 hover:underline" onClick={() => void resend()}>
-              {t('auth.resend')}
-            </button>
-          )}
-          {mode === 'login' && (
-            <button type="button" className="self-center rounded px-1 py-1 text-ink-1 underline-offset-2 hover:underline" onClick={() => go('signup')}>
-              {t('auth.toSignup')}
-            </button>
-          )}
-          {mode !== 'login' && (
-            <button type="button" className="self-center rounded px-1 py-1 text-ink-3 underline-offset-2 hover:text-ink-1 hover:underline" onClick={() => go('login')}>
-              {mode === 'code' ? t('auth.back') : t('auth.toLogin')}
-            </button>
-          )}
-        </div>
-        </div>
-        <p className="mt-6 max-w-sm text-center font-display text-caption font-medium leading-relaxed text-white/85">{t('chat.empty.title')}</p>
+        <p className="text-center text-caption leading-relaxed text-ink-4">
+          {t('auth.terms.pre')}{' '}
+          <a href={TERMS_URL} target="_blank" rel="noopener noreferrer" data-testid="auth-terms-link" className="underline decoration-white/30 underline-offset-2 hover:text-ink-1">
+            {t('auth.consent.read')}
+          </a>
+        </p>
       </div>
-    </main>
+    </AuthShell>
   )
 }

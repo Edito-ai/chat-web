@@ -85,3 +85,19 @@
   from { background-position: 120% 0; }
   to { background-position: -120% 0; }
 }
+
+/* The one-shot confetti of the onboarding popup (see auth/Confetti.tsx). */
+.confetti-piece {
+  position: absolute;
+  top: -4vh;
+  opacity: 0;
+  animation: confettiFall var(--dur, 3s) cubic-bezier(0.25, 0.6, 0.4, 1) var(--delay, 0s) 1 both;
+}
+@keyframes confettiFall {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--dx, 0px), 108vh, 0) rotate(var(--rot, 360deg)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confetti-piece { display: none; }
+}

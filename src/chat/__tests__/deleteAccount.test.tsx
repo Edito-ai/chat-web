@@ -46,15 +46,15 @@ async function typePassword(value: string) {
 const submit = () => act(async () => void ($('chat-delete-confirm') as HTMLButtonElement).click())
 
 describe('deleteAccount', () => {
-  it('sends DELETE /account with the password in the body', async () => {
+  it('sends DELETE /account with the typed email in the body (there is no password to ask)', async () => {
     del.mockResolvedValue(undefined)
-    await deleteAccount('hunter2')
-    expect(del).toHaveBeenCalledWith('/account', { body: { password: 'hunter2' } })
+    await deleteAccount('a@b.com')
+    expect(del).toHaveBeenCalledWith('/account', { body: { confirmEmail: 'a@b.com' } })
   })
 
   it('lets the server refusal through, so the dialog can say why', async () => {
     del.mockImplementation(async () => {
-      throw new ApiError(400, '400 Password is incorrect.')
+      throw new ApiError(400, '400 That is not the email of this account.')
     })
     const err = await deleteAccount('x').then(() => null, (e: unknown) => e)
     expect(err).toBeInstanceOf(ApiError)
@@ -64,7 +64,7 @@ describe('deleteAccount', () => {
 
 describe('what a refused deletion says', () => {
   it("maps the status to the wording the dialog has: wrong password, too many tries, or the server's own sentence", () => {
-    expect(deleteProblem(new ApiError(400, '400 Password is incorrect.'))).toBe('wrong')
+    expect(deleteProblem(new ApiError(400, '400 That is not the email of this account.'))).toBe('wrong')
     expect(deleteProblem(new ApiError(429, '429 Too many'))).toBe('tooMany')
     expect(deleteProblem(new ApiError(409, '409 An admin account cannot delete itself here.'))).toEqual({
       text: 'An admin account cannot delete itself here.',
@@ -74,33 +74,35 @@ describe('what a refused deletion says', () => {
 })
 
 describe('the delete dialog', () => {
-  it('names the account, says what goes, and cannot be confirmed without a password', async () => {
+  it('names the account, says what goes, and cannot be confirmed until the email is typed', async () => {
     await open()
     expect(document.body.textContent).toContain('a@b.com')
     expect(document.body.textContent).toContain('cannot be undone')
     expect(($('chat-delete-confirm') as HTMLButtonElement).disabled).toBe(true)
     await typePassword('x')
-    expect(($('chat-delete-confirm') as HTMLButtonElement).disabled).toBe(false)
+    expect(($('chat-delete-confirm') as HTMLButtonElement).disabled).toBe(true) // not this account's email
+    await typePassword(' A@B.com ')
+    expect(($('chat-delete-confirm') as HTMLButtonElement).disabled).toBe(false) // case and spaces do not matter
     expect(del).not.toHaveBeenCalled()
   })
 
-  it('deletes with the typed password and then tells the caller (which signs the person out)', async () => {
+  it('deletes with the typed email and then tells the caller (which signs the person out)', async () => {
     del.mockResolvedValue(undefined)
     const { onDeleted } = await open()
-    await typePassword('correct-horse')
+    await typePassword('a@b.com')
     await submit()
-    expect(del).toHaveBeenCalledWith('/account', { body: { password: 'correct-horse' } })
+    expect(del).toHaveBeenCalledWith('/account', { body: { confirmEmail: 'a@b.com' } })
     expect(onDeleted).toHaveBeenCalledTimes(1)
   })
 
-  it('a wrong password shows the reason, keeps the dialog open and signs nobody out', async () => {
+  it('a refusal shows the reason, keeps the dialog open and signs nobody out', async () => {
     del.mockImplementation(async () => {
-      throw new ApiError(400, '400 Password is incorrect.')
+      throw new ApiError(400, '400 That is not the email of this account.')
     })
     const { onDeleted, onClose } = await open()
-    await typePassword('nope')
+    await typePassword('a@b.com')
     await submit()
-    expect($('chat-delete-error')?.textContent).toBe('That password is not right.')
+    expect($('chat-delete-error')?.textContent).toBe('That is not the email of this account.')
     expect(onDeleted).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
     expect(($('chat-delete-confirm') as HTMLButtonElement).disabled).toBe(false) // can try again

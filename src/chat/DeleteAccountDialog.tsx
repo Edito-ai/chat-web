@@ -24,17 +24,19 @@ export function deleteProblem(e: unknown): 'wrong' | 'tooMany' | { text: string 
  */
 export function DeleteAccountDialog({ email, onClose, onDeleted }: { email: string; onClose: () => void; onDeleted: () => void }) {
   const { t } = useT()
-  const [password, setPassword] = useState('')
+  const [typed, setTyped] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const matches = typed.trim().toLowerCase() === email.trim().toLowerCase() && typed.trim() !== ''
+
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    if (busy || password === '') return
+    if (busy || !matches) return
     setBusy(true)
     setError(null)
     try {
-      await accountApi().deleteAccount(password)
+      await accountApi().deleteAccount(typed.trim())
       onDeleted()
     } catch (err) {
       const p = deleteProblem(err)
@@ -53,16 +55,16 @@ export function DeleteAccountDialog({ email, onClose, onDeleted }: { email: stri
           <li>{t('acct.delete.item3')}</li>
         </ul>
         <label className="block space-y-1">
-          <span className="text-label text-ink-2">{t('acct.delete.password')}</span>
+          <span className="text-label text-ink-2">{t('acct.delete.typeEmail', { email })}</span>
           <input
             className="field"
             data-testid="chat-delete-password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
+            type="email"
+            autoComplete="off"
+            value={typed}
             disabled={busy}
             onChange={(e) => {
-              setPassword(e.target.value)
+              setTyped(e.target.value)
               setError(null)
             }}
           />
@@ -79,7 +81,7 @@ export function DeleteAccountDialog({ email, onClose, onDeleted }: { email: stri
           <button
             type="submit"
             data-testid="chat-delete-confirm"
-            disabled={busy || password === ''}
+            disabled={busy || !matches}
             className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-danger px-3.5 text-body font-semibold text-white transition-[filter,opacity] hover:brightness-110 disabled:pointer-events-none disabled:opacity-40"
           >
             {busy ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Trash2 size={14} aria-hidden />}

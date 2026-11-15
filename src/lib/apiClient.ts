@@ -89,6 +89,8 @@ export const apiClient = {
     request(path, { method: 'POST', body: json(body), signal: opts?.signal, headers: opts?.headers }),
   put: (path: string, body?: unknown, opts?: Opts) =>
     request(path, { method: 'PUT', body: json(body), signal: opts?.signal, headers: opts?.headers }),
+  patch: (path: string, body?: unknown, opts?: Opts) =>
+    request(path, { method: 'PATCH', body: json(body), signal: opts?.signal, headers: opts?.headers }),
   delete: (path: string, opts?: BodyOpts) => request(path, { method: 'DELETE', body: json(opts?.body), signal: opts?.signal, headers: opts?.headers }),
   upload: (path: string, formData: FormData, opts?: Opts) =>
     request(path, { method: 'POST', body: formData, signal: opts?.signal }),
