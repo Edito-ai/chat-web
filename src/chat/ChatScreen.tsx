@@ -21,6 +21,8 @@ import { TID } from './testIds'
 import { isSubscriptionRequired } from '@/account/lib/freeCredit'
 
 const VIDEO_ACCEPT = 'video/*,.mp4,.mov,.avi,.mkv,.webm,.m4v'
+/** A logo or photo to place in the video (see the picture placement in backend2). */
+const PICTURE_ACCEPT = 'image/*,.jpg,.jpeg,.png,.webp'
 
 const PROBLEM_KEY: Record<ChatSendProblem, MessageKey> = {
   noVideo: 'chat.problem.noVideo',
@@ -40,6 +42,8 @@ export function ChatScreen() {
   const { t } = useT()
   const messages = useChat((s) => s.messages)
   const attachments = useChat((s) => s.attachments)
+  const pictures = useChat((s) => s.pictures)
+  const placementJobId = useChat((s) => s.placementJobId)
   const referenceLink = useChat((s) => s.referenceLink)
   const busy = useChat((s) => s.busy)
   const actionError = useChat((s) => s.actionError)
@@ -63,7 +67,7 @@ export function ChatScreen() {
     if (authStatus !== 'restoring') router.push('/login')
     return false
   }
-  const { attach, removeAttachment, toggleReference, attachReference, setReferenceLink, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob, pinChat, deleteChat } =
+  const { attach, removeAttachment, removePicture, toggleReference, attachReference, setReferenceLink, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob, pinChat, deleteChat } =
     useChat.getState()
   const loadStyles = useStyles((s) => s.load)
   const [text, setText] = useState('')
@@ -83,7 +87,9 @@ export function ChatScreen() {
   const empty = messages.length === 0
   const library = view === 'library'
   const hasVideo = lastCompleted(messages) !== null
-  const uploading = attachments.some((a) => a.state === 'uploading')
+  const uploading = attachments.some((a) => a.state === 'uploading') || pictures.some((p) => p.state === 'uploading')
+  // While the job asks where a picture goes, the box takes the answer (the job is still running, but not blocked)
+  const sendBlocked = running && placementJobId === null
   // While nothing is happening the empty box types example prompts: first the starter ideas, then follow-up changes.
   const hints = (messages.length === 0 ? EXAMPLES.map((n) => t(`chat.example.${n}.prompt` as MessageKey)) : ([1, 2, 3, 4] as const).map((n) => t(`chat.nudge.${n}` as MessageKey)))
 
@@ -137,7 +143,7 @@ export function ChatScreen() {
   }, [drawer])
 
   const submit = async () => {
-    if (running || busy || !requireAuth()) return
+    if (sendBlocked || busy || !requireAuth()) return
     const prompt = text
     const p = await send(prompt)
     setProblem(p)
@@ -173,7 +179,7 @@ export function ChatScreen() {
     void openJob(jobId)
   }
 
-  const sendDisabled = busy || running || uploading
+  const sendDisabled = busy || sendBlocked || uploading
   const needCredit = actionError !== null && isSubscriptionRequired(actionError)
   const showTopError = actionError !== null && lostJobId === null
 
@@ -356,7 +362,7 @@ export function ChatScreen() {
               data-testid="chat-file-input"
               type="file"
               multiple
-              accept={VIDEO_ACCEPT}
+              accept={`${VIDEO_ACCEPT},${PICTURE_ACCEPT}`}
               hidden
               onChange={(e) => {
                 if (e.target.files && requireAuth()) void attach(Array.from(e.target.files))
@@ -374,13 +380,15 @@ export function ChatScreen() {
               hints={hints}
               attachments={attachments}
               onRemoveAttachment={removeAttachment}
+              pictures={pictures}
+              onRemovePicture={removePicture}
               onToggleReference={toggleReference}
               onAttachReference={(files) => (requireAuth() ? void attachReference(files) : undefined)}
               referenceLink={referenceLink}
               onReferenceLink={(url) => (url === null || requireAuth() ? setReferenceLink(url) : undefined)}
               onAttachClick={() => (requireAuth() ? fileRef.current?.click() : undefined)}
-              attachDisabled={busy || running}
-              running={running}
+              attachDisabled={busy || sendBlocked}
+              running={sendBlocked}
               sendDisabled={sendDisabled}
               onSend={() => void submit()}
               onStop={() => void cancel()}

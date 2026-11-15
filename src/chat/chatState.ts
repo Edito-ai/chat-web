@@ -55,6 +55,7 @@ export function applySnapshot(messages: readonly ChatMessage[], snap: ChatJobSna
       durationSec: snap.durationSec ?? m.durationSec ?? null,
       activity: snap.activity && snap.activity.length > 0 ? snap.activity : m.activity,
       lookChoice: terminal ? null : (snap.lookChoice ?? null),
+      placementQuestion: terminal ? null : (snap.placementQuestion ?? null),
       analysis: snap.analysis ?? m.analysis ?? null,
     }
     if (snap.status === 'complete') {

@@ -186,6 +186,11 @@ export function Bubble({ msg, chips = false, onSuggest }: { msg: ChatMessage; ch
       </div>
       <div className="min-w-0 max-w-full flex-1">
         <span className="sr-only">{t('chat.assistant')}: </span>
+        {msg.placementQuestion && (
+          <p data-testid="chat-placement-question" className="mb-2 whitespace-pre-wrap break-words text-prose text-ink-0">
+            {msg.placementQuestion}
+          </p>
+        )}
         <AssistantBody msg={msg} chips={chips} onSuggest={onSuggest} />
       </div>
     </li>

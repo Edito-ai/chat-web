@@ -21,6 +21,9 @@ export interface ChatJobWire {
   title?: string | null
   stageTimings?: { state: string; stage?: string | null; at: string }[]
   kind?: string
+  /** Waiting for the answer about where an attached picture goes. */
+  placementOpen?: boolean
+  placementQuestion?: string | null
   /** Pinned to the top of the chat list. */
   pinned?: boolean
   suggestions?: { id: string; label: string; action: string; prompt?: string | null }[]
@@ -163,6 +166,8 @@ export function toSnapshot(w: ChatJobWire): ChatJobSnapshot {
     activity: toActivity(w.activity),
     analysis: toAnalysis(w.analysis),
     lookChoice: status === 'running' ? toLookChoice(w.lookChoice) : null,
+    placementOpen: w.placementOpen ?? false,
+    placementQuestion: w.placementQuestion ?? null,
   }
 }
 
@@ -178,13 +183,19 @@ export const httpChatApi: ChatApi = {
           ...(input.styleId ? { styleId: input.styleId } : {}),
           ...(input.referenceVideoId ? { referenceVideoId: input.referenceVideoId } : {}),
           ...(input.referenceUrl ? { referenceUrl: input.referenceUrl } : {}),
+          ...(input.overlayIds?.length ? { overlayIds: input.overlayIds } : {}),
         },
         { signal },
       )) as ChatJobWire,
     )
   },
-  async followUp(jobId, prompt, signal, videoIds, style) {
-    const body = { prompt, ...(videoIds && videoIds.length > 0 ? { videoIds } : {}), ...(style ?? {}) }
+  async followUp(jobId, prompt, signal, videoIds, style, overlayIds) {
+    const body = {
+      prompt,
+      ...(videoIds && videoIds.length > 0 ? { videoIds } : {}),
+      ...(overlayIds && overlayIds.length > 0 ? { overlayIds } : {}),
+      ...(style ?? {}),
+    }
     return toSnapshot((await apiClient.post(`${jobPath(jobId)}/followup`, body, { signal })) as ChatJobWire)
   },
   async getJob(jobId, signal) {
