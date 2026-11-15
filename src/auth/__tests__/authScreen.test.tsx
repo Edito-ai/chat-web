@@ -69,10 +69,17 @@ describe('the sign-in screen has no password', () => {
     expect(host.textContent).toContain(translate('en', 'auth.sendCode'))
   })
 
-  it('the Google button is not shown while no client id is set (the email code is always there)', async () => {
+  it('the Google button is always there; without a client id it says Google is not set up (the email code stays the way in)', async () => {
     await mount('signup')
     expect(title()).toBe(translate('en', 'auth.title.signup'))
-    expect(host.querySelector('[data-testid="auth-google"]')).toBeNull()
+    const g = host.querySelector('[data-testid="auth-google-button"]') as HTMLButtonElement
+    expect(g.textContent).toContain(translate('en', 'auth.google'))
+    expect(host.querySelector('[data-testid="auth-google-note"]')).toBeNull()
+    await click(g)
+    expect(host.querySelector('[data-testid="auth-google-note"]')!.textContent).toBe(translate('en', 'auth.google.notSetUp'))
+    expect(useAuth.getState().status).toBe('unauthenticated') // nothing was sent, nobody was signed in
+    expect(calls).toEqual([])
+    expect(field('email')).not.toBeNull()
   })
 
   it('a bad address cannot be sent; a good one asks for the code (allowing a first-time sign-up) and moves to the code step', async () => {

@@ -6,7 +6,6 @@ import { TERMS_URL } from '@/lib/links'
 import { useT } from '@/i18n'
 import { Button, InlineError } from '@/components/ui'
 import { BrandTile } from '@/components/BrandTile'
-import { GOOGLE_CLIENT_ID } from '@/lib/env'
 import { AuthShell } from './AuthShell'
 import { useAuth } from './authStore'
 import { GoogleButton } from './google'
@@ -141,16 +140,12 @@ export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 
 
         {mode === 'start' ? (
           <div className="space-y-4">
-            {GOOGLE_CLIENT_ID && (
-              <>
-                <GoogleButton onCredential={(tok) => void onGoogle(tok)} disabled={loading} />
-                <div className="flex items-center gap-3 text-caption uppercase tracking-[0.14em] text-ink-4">
-                  <span className="h-px flex-1 bg-white/10" />
-                  {t('auth.or')}
-                  <span className="h-px flex-1 bg-white/10" />
-                </div>
-              </>
-            )}
+            <GoogleButton onCredential={(tok) => void onGoogle(tok)} disabled={loading} />
+            <div className="flex items-center gap-3 text-caption uppercase tracking-[0.14em] text-ink-4">
+              <span className="h-px flex-1 bg-white/10" />
+              {t('auth.or')}
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
             <form onSubmit={(e) => void sendCode(e)} className="space-y-3" noValidate>
               <label className="block space-y-1">
                 <span className="text-label text-ink-2">{t('auth.email')}</span>
