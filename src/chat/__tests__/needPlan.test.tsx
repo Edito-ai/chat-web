@@ -14,7 +14,7 @@ describe('NeedPlanNotice (there is no self-serve free credit any more)', () => {
     const out = html(true)
     expect(out).toContain('data-testid="chat-need-credit"')
     expect(out).toContain('href="mailto:hello@trybroll.com"')
-    expect(out).toContain('href="https://wa.me/918595051170?text=')
+    expect(out).toContain('href="https://wa.me/918595851170?text=')
     expect(out).not.toContain('credit-phone')
     expect(out).not.toContain('Claim')
   })

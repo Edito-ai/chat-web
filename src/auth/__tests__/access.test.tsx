@@ -61,12 +61,12 @@ describe('the access-pending screen', () => {
     useAccess.getState().markPending()
     const out = renderToStaticMarkup(createElement(AccessPending))
     expect(out).toContain('href="mailto:hello@trybroll.com"')
-    expect(out).toContain('href="tel:8595051170"')
-    expect(out).toContain('href="https://wa.me/918595051170?text=')  // WhatsApp, with the Indian country code
+    expect(out).toContain('href="tel:8595851170"')
+    expect(out).toContain('href="https://wa.me/918595851170?text=')  // WhatsApp, with the Indian country code
     expect(out).toContain('target="_blank"')
     expect(out).not.toContain('sms:')
     expect(out).toContain('hello@trybroll.com')
-    expect(out).toContain('8595051170')
+    expect(out).toContain('8595851170')
     for (const id of ['access-check', 'access-signout']) expect(out).toContain(`data-testid="${id}"`)
   })
 })
