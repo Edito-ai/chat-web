@@ -19,6 +19,16 @@ export interface ActivityEvent {
   endedAt: number | null
 }
 
+/** What the edit saw in the footage before editing, and the before / after frame sheets (backend2). */
+export interface ChatAnalysis {
+  seen: { peopleMax: number; mainItem: string; items: string[]; text: string[]; places: string[] } | null
+  beforeSheet: string | null
+  /** The final look, drawn from the plan while the video renders. */
+  plannedSheet: string | null
+  afterSheet: string | null
+  review: { summary: string | null; problems: { scene: string; problems: string[]; note: string }[] } | null
+}
+
 export type ChatJobStatus = 'queued' | 'running' | 'complete' | 'failed' | 'cancelled'
 
 /** What a finished job hands back. */
@@ -92,6 +102,7 @@ export interface ChatJobSnapshot {
   projectId?: string | null
   /** Real step-entry times of the current turn (older backends send none). */
   stageTimings?: StageEvent[]
+  analysis?: ChatAnalysis | null
   /** Epoch ms the turn began: first recorded step, else the job's creation for turn 1. */
   startedAt?: number | null
   /** Epoch ms of the job's last write (the finish time once terminal). */
@@ -166,6 +177,8 @@ export interface ChatAssistantMessage {
   activity?: ActivityEvent[]
   /** Templates waiting for the user's pick, while the turn is running. */
   lookChoice?: LookChoice | null
+  /** What was seen in the footage and the before / after frame sheets. */
+  analysis?: ChatAnalysis | null
   /** `chat` = this turn is a plain reply, with no video behind it. */
   kind?: string
   suggestions?: ChatSuggestion[]

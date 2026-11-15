@@ -8,17 +8,18 @@ import { ORB_ENABLED } from '@/lib/features'
 import { Presence } from './Presence'
 import { boldRuns, replyBlocks } from './replyText'
 import { useChat } from './chatStore'
-import { ActivitySummary, LiveActivity } from './ActivityPanel'
-import { ResultCard } from './ResultCard'
+import { ResultCard, SeenFrames } from './ResultCard'
+import { ThinkingTrail } from './Thinking'
+import { LookChoice } from './LookChoice'
 import type { ChatAssistantMessage, ChatMessage, ChatSuggestion } from './chatTypes'
 
 function ErrorCard({ msg }: { msg: ChatAssistantMessage }) {
   const { t } = useT()
   const detail = msg.error && msg.error !== 'failed' && msg.error !== 'missing_result' ? msg.error : undefined
   return (
-    <div role="alert" className="w-full max-w-lg rounded-2xl border border-danger/25 bg-danger-soft p-4">
-      <p className="flex items-center gap-2 font-display text-body font-semibold text-ink-0"><AlertTriangle size={16} className="shrink-0 text-danger" aria-hidden />{t('chat.error.title')}</p>
-      {detail && <p className="mt-2 break-words rounded-lg bg-black/25 px-3 py-2 font-mono text-label text-danger">{detail}</p>}
+    <div role="alert" className="w-full max-w-lg">
+      <p className="flex items-center gap-2 text-prose font-medium text-ink-0"><AlertTriangle size={15} className="shrink-0 text-danger" aria-hidden />{t('chat.error.title')}</p>
+      {detail && <p className="mt-1.5 break-words font-mono text-label text-danger">{detail}</p>}
       <p className="mt-2 text-label text-ink-3">{t('chat.error.next')}</p>
     </div>
   )
@@ -107,8 +108,8 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
   }
   if (msg.status === 'complete') {
     return (
-      <div className="space-y-2">
-        <ActivitySummary msg={msg} />
+      <div className="space-y-3">
+        <ThinkingTrail msg={msg} />
         {msg.result ? (
           <ResultCard msg={{ ...msg, result: msg.result }} />
         ) : (
@@ -122,16 +123,16 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
   }
   if (msg.status === 'cancelled') {
     return (
-      <div className="space-y-2">
-        <ActivitySummary msg={msg} />
+      <div className="space-y-3">
+        <ThinkingTrail msg={msg} />
         <p className="text-prose text-ink-3">{t('chat.stopped')}</p>
       </div>
     )
   }
   if (msg.status === 'failed') {
     return (
-      <div className="space-y-2">
-        <ActivitySummary msg={msg} />
+      <div className="space-y-3">
+        <ThinkingTrail msg={msg} />
         <ErrorCard msg={msg} />
       </div>
     )
@@ -144,7 +145,17 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
       </div>
     )
   }
-  return <LiveActivity msg={msg} />
+  return (
+    <div className="space-y-3">
+      <ThinkingTrail msg={msg} />
+      <LookChoice msg={msg} />
+      {msg.analysis && (
+        <div className="w-full max-w-xl">
+          <SeenFrames analysis={msg.analysis} />
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function Bubble({ msg, chips = false, onSuggest }: { msg: ChatMessage; chips?: boolean; onSuggest?: (s: ChatSuggestion) => void }) {
