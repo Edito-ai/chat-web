@@ -2,11 +2,11 @@
 
 import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import clsx from 'clsx'
-import { ArrowUp, Check, FolderOpen, Link2, Paperclip, Scissors, Square, X, AlertCircle, Wand2 } from 'lucide-react'
+import { ArrowUp, Check, Link2, Paperclip, Scissors, Square, X, AlertCircle, Wand2 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useTypewriter } from './useTypewriter'
 import { IconButton } from '@/components/ui'
-import type { ChatAttachment } from './chatStore'
+import type { ChatAttachment, ChatPicture } from './chatStore'
 import type { ClipOptions } from './chatTypes'
 import { StylePicker } from './StylePicker'
 import { useStyles } from './styles'
@@ -75,6 +75,9 @@ export interface ComposerProps {
   /** Example prompts typed out in the empty box while nothing is happening, to invite the person to write one. */
   hints?: string[]
   attachments: ChatAttachment[]
+  /** Pictures (logo, photo) for the next message. */
+  pictures: ChatPicture[]
+  onRemovePicture: (id: string) => void
   onRemoveAttachment: (id: string) => void
   onToggleReference?: (id: string) => void
   onAttachReference?: (files: File[]) => void
@@ -82,7 +85,6 @@ export interface ComposerProps {
   referenceLink?: string | null
   onReferenceLink?: (url: string | null) => void
   onAttachClick: () => void
-  onLibraryClick: () => void
   attachDisabled: boolean
   running: boolean
   sendDisabled: boolean
@@ -166,7 +168,7 @@ export function Composer(p: ComposerProps) {
     }
   }
   const typed = useTypewriter(p.hints ?? [], p.text === '' && !p.running)
-  const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0 || !!p.referenceLink)
+  const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0 || p.pictures.length > 0 || !!p.referenceLink)
   const typedHint = p.clipsMode ? '' : typed
   const stylesOn = useStyles((s) => s.items) !== null
   return (
@@ -174,7 +176,7 @@ export function Composer(p: ComposerProps) {
       {p.clipsMode && p.clipsOptions && p.onClipsOptions && (
         <ClipsBar options={p.clipsOptions} onOptions={p.onClipsOptions} onOff={() => p.onClipsMode?.(false)} />
       )}
-      {(p.attachments.length > 0 || p.referenceLink) && (
+      {(p.attachments.length > 0 || p.pictures.length > 0 || p.referenceLink) && (
         <ul className="flex flex-wrap gap-2 px-3 pt-3">
           {p.referenceLink && (
             <li data-testid="chat-reference-link" className="flex max-w-full items-center gap-2 rounded-xl border border-accent-line bg-surface-2 py-1 pl-2.5 pr-1 text-label">
@@ -186,6 +188,22 @@ export function Composer(p: ComposerProps) {
               <IconButton icon={X} size="sm" aria-label={t('chat.remove', { name: p.referenceLink })} onClick={() => p.onReferenceLink?.(null)} className="h-6 w-6" />
             </li>
           )}
+          {p.pictures.map((pic) => (
+            <li
+              key={pic.id}
+              data-testid="chat-picture-chip"
+              className={clsx(
+                'flex max-w-full items-center gap-2 rounded-xl border bg-surface-2 py-1 pl-2.5 pr-1 text-label',
+                pic.state === 'failed' ? 'border-danger/60' : 'border-line-strong',
+              )}
+            >
+              <span className="min-w-0 max-w-[16rem] truncate text-ink-1">{pic.name}</span>
+              <span className="shrink-0 text-caption text-ink-3">
+                {pic.state === 'uploading' ? t('chat.picture.uploading') : pic.state === 'failed' ? t('chat.picture.failed') : t('chat.picture.label')}
+              </span>
+              <IconButton icon={X} size="sm" aria-label={t('chat.remove', { name: pic.name })} onClick={() => p.onRemovePicture(pic.id)} className="h-6 w-6" />
+            </li>
+          ))}
           {p.attachments.map((a) => (
             <AttachmentChip
               key={a.id}
@@ -204,15 +222,6 @@ export function Composer(p: ComposerProps) {
           aria-label={t('chat.attach')}
           disabled={p.attachDisabled}
           onClick={p.onAttachClick}
-          className="shrink-0 rounded-full"
-        />
-        <IconButton
-          data-testid="chat-library"
-          icon={FolderOpen}
-          size="lg"
-          aria-label={t('chat.library.open')}
-          disabled={p.attachDisabled}
-          onClick={p.onLibraryClick}
           className="shrink-0 rounded-full"
         />
         {!p.clipsMode && (

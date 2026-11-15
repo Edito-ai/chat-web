@@ -2,7 +2,7 @@
 
 import clsx from 'clsx'
 import { useRouter } from 'next/navigation'
-import { MoreHorizontal, Pin, PinOff, PanelLeftClose, SquarePen, Trash2, X } from 'lucide-react'
+import { LibraryBig, MoreHorizontal, Pin, PinOff, PanelLeftClose, SquarePen, Trash2, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useEffect, useRef, useState } from 'react'
 import { Dialog } from '@/components/Dialog'
@@ -171,6 +171,10 @@ export interface SidebarProps {
   now: number
   disabled: boolean
   onNew: () => void
+  /** Opens the Library page in the main area. */
+  onLibrary: () => void
+  /** The Library page is what the main area shows now. */
+  libraryActive?: boolean
   onOpen: (jobId: string) => void
   onRetry: () => void
   onPin: (jobId: string, pinned: boolean) => void
@@ -184,7 +188,7 @@ export interface SidebarProps {
 }
 
 /** Left rail: brand, New chat, and the user's recent chats grouped by day. Arrow-free: plain buttons in tab order. */
-export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, now, disabled, onNew, onOpen, onRetry, onPin, onDelete, onClose, drawer = false, user, onSignOut }: SidebarProps) {
+export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, now, disabled, onNew, onLibrary, libraryActive = false, onOpen, onRetry, onPin, onDelete, onClose, drawer = false, user, onSignOut }: SidebarProps) {
   const { t } = useT()
   const locale = useLocale((s) => s.locale)
   const router = useRouter()
@@ -200,17 +204,32 @@ export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, no
         <IconButton icon={drawer ? X : PanelLeftClose} aria-label={t(drawer ? 'nav.close' : 'nav.collapse')} onClick={onClose} className="h-10 w-10 md:h-8 md:w-8" />
       </div>
 
-      <div className="px-3 pb-2">
+      <div className="space-y-px px-2 pb-2">
         <button
           type="button"
           data-testid="chat-new-side"
           disabled={disabled}
           onClick={onNew}
-          className="group flex h-11 w-full items-center gap-2.5 rounded-xl md:h-10 border border-line-strong bg-white/[0.03] px-3 text-body font-medium text-ink-0 transition-colors hover:bg-white/[0.07] disabled:opacity-40"
+          className="group flex h-11 w-full items-center gap-3 rounded-lg px-2.5 text-body font-medium text-ink-0 transition-colors hover:bg-white/[0.06] disabled:opacity-40 md:h-9"
         >
-          <SquarePen size={15} strokeWidth={1.75} aria-hidden className="text-ink-2 group-hover:text-ink-0" />
+          <SquarePen size={17} strokeWidth={1.75} aria-hidden className="text-ink-1 group-hover:text-ink-0" />
           {t('chat.new')}
         </button>
+        {signedIn && (
+          <button
+            type="button"
+            data-testid="chat-library"
+            aria-current={libraryActive ? 'page' : undefined}
+            onClick={onLibrary}
+            className={clsx(
+              'group flex h-11 w-full items-center gap-3 rounded-lg px-2.5 text-body font-medium transition-colors md:h-9',
+              libraryActive ? 'bg-white/[0.08] text-ink-0' : 'text-ink-0 hover:bg-white/[0.06]',
+            )}
+          >
+            <LibraryBig size={17} strokeWidth={1.75} aria-hidden className="text-ink-1 group-hover:text-ink-0" />
+            {t('nav.library')}
+          </button>
+        )}
       </div>
 
       <nav aria-label={t('nav.aria')} className="scroll-thin min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4 pt-2">

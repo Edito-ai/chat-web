@@ -57,6 +57,8 @@ export function applySnapshot(messages: readonly ChatMessage[], snap: ChatJobSna
       lookChoice: terminal ? null : (snap.lookChoice ?? null),
       ...(snap.clips ? { clips: snap.clips } : {}),
       ...(snap.source !== undefined ? { source: snap.source } : {}),
+      placementQuestion: terminal ? null : (snap.placementQuestion ?? null),
+      analysis: snap.analysis ?? m.analysis ?? null,
     }
     if (snap.status === 'complete') {
       if (snap.result) return { ...base, status: 'complete', progress: 1, result: snap.result, error: null }

@@ -67,6 +67,18 @@ export async function uploadVideo(projectId: string, file: File, probe: VideoPro
   throw lastError
 }
 
+/** Uploads one picture (a logo, a photo) into the project and returns the backend asset id (`kind: image`). */
+export async function uploadPicture(projectId: string, file: File, opts: UploadOptions = {}): Promise<string> {
+  const form = new FormData()
+  form.set('name', file.name)
+  form.set('kind', 'image')
+  form.set('duration', '0')
+  form.set('file', file, file.name)
+  const body = await apiClient.upload(`/projects/${encodeURIComponent(projectId)}/media`, form, { signal: opts.signal })
+  opts.onProgress?.(1)
+  return body.id as string
+}
+
 /** Fields shared by both upload routes. `hasAudio` unknown is sent as true; the server ffprobes the real file. */
 function metaFields(file: File, probe: VideoProbe) {
   return {

@@ -1,6 +1,7 @@
 import * as billing from './services/billing'
 import * as weekly from './services/weeklyPass'
 import * as support from './services/supportApi'
+import { deleteAccount } from './services/accountDelete'
 
 /** Every network call the account UI makes, behind one seam so /dev/preview can swap in fixtures. */
 export const realAccountApi = {
@@ -19,6 +20,7 @@ export const realAccountApi = {
   legalList: support.listLegalDocuments,
   legalDoc: support.getLegalDocument,
   createTicket: support.createTicket,
+  deleteAccount,
 }
 
 export type AccountApi = typeof realAccountApi

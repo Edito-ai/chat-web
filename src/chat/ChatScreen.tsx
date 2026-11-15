@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import clsx from 'clsx'
 import { useRouter } from 'next/navigation'
-import { BrandTile } from '@/components/BrandTile'
-import { ArrowUpRight, Menu, PanelLeftOpen, SquarePen, X } from 'lucide-react'
+import { Menu, PanelLeftOpen, SquarePen, X } from 'lucide-react'
 import { useT, type MessageKey } from '@/i18n'
 import { Button, IconButton, InlineError, Logo } from '@/components/ui'
 import { useAuth } from '@/auth/authStore'
-import { useAccount } from '@/account/accountStore'
 import { AccountDialogs } from '@/account/components/AccountDialogs'
 import { useChat, type ChatSendProblem } from './chatStore'
 import type { ChatSuggestion } from './chatTypes'
@@ -14,15 +12,17 @@ import { activeAssistant, lastCompleted } from './chatState'
 import { Bubble } from './Messages'
 import { Composer } from './Composer'
 import { useStyles } from './styles'
-import { LibraryDialog } from './LibraryDialog'
+import { LibraryPage } from './LibraryPage'
 import { Sidebar } from './Sidebar'
 import { useNow } from './ActivityPanel'
-import { FreeCreditBanner } from './FreeCreditBanner'
+import { NeedPlanNotice } from './NeedPlanNotice'
 import { takeFreshStart } from './freshStart'
 import { TID } from './testIds'
 import { isSubscriptionRequired } from '@/account/lib/freeCredit'
 
 const VIDEO_ACCEPT = 'video/*,.mp4,.mov,.avi,.mkv,.webm,.m4v'
+/** A logo or photo to place in the video (see the picture placement in backend2). */
+const PICTURE_ACCEPT = 'image/*,.jpg,.jpeg,.png,.webp'
 
 const PROBLEM_KEY: Record<ChatSendProblem, MessageKey> = {
   noVideo: 'chat.problem.noVideo',
@@ -35,38 +35,6 @@ const PROBLEM_KEY: Record<ChatSendProblem, MessageKey> = {
 
 const EXAMPLES = [1, 2, 3, 4] as const
 
-function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
-  const { t } = useT()
-  return (
-    <div className="mx-auto flex min-h-full max-w-2xl flex-col items-center justify-center px-1 py-6 text-center sm:py-8">
-      <BrandTile size={56} className="animate-rise" />
-      <h2 className="mt-6 animate-rise font-display text-[1.65rem] font-bold leading-[1.18] tracking-[-0.02em] text-ink-0 [animation-delay:40ms] sm:text-[2.2rem]">
-        {t('chat.empty.title')}
-      </h2>
-      <p className="mt-3 max-w-md animate-rise text-prose text-ink-2 [animation-delay:80ms]">{t('chat.empty.sub')}</p>
-      <ul className="mt-6 grid w-full animate-rise grid-cols-1 gap-2 text-left [animation-delay:140ms] sm:mt-8 sm:grid-cols-2 sm:gap-2.5">
-        {EXAMPLES.map((n) => (
-          <li key={n}>
-            <button
-              type="button"
-              data-testid={`chat-example-${n}`}
-              aria-label={t(`chat.example.${n}.title` as MessageKey)}
-              onClick={() => onPick(t(`chat.example.${n}.prompt` as MessageKey))}
-              className="group flex h-full w-full flex-col gap-0.5 rounded-2xl border border-white/10 bg-surface-1/60 px-3.5 py-2.5 text-left backdrop-blur transition-all hover:-translate-y-px hover:border-accent-line hover:bg-surface-2/80 active:scale-[0.99] sm:gap-1 sm:px-4 sm:py-3.5"
-            >
-              <span className="flex items-center justify-between gap-2 text-body font-semibold text-ink-0">
-                {t(`chat.example.${n}.title` as MessageKey)}
-                <ArrowUpRight size={14} aria-hidden className="shrink-0 text-accent opacity-0 transition-opacity group-hover:opacity-100" />
-              </span>
-              <span className="line-clamp-1 text-label text-ink-3 transition-colors group-hover:text-ink-2 sm:line-clamp-2">{t(`chat.example.${n}.prompt` as MessageKey)}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
 /**
  * Chat-style edit screen: a left sidebar with recent chats, and the conversation. Add footage, describe the edit,
  * watch what it is doing, get the video back with a player and Download, then send follow-ups. No timeline.
@@ -75,6 +43,8 @@ export function ChatScreen() {
   const { t } = useT()
   const messages = useChat((s) => s.messages)
   const attachments = useChat((s) => s.attachments)
+  const pictures = useChat((s) => s.pictures)
+  const placementJobId = useChat((s) => s.placementJobId)
   const referenceLink = useChat((s) => s.referenceLink)
   const clipsMode = useChat((s) => s.clipsMode)
   const clipsOptions = useChat((s) => s.clipsOptions)
@@ -87,10 +57,8 @@ export function ChatScreen() {
   const history = useChat((s) => s.history)
   const historyState = useChat((s) => s.historyState)
   const currentJobId = useChat((s) => s.jobId)
-  const videoIds = useChat((s) => s.videoIds)
   const projectId = useChat((s) => s.projectId)
   const user = useAuth((s) => s.user)
-  const openDialog = useAccount((s) => s.openDialog)
   const signOut = () => {
     useChat.getState().reset()
     useAuth.getState().logout()
@@ -104,13 +72,14 @@ export function ChatScreen() {
     if (authStatus !== 'restoring') router.push('/login')
     return false
   }
-  const { attach, removeAttachment, toggleReference, attachReference, setReferenceLink, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob, pinChat, deleteChat } =
+  const { attach, removeAttachment, removePicture, toggleReference, attachReference, setReferenceLink, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob, pinChat, deleteChat } =
     useChat.getState()
   const loadStyles = useStyles((s) => s.load)
   const [text, setText] = useState('')
   const [problem, setProblem] = useState<ChatSendProblem | null>(null)
   const [dragging, setDragging] = useState(false)
-  const [libraryOpen, setLibraryOpen] = useState(false)
+  /** The main area shows the chat, or the Library page opened from the sidebar. */
+  const [view, setView] = useState<'chat' | 'library'>('chat')
   /** Mobile drawer / desktop collapse. */
   const [drawer, setDrawer] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -120,8 +89,12 @@ export function ChatScreen() {
   const now = useNow(history.length > 0, 60_000)
 
   const running = activeAssistant(messages) !== null
+  const empty = messages.length === 0
+  const library = view === 'library'
   const hasVideo = lastCompleted(messages) !== null
-  const uploading = attachments.some((a) => a.state === 'uploading')
+  const uploading = attachments.some((a) => a.state === 'uploading') || pictures.some((p) => p.state === 'uploading')
+  // While the job asks where a picture goes, the box takes the answer (the job is still running, but not blocked)
+  const sendBlocked = running && placementJobId === null
   // While nothing is happening the empty box types example prompts: first the starter ideas, then follow-up changes.
   const hints = (messages.length === 0 ? EXAMPLES.map((n) => t(`chat.example.${n}.prompt` as MessageKey)) : ([1, 2, 3, 4] as const).map((n) => t(`chat.nudge.${n}` as MessageKey)))
 
@@ -133,13 +106,6 @@ export function ChatScreen() {
     void loadHistory()
     void loadStyles()
   }, [startFresh, loadHistory, loadStyles, signedIn])
-
-  // The starter-credit offer: asked once per login, never polled; any failure just hides the banner.
-  const loadFreeCredit = useAccount((s) => s.loadFreeCredit)
-  const creditLoad = useAccount((s) => s.creditLoad)
-  useEffect(() => {
-    if (signedIn && creditLoad === 'idle') void loadFreeCredit()
-  }, [signedIn, creditLoad, loadFreeCredit])
 
   useEffect(() => {
     try {
@@ -157,8 +123,21 @@ export function ChatScreen() {
     }
   }
 
+  // Follow the newest message only while the person is already at the bottom (or has just sent something). Reading back up
+  // the chat is not yanked down every time a step updates.
+  const logRef = useRef<HTMLDivElement | null>(null)
+  const atBottom = useRef(true)
+  const onLogScroll = () => {
+    const el = logRef.current
+    if (el) atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 160
+  }
   useEffect(() => {
-    if (messages.length > 0 || attachments.length > 0) endRef.current?.scrollIntoView?.({ block: 'end' })
+    const last = messages[messages.length - 1]
+    const sentNow = last?.role === 'user'
+    if (sentNow) atBottom.current = true
+    if ((messages.length > 0 || attachments.length > 0) && (atBottom.current || sentNow)) {
+      endRef.current?.scrollIntoView?.({ block: 'end' })
+    }
   }, [messages, attachments.length])
 
   useEffect(() => {
@@ -169,7 +148,7 @@ export function ChatScreen() {
   }, [drawer])
 
   const submit = async () => {
-    if (running || busy || !requireAuth()) return
+    if (sendBlocked || busy || !requireAuth()) return
     const prompt = text
     const p = await send(prompt)
     setProblem(p)
@@ -180,7 +159,7 @@ export function ChatScreen() {
   const onSuggest = (chip: ChatSuggestion) => {
     if (running || busy || !requireAuth()) return
     if (chip.action === 'upload') fileRef.current?.click()
-    else if (chip.action === 'library') setLibraryOpen(true)
+    else if (chip.action === 'library') setView('library')
     else if (chip.prompt) void send(chip.prompt).then(setProblem)
   }
 
@@ -193,17 +172,19 @@ export function ChatScreen() {
 
   const startNew = () => {
     setDrawer(false)
+    setView('chat')
     setText('')
     setProblem(null)
     void newChat().then(() => textareaRef.current?.focus())
   }
   const open = (jobId: string) => {
     setDrawer(false)
+    setView('chat')
     setProblem(null)
     void openJob(jobId)
   }
 
-  const sendDisabled = busy || running || uploading
+  const sendDisabled = busy || sendBlocked || uploading
   const needCredit = actionError !== null && isSubscriptionRequired(actionError)
   const showTopError = actionError !== null && lostJobId === null
 
@@ -217,6 +198,11 @@ export function ChatScreen() {
       now={now}
       disabled={busy}
       onNew={startNew}
+      onLibrary={() => {
+        setDrawer(false)
+        if (requireAuth()) setView('library')
+      }}
+      libraryActive={view === 'library'}
       onOpen={open}
       onRetry={() => void loadHistory()}
       onPin={(id, pinned) => void pinChat(id, pinned)}
@@ -280,7 +266,7 @@ export function ChatScreen() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <FreeCreditBanner nudge={needCredit} />
+        <NeedPlanNotice show={needCredit} />
 
         <header className="flex h-14 shrink-0 items-center gap-1 px-3 sm:gap-2 sm:px-4">
           <IconButton
@@ -305,7 +291,7 @@ export function ChatScreen() {
           <span className="md:hidden">
             <Logo size={24} />
           </span>
-          <h1 className="hidden min-w-0 flex-1 truncate text-body font-medium text-ink-2 md:block md:pl-1">{t('chat.title')}</h1>
+          <h1 className="hidden min-w-0 flex-1 truncate text-body font-medium text-ink-2 md:block md:pl-1">{t(library ? 'nav.library' : 'chat.title')}</h1>
           <Button
             data-testid="chat-new"
             variant="ghost"
@@ -329,28 +315,40 @@ export function ChatScreen() {
           ) : null}
         </header>
 
-        <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto min-h-full w-full max-w-3xl px-4 py-4">
-            {messages.length === 0 ? (
-              <EmptyState
-                onPick={(prompt) => {
-                  setText(prompt)
-                  setProblem(null)
-                  textareaRef.current?.focus()
-                }}
-              />
-            ) : (
+        {library && (
+          <LibraryPage
+            // a chat's earlier footage does not lock the library: only what is picked for the next message does
+            lockProjectId={attachments.length > 0 ? (projectId ?? null) : null}
+            onPick={(items) => {
+              useChat.getState().attachFromLibrary(items)
+              setView('chat')
+              requestAnimationFrame(() => textareaRef.current?.focus())
+            }}
+          />
+        )}
+
+        {!library && !empty && (
+          <div ref={logRef} onScroll={onLogScroll} className="scroll-thin min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto min-h-full w-full max-w-3xl px-4 py-4">
               <ol data-testid="chat-log" role="log" aria-label={t('chat.log.aria')} className="space-y-6 pb-4">
                 {messages.map((m, i) => (
                   <Bubble key={m.id} msg={m} chips={i === messages.length - 1 && !running} onSuggest={onSuggest} />
                 ))}
               </ol>
-            )}
-            <div ref={endRef} />
+              <div ref={endRef} />
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-4">
+        {/* New chat: only the box, in the middle of the screen. After the first message it sits at the bottom. */}
+        <div
+          data-testid="chat-composer-dock"
+          data-centered={empty}
+          className={clsx(
+            'px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-4',
+            library ? 'hidden' : empty ? 'flex flex-1 flex-col justify-center pb-[14vh]' : 'shrink-0',
+          )}
+        >
           <div className="mx-auto w-full max-w-3xl space-y-2">
             {showTopError && (
               <div className="flex items-start justify-between gap-2">
@@ -370,7 +368,7 @@ export function ChatScreen() {
               data-testid="chat-file-input"
               type="file"
               multiple
-              accept={VIDEO_ACCEPT}
+              accept={`${VIDEO_ACCEPT},${PICTURE_ACCEPT}`}
               hidden
               onChange={(e) => {
                 if (e.target.files && requireAuth()) void attach(Array.from(e.target.files))
@@ -388,14 +386,15 @@ export function ChatScreen() {
               hints={hints}
               attachments={attachments}
               onRemoveAttachment={removeAttachment}
+              pictures={pictures}
+              onRemovePicture={removePicture}
               onToggleReference={toggleReference}
               onAttachReference={(files) => (requireAuth() ? void attachReference(files) : undefined)}
               referenceLink={referenceLink}
               onReferenceLink={(url) => (url === null || requireAuth() ? setReferenceLink(url) : undefined)}
               onAttachClick={() => (requireAuth() ? fileRef.current?.click() : undefined)}
-              onLibraryClick={() => (requireAuth() ? setLibraryOpen(true) : undefined)}
-              attachDisabled={busy || running}
-              running={running}
+              attachDisabled={busy || sendBlocked}
+              running={sendBlocked}
               sendDisabled={sendDisabled}
               onSend={() => void submit()}
               onStop={() => void cancel()}
@@ -404,31 +403,20 @@ export function ChatScreen() {
               onClipsMode={clipsOn ? (on) => (requireAuth() ? setClipsMode(on) : undefined) : undefined}
               onClipsOptions={setClipsOptions}
             />
+            {/* Disclaimer under the box: hidden for now. Bring it back with the link pointing at TERMS_URL (the website).
             <p data-testid="chat-disclaimer" className="px-3 pt-0.5 text-center text-caption leading-snug text-ink-4">
               {t('chat.disclaimer.pre')}
-              <button
-                type="button"
-                data-testid="chat-terms-link"
-                onClick={() => openDialog('legal')}
-                className="rounded underline decoration-white/25 underline-offset-2 transition-colors hover:text-ink-2 hover:decoration-white/50"
-              >
+              <a data-testid="chat-terms-link" href={TERMS_URL} target="_blank" rel="noopener noreferrer" className="rounded underline decoration-white/25 underline-offset-2 transition-colors hover:text-ink-2 hover:decoration-white/50">
                 {t('chat.disclaimer.link')}
-              </button>
+              </a>
               {t('chat.disclaimer.post')}
             </p>
+            */}
           </div>
         </div>
       </div>
 
-      {libraryOpen && (
-        <LibraryDialog
-          onClose={() => setLibraryOpen(false)}
-          onPick={useChat.getState().attachFromLibrary}
-          lockProjectId={videoIds.length > 0 || attachments.length > 0 ? (projectId ?? null) : null}
-        />
-      )}
-
-      {/* Signed-in users get the dialogs from the profile menu; guests still need Terms to open from the disclaimer. */}
+      {/* Signed-in users get the dialogs from the profile menu. */}
       {!user && <AccountDialogs />}
 
       {dragging && (

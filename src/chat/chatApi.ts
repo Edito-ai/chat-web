@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { toClips, toClipsSource } from './clips'
-import type { ActivityEvent, ChatApi, ChatJobSnapshot, ChatJobStatus, LookChoice, StageEvent, ChatSuggestion } from './chatTypes'
+import type { ActivityEvent, ChatAnalysis, ChatApi, ChatJobSnapshot, ChatJobStatus, LookChoice, StageEvent, ChatSuggestion } from './chatTypes'
 
 /** The adapter the chat store talks to: the real `/chat/*` backend. Tests inject their own via `setChatApi`. */
 
@@ -22,12 +22,17 @@ export interface ChatJobWire {
   title?: string | null
   stageTimings?: { state: string; stage?: string | null; at: string }[]
   kind?: string
+  /** Waiting for the answer about where an attached picture goes. */
+  placementOpen?: boolean
+  placementQuestion?: string | null
   /** Pinned to the top of the chat list. */
   pinned?: boolean
   suggestions?: { id: string; label: string; action: string; prompt?: string | null }[]
   turns?: {
     turn: number
     prompt: string
+    /** Names of what that message carried (videos, pictures); shown on the message after a reload. */
+    attachments?: string[]
     kind?: string
     reply?: string | null
     state: string
@@ -45,6 +50,14 @@ export interface ChatJobWire {
   }[]
   createdAt?: string
   updatedAt?: string
+  /** What the edit saw before editing, and the frame sheets (backend2). */
+  analysis?: {
+    seen?: { people_max?: number; main_item?: string; items?: { name?: string }[]; text?: string[]; places?: string[] } | null
+    beforeSheet?: string | null
+    plannedSheet?: string | null
+    afterSheet?: string | null
+    review?: { summary?: string | null; problems?: { scene?: string; problems?: string[]; note?: string }[] } | null
+  } | null
   /** Templates on offer right now (backend2). */
   lookChoice?: {
     open?: boolean
@@ -75,6 +88,35 @@ export function toActivity(raw: ChatJobWire['activity']): ActivityEvent[] {
     out.push({ id: e.id, kind, title: e.title, detail: e.detail ?? null, state, at, endedAt: ms(e.endedAt) })
   }
   return out
+}
+
+/** Wire analysis -> the typed one; anything malformed becomes null / empty, never an error. */
+export function toAnalysis(raw: ChatJobWire['analysis']): ChatAnalysis | null {
+  if (!raw) return null
+  const str = (v: unknown) => (typeof v === 'string' && v ? v : null)
+  const s = raw.seen
+  return {
+    seen: s
+      ? {
+          peopleMax: typeof s.people_max === 'number' ? s.people_max : 0,
+          mainItem: str(s.main_item) ?? '',
+          items: (s.items ?? []).map((i) => str(i?.name)).filter((x): x is string => !!x),
+          text: (s.text ?? []).filter((x): x is string => typeof x === 'string' && !!x),
+          places: (s.places ?? []).filter((x): x is string => typeof x === 'string' && !!x),
+        }
+      : null,
+    beforeSheet: str(raw.beforeSheet),
+    plannedSheet: str(raw.plannedSheet),
+    afterSheet: str(raw.afterSheet),
+    review: raw.review
+      ? {
+          summary: str(raw.review.summary),
+          problems: (raw.review.problems ?? [])
+            .filter((p) => typeof p?.scene === 'string')
+            .map((p) => ({ scene: p.scene!, problems: (p.problems ?? []).filter((x) => typeof x === 'string'), note: p.note ?? '' })),
+        }
+      : null,
+  }
 }
 
 /** Wire template choice -> the typed one; malformed options are dropped. No options is still a choice: the link / upload box. */
@@ -128,8 +170,11 @@ export function toSnapshot(w: ChatJobWire): ChatJobSnapshot {
     updatedAt: ms(w.updatedAt),
     durationSec: w.turns?.find((t) => t.turn === (w.turn ?? 1))?.durationSec ?? null,
     activity: toActivity(w.activity),
+    analysis: toAnalysis(w.analysis),
     lookChoice: status === 'running' ? toLookChoice(w.lookChoice) : null,
     ...(w.kind === 'clips' ? { clips: toClips(w.clips), source: toClipsSource(w.source) } : {}),
+    placementOpen: w.placementOpen ?? false,
+    placementQuestion: w.placementQuestion ?? null,
   }
 }
 
@@ -148,13 +193,19 @@ export const httpChatApi: ChatApi = {
           ...(input.kind === 'clips'
             ? { kind: 'clips', ...(input.sourceUrl ? { sourceUrl: input.sourceUrl } : {}), ...(input.clips ? { clips: input.clips } : {}) }
             : {}),
+          ...(input.overlayIds?.length ? { overlayIds: input.overlayIds } : {}),
         },
         { signal },
       )) as ChatJobWire,
     )
   },
-  async followUp(jobId, prompt, signal, videoIds, style) {
-    const body = { prompt, ...(videoIds && videoIds.length > 0 ? { videoIds } : {}), ...(style ?? {}) }
+  async followUp(jobId, prompt, signal, videoIds, style, overlayIds) {
+    const body = {
+      prompt,
+      ...(videoIds && videoIds.length > 0 ? { videoIds } : {}),
+      ...(overlayIds && overlayIds.length > 0 ? { overlayIds } : {}),
+      ...(style ?? {}),
+    }
     return toSnapshot((await apiClient.post(`${jobPath(jobId)}/followup`, body, { signal })) as ChatJobWire)
   },
   async getJob(jobId, signal) {

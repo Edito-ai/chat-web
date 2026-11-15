@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import { useAuth } from '@/auth/authStore'
 import { ApiError } from '@/lib/apiClient'
 import { getChatApi, toSnapshot, type LibraryVideo } from './chatApi'
-import { createChatProject, deleteAsset, uploadVideo } from './chatUploads'
+import { createChatProject, deleteAsset, uploadPicture, uploadVideo } from './chatUploads'
 import { looksLikeVideo, probeVideo, type VideoProbe } from './probe'
 import { shapeFor } from './projectShape'
 import {
@@ -40,8 +40,24 @@ export interface ChatAttachment {
   reference?: boolean
 }
 
+/** A picture (a logo, a photo) the message places in the video. One per message. */
+export interface ChatPicture {
+  id: string
+  name: string
+  state: 'uploading' | 'ready' | 'failed'
+  /** Backend asset id once uploaded: the `overlayIds` entry the job takes. */
+  assetId: string | null
+  error: string | null
+}
+
 /** Why a send could not start; the screen maps the code to copy. */
 export type ChatSendProblem = 'noVideo' | 'noPrompt' | 'uploading' | 'uploadFailed' | 'twoReferences' | 'noStream'
+
+const PICTURE_NAME = /\.(jpe?g|png|webp)$/i
+/** A still picture (not a video): it goes to the placement, never to the footage list. */
+export function looksLikePicture(f: File): boolean {
+  return f.type.startsWith('image/') || PICTURE_NAME.test(f.name)
+}
 
 /** True for text that can be sent as a reference link. The server decides whether it really is a video. */
 export const looksLikeLink = (v: string): boolean => /^(https?:\/\/)?[^\s/]+\.[^\s/]{2,}(\/\S*)?$/i.test(v.trim())
@@ -57,6 +73,10 @@ interface ChatState {
   videoIds: string[]
   messages: ChatMessage[]
   attachments: ChatAttachment[]
+  /** Pictures for the next message (logo, photo): placed in the video at the position and time the user says. */
+  pictures: ChatPicture[]
+  /** The job that is waiting for the answer about where a picture goes (the next message is that answer); null = none. */
+  placementJobId: string | null
   /** A link (Instagram reel, YouTube short ...) whose look the next message copies; null = none. */
   referenceLink: string | null
   /** The next message cuts the best clips out of a long stream (the attached video, or a link in the text) instead of editing. */
@@ -89,6 +109,8 @@ interface ChatState {
   openJob: (jobId: string) => Promise<void>
 
   attach: (files: File[]) => Promise<void>
+  /** Take a picture off the next message (its upload is kept in the library, like a removed video chip). */
+  removePicture: (id: string) => void
   /** Adds library videos to the next message. They all belong to one project; the chat moves there if it has no footage yet. */
   attachFromLibrary: (items: LibraryVideo[]) => void
   removeAttachment: (id: string) => void
@@ -159,7 +181,31 @@ function absorb(snap: ChatJobSnapshot): void {
     canFollowUp: snap.canFollowUp,
     videoIds: snap.videoIds.length > 0 ? snap.videoIds : s.videoIds,
     projectId: snap.projectId ?? s.projectId,
+    placementJobId: snap.placementOpen ? snap.jobId : null,
   }))
+}
+
+function setPicture(id: string, patch: Partial<ChatPicture>): void {
+  useChat.setState((s) => ({ pictures: s.pictures.map((p) => (p.id === id ? { ...p, ...patch } : p)) }))
+}
+
+/** A picture for the next message: one at a time (a new one replaces the old). Uploads straight into the chat's project. */
+async function attachPicture(file: File): Promise<void> {
+  const id = newId()
+  const replaced = useChat.getState().pictures
+  useChat.setState({ pictures: [{ id, name: file.name, state: 'uploading', assetId: null, error: null }], actionError: null })
+  for (const p of replaced) if (p.assetId) void deleteAsset(p.assetId)
+  try {
+    let projectId = useChat.getState().projectId
+    if (!projectId) {
+      projectId = await createChatProject(shapeFor(null, null))
+      useChat.setState({ projectId, userId: currentUserId() })
+    }
+    const assetId = await uploadPicture(projectId, file)
+    setPicture(id, { state: 'ready', assetId })
+  } catch (e) {
+    setPicture(id, { state: 'failed', error: e instanceof Error ? e.message : String(e) })
+  }
 }
 
 /** The template chooser of a job leaves the screen (an answer was accepted). */
@@ -288,7 +334,8 @@ async function sendClips(rawPrompt: string): Promise<ChatSendProblem | null> {
 }
 
 const EMPTY_CHAT = {
-  messages: [] as ChatMessage[], attachments: [] as ChatAttachment[], referenceLink: null as string | null, projectId: null, jobId: null,
+  messages: [] as ChatMessage[], attachments: [] as ChatAttachment[], pictures: [] as ChatPicture[], placementJobId: null as string | null,
+  referenceLink: null as string | null, projectId: null, jobId: null,
   canFollowUp: false, videoIds: [] as string[], actionError: null, pollLostJobId: null, clipsMode: false,
 }
 
@@ -302,6 +349,8 @@ export const useChat = create<ChatState>()(
       videoIds: [],
       messages: [],
       attachments: [],
+      pictures: [],
+      placementJobId: null,
       referenceLink: null,
       clipsMode: false,
       clipsOptions: DEFAULT_CLIP_OPTIONS,
@@ -405,9 +454,14 @@ export const useChat = create<ChatState>()(
         }
       },
 
-      attach: async (picked) => {
+      attach: async (all) => {
+        // a picture (logo, photo) is not footage: it goes to the placement, and the rest goes on as before
+        const pictures = all.filter(looksLikePicture)
+        if (pictures.length > 0) await attachPicture(pictures[pictures.length - 1]!)
+        const picked = all.filter((f) => !looksLikePicture(f))
         const files = picked.filter(looksLikeVideo)
         const notVideo = picked.filter((f) => !looksLikeVideo(f)).map((f) => f.name)
+        if (picked.length === 0) return
         if (files.length === 0) {
           if (notVideo.length > 0) set({ actionError: new Error(`Not a video: ${notVideo.join(', ')}`) })
           return
@@ -450,6 +504,12 @@ export const useChat = create<ChatState>()(
         } finally {
           set({ busy: false })
         }
+      },
+
+      removePicture: (id) => {
+        const gone = get().pictures.find((p) => p.id === id)
+        if (gone?.assetId) void deleteAsset(gone.assetId)
+        set((s) => ({ pictures: s.pictures.filter((p) => p.id !== id) }))
       },
 
       attachFromLibrary: (items) => {
@@ -501,6 +561,17 @@ export const useChat = create<ChatState>()(
         // A reference on its own is a request to save its style: no words needed.
         const prompt =
           rawPrompt.trim() || ((refs.length > 0 || refLink) && s0.attachments.length === refs.length ? 'Save this style' : '')
+        // The job is waiting for where a picture goes: this message is the answer, not a new turn.
+        if (s0.placementJobId && rawPrompt.trim() && s0.attachments.length === 0 && s0.pictures.length === 0) {
+          const answer = rawPrompt.trim()
+          set((s) => ({ messages: [...s.messages, { id: newId(), role: 'user', text: answer, attachments: [] }] }))
+          try {
+            absorb(await getChatApi().followUp(s0.placementJobId, answer))
+          } catch (e) {
+            set({ actionError: e })
+          }
+          return null
+        }
         if (s0.busy || activeAssistant(s0.messages)) return null
         if (!prompt) return 'noPrompt'
         if (refs.length + (refLink ? 1 : 0) > 1) return 'twoReferences'
@@ -508,6 +579,9 @@ export const useChat = create<ChatState>()(
         const followUp = s0.jobId !== null && s0.canFollowUp
         if (s0.attachments.some((a) => a.state === 'uploading')) return 'uploading'
         if (s0.attachments.some((a) => a.state === 'failed' || !a.videoId)) return 'uploadFailed'
+        if (s0.pictures.some((p) => p.state === 'uploading')) return 'uploading'
+        if (s0.pictures.some((p) => p.state === 'failed')) return 'uploadFailed'
+        const overlayIds = s0.pictures.flatMap((p) => (p.assetId ? [p.assetId] : []))
 
         set({ busy: true, actionError: null })
         try {
@@ -523,9 +597,10 @@ export const useChat = create<ChatState>()(
           const withStyle = Object.keys(style).length > 0
           let snap: ChatJobSnapshot
           if (followUp) {
-            snap = withStyle
-              ? await api.followUp(s0.jobId!, prompt, undefined, attached, style)
-              : await api.followUp(s0.jobId!, prompt, undefined, attached)
+            // the old call shapes stay as they were when nothing new is attached (a picture is the last argument)
+            if (overlayIds.length > 0) snap = await api.followUp(s0.jobId!, prompt, undefined, attached, withStyle ? style : undefined, overlayIds)
+            else if (withStyle) snap = await api.followUp(s0.jobId!, prompt, undefined, attached, style)
+            else snap = await api.followUp(s0.jobId!, prompt, undefined, attached)
           } else {
             // Words only is fine: a conversation needs a home, not footage. Footage can come with a later message.
             let projectId = s0.projectId
@@ -535,6 +610,7 @@ export const useChat = create<ChatState>()(
             }
             snap = await api.createJob({
               projectId, videoIds: attached.length > 0 || referenceVideoId || referenceUrl ? attached : s0.videoIds, prompt, ...style,
+              ...(overlayIds.length > 0 ? { overlayIds } : {}),
             })
           }
           const user: ChatMessage = {
@@ -542,11 +618,13 @@ export const useChat = create<ChatState>()(
             attachments: [
               ...s0.attachments.map((a) => (a.reference ? `${a.name} (style reference)` : a.name)),
               ...(refLink ? [`${refLink} (style reference)`] : []),
+              ...s0.pictures.map((p) => `${p.name} (picture)`),
             ],
           }
           set((s) => ({
             messages: applySnapshot(capMessages([...s.messages, user, newAssistant(newId(), snap.jobId, snap.turn)]), snap),
             attachments: [],
+            pictures: [],
             referenceLink: null,
             userId: currentUserId(),
           }))
