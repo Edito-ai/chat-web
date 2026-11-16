@@ -2,13 +2,14 @@
 
 import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import clsx from 'clsx'
-import { ArrowUp, Check, Link2, Paperclip, Scissors, Square, X, AlertCircle, Wand2 } from 'lucide-react'
+import { ArrowUp, Check, Link2, Scissors, Square, X, AlertCircle, Wand2 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useTypewriter } from './useTypewriter'
 import { IconButton } from '@/components/ui'
 import type { ChatAttachment, ChatPicture } from './chatStore'
 import type { ClipOptions } from './chatTypes'
-import { StylePicker } from './StylePicker'
+import { AttachMenu } from './AttachMenu'
+import { StyleChip, useChosenStyle } from './StylePicker'
 import { useStyles } from './styles'
 
 /** A small ring that fills with upload progress; a check when ready, an alert when failed. */
@@ -171,13 +172,15 @@ export function Composer(p: ComposerProps) {
   const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0 || p.pictures.length > 0 || !!p.referenceLink)
   const typedHint = p.clipsMode ? '' : typed
   const stylesOn = useStyles((s) => s.items) !== null
+  const styleChosen = useChosenStyle()
   return (
     <div className="rounded-[1.75rem] border border-white/15 bg-surface-1/75 backdrop-blur-xl shadow-composer transition-[border-color,box-shadow] duration-200 focus-within:border-accent-line focus-within:shadow-[0_0_0_4px_rgb(255_158_140/0.10),0_20px_50px_-20px_rgb(0_0_0/0.9)]">
       {p.clipsMode && p.clipsOptions && p.onClipsOptions && (
         <ClipsBar options={p.clipsOptions} onOptions={p.onClipsOptions} onOff={() => p.onClipsMode?.(false)} />
       )}
-      {(p.attachments.length > 0 || p.pictures.length > 0 || p.referenceLink) && (
+      {(p.attachments.length > 0 || p.pictures.length > 0 || p.referenceLink || (styleChosen && !p.clipsMode)) && (
         <ul className="flex flex-wrap gap-2 px-3 pt-3">
+          {!p.clipsMode && <StyleChip />}
           {p.referenceLink && (
             <li data-testid="chat-reference-link" className="flex max-w-full items-center gap-2 rounded-xl border border-accent-line bg-surface-2 py-1 pl-2.5 pr-1 text-label">
               <Link2 size={14} className="shrink-0 text-accent" aria-hidden />
@@ -215,34 +218,14 @@ export function Composer(p: ComposerProps) {
         </ul>
       )}
       <div className="flex flex-wrap items-end gap-1.5 p-2 sm:flex-nowrap">
-        <IconButton
-          data-testid="chat-attach"
-          icon={Paperclip}
-          size="lg"
-          aria-label={t('chat.attach')}
+        <AttachMenu
           disabled={p.attachDisabled}
-          onClick={p.onAttachClick}
-          className="shrink-0 rounded-full"
+          clipsMode={!!p.clipsMode}
+          onFootage={p.onAttachClick}
+          onClipsMode={p.onClipsMode}
+          onReference={p.onAttachReference}
+          onReferenceLink={p.onReferenceLink ?? undefined}
         />
-        {!p.clipsMode && (
-          <StylePicker disabled={p.attachDisabled} onReference={p.onAttachReference} onReferenceLink={p.onReferenceLink ?? undefined} />
-        )}
-        {p.onClipsMode && (
-          <button
-            type="button"
-            data-testid="chat-clips-toggle"
-            aria-pressed={!!p.clipsMode}
-            title={t('chat.clips.modeHint')}
-            disabled={p.attachDisabled}
-            onClick={() => p.onClipsMode?.(!p.clipsMode)}
-            className={clsx(
-              'inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3 text-label font-medium transition-colors disabled:opacity-40',
-              p.clipsMode ? 'bg-accent/20 text-ink-0' : 'text-ink-2 hover:bg-white/[0.06] hover:text-ink-0',
-            )}
-          >
-            <Scissors size={16} strokeWidth={1.75} aria-hidden /> {t('chat.clips.mode')}
-          </button>
-        )}
         <textarea
           ref={setRef}
           data-testid="chat-input"
