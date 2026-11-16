@@ -173,10 +173,10 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
                 poster={clip.thumbUrl ?? undefined}
                 controls
                 playsInline
-                className={clsx('max-h-[70vh] w-full object-contain', rendering && 'opacity-50')}
+                className={clsx('mx-auto aspect-[9/16] max-h-[72vh] w-auto bg-black object-contain', rendering && 'opacity-50')}
               />
             ) : (
-              <div className="grid aspect-video place-items-center text-label text-ink-3">{t('chat.clips.cutting')}</div>
+              <div className="mx-auto grid aspect-[9/16] max-h-[72vh] place-items-center text-label text-ink-3">{t('chat.clips.cutting')}</div>
             )}
             {rendering && (
               <span className="absolute inset-0 grid place-items-center">

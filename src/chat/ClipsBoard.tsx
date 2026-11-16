@@ -19,7 +19,7 @@ export function ClipsBoard({ msg }: { msg: ChatAssistantMessage }) {
   const clips = msg.clips ?? []
   const source = msg.source ?? null
   return (
-    <div data-testid="chat-clips" className="w-full max-w-3xl space-y-3">
+    <div data-testid="chat-clips" className="w-full max-w-2xl space-y-3">
       <div className="space-y-1">
         {msg.reply && <p className="text-prose text-ink-0">{msg.reply}</p>}
         <p className="text-label text-ink-3">
@@ -31,7 +31,7 @@ export function ClipsBoard({ msg }: { msg: ChatAssistantMessage }) {
       {clips.length === 0 ? (
         <p className="text-label text-ink-3">{t('chat.clips.empty')}</p>
       ) : (
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {clips.map((c, i) => (
             <ClipCard key={c.id} jobId={msg.jobId} clip={c} rank={i + 1} sourceSec={source?.durationSec ?? null} />
           ))}
@@ -65,7 +65,7 @@ function ClipCard({ jobId, clip, rank, sourceSec }: { jobId: string; clip: ClipI
             href={studioHref}
             data-testid={`chat-clip-open-${clip.id}`}
             aria-label={t('chat.clips.open', { title: clip.title })}
-            className={clsx('group relative block aspect-video w-full', cutting && 'pointer-events-none opacity-40')}
+            className={clsx('group relative block aspect-[9/16] w-full', cutting && 'pointer-events-none opacity-40')}
           >
             {clip.thumbUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- a still served by the API, not a static asset
@@ -80,7 +80,7 @@ function ClipCard({ jobId, clip, rank, sourceSec }: { jobId: string; clip: ClipI
             </span>
           </Link>
         ) : (
-          <div className="grid aspect-video w-full place-items-center px-4 text-center text-label text-ink-3">
+          <div className="grid aspect-[9/16] w-full place-items-center px-4 text-center text-label text-ink-3">
             {clip.state === 'failed' ? t('chat.clips.failed') : t('chat.clips.cutting')}
           </div>
         )}
