@@ -49,8 +49,6 @@ export function ChatScreen() {
   const clipsMode = useChat((s) => s.clipsMode)
   const clipsOptions = useChat((s) => s.clipsOptions)
   const { setClipsMode, setClipsOptions } = useChat.getState()
-  // Clipping is a backend2 feature; the same backend serves the templates, so their presence tells which backend answers.
-  const clipsOn = useStyles((s) => s.items) !== null
   const busy = useChat((s) => s.busy)
   const actionError = useChat((s) => s.actionError)
   const lostJobId = useChat((s) => s.pollLostJobId)
@@ -400,7 +398,7 @@ export function ChatScreen() {
               onStop={() => void cancel()}
               clipsMode={clipsMode}
               clipsOptions={clipsOptions}
-              onClipsMode={clipsOn ? (on) => (requireAuth() ? setClipsMode(on) : undefined) : undefined}
+              onClipsMode={(on) => (requireAuth() ? setClipsMode(on) : undefined)}
               onClipsOptions={setClipsOptions}
             />
             {/* Disclaimer under the box: hidden for now. Bring it back with the link pointing at TERMS_URL (the website).
