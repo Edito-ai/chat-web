@@ -9,9 +9,15 @@ import { shapeFor } from './projectShape'
 import {
   activeAssistant, applySnapshot, capMessages, finishLocally, isTerminal, lastCompleted, newAssistant,
 } from './chatState'
-import type { ChatJobSnapshot, ChatMessage } from './chatTypes'
+import type { ChatJobSnapshot, ChatMessage, ClipItem, ClipOptions } from './chatTypes'
+import { clampOptions, DEFAULT_CLIP_OPTIONS, getClipsApi, LONG_STREAM_SEC, splitLink, type ClipPatch } from './clips'
+
+/** How often a clip's render (captions / music / effects) is checked, and for how long at most. */
+export const STYLE_POLL_MS = 2000
+const STYLE_MAX_POLLS = 150
 import { getHistoryApi, rebuildMessages, toHistoryItem, type HistoryItem } from './history'
 import { useStyles } from './styles'
+import { getMusicApi, type MusicChoice } from './music'
 
 /** Time between polls; a failing poll backs off (x2 per miss) up to MAX_BACKOFF_MS. */
 export const POLL_MS = 2000
@@ -45,7 +51,7 @@ export interface ChatPicture {
 }
 
 /** Why a send could not start; the screen maps the code to copy. */
-export type ChatSendProblem = 'noVideo' | 'noPrompt' | 'uploading' | 'uploadFailed' | 'twoReferences'
+export type ChatSendProblem = 'noVideo' | 'noPrompt' | 'uploading' | 'uploadFailed' | 'twoReferences' | 'noStream'
 
 const PICTURE_NAME = /\.(jpe?g|png|webp)$/i
 /** A still picture (not a video): it goes to the placement, never to the footage list. */
@@ -73,6 +79,17 @@ interface ChatState {
   placementJobId: string | null
   /** A link (Instagram reel, YouTube short ...) whose look the next message copies; null = none. */
   referenceLink: string | null
+  /** The next message cuts the best clips out of a long stream (the attached video, or a link in the text) instead of editing. */
+  clipsMode: boolean
+  clipsOptions: ClipOptions
+  setClipsMode: (on: boolean) => void
+  setClipsOptions: (o: Partial<ClipOptions>) => void
+  /** New bounds / title for one clip of a clipping chat. Resolves with the reason when it fails. */
+  trimClip: (jobId: string, clipId: string, patch: ClipPatch) => Promise<string | null>
+  /** One click: burn captions into a clip (default style) and follow the render. Resolves with the reason when it fails. */
+  captionClip: (jobId: string, clipId: string) => Promise<string | null>
+  /** A clip changed somewhere else (the studio page): the chat shows the new version. */
+  patchClip: (jobId: string, clip: ClipItem) => void
   /** Reading the picked files / creating the project / creating the job. */
   busy: boolean
   /** The last thing that went wrong outside a job (upload, create). Any thrown value. */
@@ -102,6 +119,8 @@ interface ChatState {
   /** Attach videos that are style references from the start (the "new style from a reference" entry). */
   attachReference: (files: File[]) => Promise<void>
   send: (prompt: string) => Promise<ChatSendProblem | null>
+  /** Changes the music of the finished video (backend2): a new turn that only re-mixes the sound. `label` is the line shown as the person's message. */
+  changeMusic: (choice: MusicChoice, label: string) => Promise<void>
   cancel: () => Promise<void>
   setReferenceLink: (url: string | null) => void
   /** The user picked a template on offer (or `null` = none of them): it leaves the screen at once, the server carries on. */
@@ -196,6 +215,24 @@ function closeLook(jobId: string): void {
   }))
 }
 
+/** The clips of a finished clipping chat changed (a trim): its message shows the new list. */
+function setClips(jobId: string, clips: ClipItem[]): void {
+  useChat.setState((s) => ({
+    messages: s.messages.map((m): ChatMessage => (m.role === 'assistant' && m.jobId === jobId && m.kind === 'clips' ? { ...m, clips } : m)),
+  }))
+}
+
+/** One clip of a clipping chat replaced by a newer copy of it. */
+function replaceClip(jobId: string, clip: ClipItem): void {
+  useChat.setState((s) => ({
+    messages: s.messages.map((m): ChatMessage =>
+      m.role === 'assistant' && m.jobId === jobId && m.kind === 'clips' && m.clips
+        ? { ...m, clips: m.clips.map((c) => (c.id === clip.id ? clip : c)) }
+        : m,
+    ),
+  }))
+}
+
 function patchAttachment(id: string, patch: Partial<ChatAttachment>): void {
   useChat.setState((s) => ({ attachments: s.attachments.map((a) => (a.id === id ? { ...a, ...patch } : a)) }))
 }
@@ -254,10 +291,52 @@ async function pollJob(jobId: string): Promise<void> {
   if (pollCtl === ctl) pollCtl = null
 }
 
+/**
+ * Clipping a stream (backend2): the attached video, else the first link in the text, becomes a NEW chat of kind `clips`
+ * (never a turn of the chat on screen). The rest of the text is the focus ("only the funny moments").
+ */
+async function sendClips(rawPrompt: string): Promise<ChatSendProblem | null> {
+  const s0 = useChat.getState()
+  if (s0.busy || activeAssistant(s0.messages)) return null
+  const { url, rest } = splitLink(rawPrompt)
+  const videos = s0.attachments.filter((a) => !a.reference)
+  if (videos.some((a) => a.state === 'uploading')) return 'uploading'
+  if (videos.some((a) => a.state === 'failed' || !a.videoId)) return 'uploadFailed'
+  if (videos.length === 0 && !url) return 'noStream'
+  useChat.setState({ busy: true, actionError: null })
+  try {
+    let projectId = s0.projectId
+    if (!projectId) {
+      projectId = await createChatProject(shapeFor(null, null))
+      useChat.setState({ projectId, userId: currentUserId() })
+    }
+    const snap = await getChatApi().createJob({
+      projectId, videoIds: videos.length > 0 ? [videos[0]!.videoId!] : [], prompt: rest, kind: 'clips',
+      ...(videos.length === 0 && url ? { sourceUrl: url } : {}), clips: s0.clipsOptions,
+    })
+    const user: ChatMessage = {
+      id: newId(), role: 'user', text: rawPrompt.trim() || 'Find the best clips', attachments: videos.slice(0, 1).map((a) => a.name),
+    }
+    const fresh = s0.jobId !== null && s0.jobId !== snap.jobId
+    useChat.setState((s) => ({
+      messages: applySnapshot(capMessages([...(fresh ? [] : s.messages), user, newAssistant(newId(), snap.jobId, snap.turn)]), snap),
+      attachments: [], referenceLink: null, clipsMode: false, userId: currentUserId(),
+    }))
+    absorb(snap)
+    if (!isTerminal(snap.status)) void pollJob(snap.jobId)
+    void useChat.getState().loadHistory()
+  } catch (e) {
+    useChat.setState({ actionError: e })
+  } finally {
+    useChat.setState({ busy: false })
+  }
+  return null
+}
+
 const EMPTY_CHAT = {
   messages: [] as ChatMessage[], attachments: [] as ChatAttachment[], pictures: [] as ChatPicture[], placementJobId: null as string | null,
   referenceLink: null as string | null, projectId: null, jobId: null,
-  canFollowUp: false, videoIds: [] as string[], actionError: null, pollLostJobId: null,
+  canFollowUp: false, videoIds: [] as string[], actionError: null, pollLostJobId: null, clipsMode: false,
 }
 
 export const useChat = create<ChatState>()(
@@ -273,11 +352,49 @@ export const useChat = create<ChatState>()(
       pictures: [],
       placementJobId: null,
       referenceLink: null,
+      clipsMode: false,
+      clipsOptions: DEFAULT_CLIP_OPTIONS,
       busy: false,
       actionError: null,
       pollLostJobId: null,
       history: [],
       historyState: 'idle',
+
+      setClipsMode: (on) => set({ clipsMode: on, actionError: null }),
+      setClipsOptions: (o) => set((s) => ({ clipsOptions: clampOptions({ ...s.clipsOptions, ...o }) })),
+
+      trimClip: async (jobId, clipId, patch) => {
+        const before = get().messages.find((m) => m.role === 'assistant' && m.jobId === jobId && m.kind === 'clips')
+        const old = before?.role === 'assistant' ? before.clips : undefined
+        if (old) setClips(jobId, old.map((c) => (c.id === clipId ? { ...c, state: 'cutting' } : c)))
+        try {
+          const snap = await getClipsApi().trim(jobId, clipId, patch)
+          if (snap.clips) setClips(jobId, snap.clips)
+          return null
+        } catch (e) {
+          if (old) setClips(jobId, old)
+          return e instanceof Error ? e.message : String(e)
+        }
+      },
+
+      captionClip: async (jobId, clipId) => {
+        try {
+          const api = getClipsApi()
+          let st = await api.setLook(jobId, clipId, { captions: { on: true } })
+          replaceClip(jobId, st.clip)
+          for (let i = 0; i < STYLE_MAX_POLLS && st.clip.styled?.state === 'rendering'; i++) {
+            await new Promise((r) => setTimeout(r, STYLE_POLL_MS))
+            st = await api.studio(jobId, clipId)
+            replaceClip(jobId, st.clip)
+          }
+          if (st.clip.styled?.state === 'failed') return st.clip.styled.error ?? 'failed'
+          return null
+        } catch (e) {
+          return e instanceof Error ? e.message : String(e)
+        }
+      },
+
+      patchClip: (jobId, clip) => replaceClip(jobId, clip),
 
       loadHistory: async () => {
         if (!currentUserId()) return
@@ -376,6 +493,8 @@ export const useChat = create<ChatState>()(
                 })),
               ],
             }))
+            // A stream-length video in a new chat: cutting clips is almost surely what is wanted (one tap turns it off).
+            if (!get().jobId && probed.some((p) => (p.probe.duration ?? 0) >= LONG_STREAM_SEC)) set({ clipsMode: true })
             // Uploads run in the background; the screen shows each chip's progress and Send waits for them.
             for (const i of items) void runUpload(i.id, projectId, i.file, i.probe)
           }
@@ -398,7 +517,9 @@ export const useChat = create<ChatState>()(
         set((s) => {
           const have = new Set(s.attachments.map((a) => a.videoId))
           const fresh = items.filter((i) => !have.has(i.id))
+          const long = !s.jobId && fresh.some((i) => i.durationSec >= LONG_STREAM_SEC)
           return {
+            ...(long ? { clipsMode: true } : {}),
             // A chat with no footage yet has nothing tied to its project, so it moves to the picked videos' project.
             projectId: s.videoIds.length === 0 && s.attachments.length === 0 ? items[0]!.projectId : s.projectId,
             actionError: null,
@@ -434,6 +555,7 @@ export const useChat = create<ChatState>()(
 
       send: async (rawPrompt) => {
         const s0 = get()
+        if (s0.clipsMode) return sendClips(rawPrompt)
         const refs = s0.attachments.filter((a) => a.reference)
         const refLink = s0.referenceLink?.trim() || null
         // A reference on its own is a request to save its style: no words needed.
@@ -570,6 +692,28 @@ export const useChat = create<ChatState>()(
         }
         closeLook(jobId)
         return null
+      },
+
+      changeMusic: async (choice, label) => {
+        const s0 = get()
+        // Only a finished chat can change its music, and never while another turn is running.
+        if (s0.busy || !s0.jobId || !s0.canFollowUp || activeAssistant(s0.messages)) return
+        set({ busy: true, actionError: null })
+        try {
+          const snap = await getMusicApi().set(s0.jobId, choice)
+          const user: ChatMessage = { id: newId(), role: 'user', text: label, attachments: [] }
+          set((s) => ({
+            messages: applySnapshot(capMessages([...s.messages, user, newAssistant(newId(), snap.jobId, snap.turn)]), snap),
+            userId: currentUserId(),
+          }))
+          absorb(snap)
+          if (!isTerminal(snap.status)) void pollJob(snap.jobId)
+          void get().loadHistory()
+        } catch (e) {
+          set({ actionError: e })
+        } finally {
+          set({ busy: false })
+        }
       },
 
       cancel: async () => {

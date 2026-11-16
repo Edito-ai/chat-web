@@ -73,6 +73,59 @@ export interface LookChoice {
 /** The user's answer to the template chooser: one of the offered templates, none, a link to copy, an uploaded reference, or "wait for me". */
 export type LookAnswer = { look: string } | { skip: true } | { url: string } | { referenceVideoId: string } | { hold: true }
 
+/** One clip of a stream-clipping chat (backend2, kind `clips`). Times are seconds from the start of the stream. */
+export interface ClipItem {
+  id: string
+  start: number
+  end: number
+  durationSec: number
+  title: string
+  /** Why this moment works, in a few words. */
+  reason: string
+  /** 0..100, best first. */
+  score: number | null
+  /** What is said in the clip (the trim view and the card show it). */
+  text: string
+  /** `ready`, `cutting` (being re-cut after a trim) or `failed`. */
+  state: 'ready' | 'cutting' | 'failed' | 'pending'
+  error: string | null
+  version: number
+  videoUrl: string | null
+  thumbUrl: string | null
+  downloadUrl: string | null
+  downloadFilename: string
+  /** The clip with its look applied (captions / music / effects), once one was asked for. */
+  styled: ClipStyled | null
+}
+
+/** A clip with captions, music or effects: being rendered, ready (with its links) or failed (with the reason). */
+export interface ClipStyled {
+  state: 'rendering' | 'ready' | 'failed'
+  version: number
+  error: string | null
+  /** The captions are burnt in (false when captions were off, or the clip has no words). */
+  captions: boolean
+  /** The clip has no speech, so there was nothing to caption. */
+  noWords: boolean
+  videoUrl: string | null
+  downloadUrl: string | null
+  downloadFilename: string
+}
+
+/** The footage a clipping chat was made from. */
+export interface ClipsSource {
+  kind: 'upload' | 'link'
+  title: string
+  durationSec: number | null
+}
+
+/** What the person asks of a clipping run: how many clips, and how long each may be. */
+export interface ClipOptions {
+  count: number
+  minSec: number
+  maxSec: number
+}
+
 /** One poll of a job, already normalised by the adapter. */
 export interface ChatJobSnapshot {
   jobId: string
@@ -116,6 +169,9 @@ export interface ChatJobSnapshot {
   activity?: ActivityEvent[]
   /** Templates waiting for a pick (backend2 only); null/absent when none are on offer. */
   lookChoice?: LookChoice | null
+  /** The clips of a stream-clipping chat (kind `clips`), best first. */
+  clips?: ClipItem[]
+  source?: ClipsSource | null
 }
 
 export interface CreateChatJobInput {
@@ -129,6 +185,11 @@ export interface CreateChatJobInput {
   referenceVideoId?: string
   /** The same, given as a link (an Instagram reel, a YouTube short ...). */
   referenceUrl?: string
+  /** `clips`: cut the best short clips out of a long stream (the video, or `sourceUrl`) instead of editing it. */
+  kind?: 'clips'
+  /** The stream as a link (a YouTube / Twitch VOD), when no video is uploaded. */
+  sourceUrl?: string
+  clips?: ClipOptions
   /** A picture (logo, photo) the edit places in the video (backend2 only). */
   overlayIds?: string[]
 }
@@ -189,6 +250,9 @@ export interface ChatAssistantMessage {
   /** `chat` = this turn is a plain reply, with no video behind it. */
   kind?: string
   suggestions?: ChatSuggestion[]
+  /** The clips, when this is a stream-clipping turn. */
+  clips?: ClipItem[]
+  source?: ClipsSource | null
 }
 
 export type ChatMessage = ChatUserMessage | ChatAssistantMessage

@@ -9,6 +9,7 @@ import { Presence } from './Presence'
 import { boldRuns, replyBlocks } from './replyText'
 import { useChat } from './chatStore'
 import { ResultCard, SeenFrames } from './ResultCard'
+import { ClipsBoard } from './ClipsBoard'
 import { ThinkingTrail } from './Thinking'
 import { LookChoice } from './LookChoice'
 import type { ChatAssistantMessage, ChatMessage, ChatSuggestion } from './chatTypes'
@@ -105,6 +106,14 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
   if (msg.kind === 'chat') {
     if (msg.status === 'complete') return <ChatReply msg={msg} chips={chips} onSuggest={onSuggest} />
     if (msg.status === 'queued' || msg.status === 'running') return lostJobId === msg.jobId ? <ErrorCard msg={{ ...msg, error: null }} /> : <Typing />
+  }
+  if (msg.status === 'complete' && msg.kind === 'clips') {
+    return (
+      <div className="space-y-3">
+        <ThinkingTrail msg={msg} />
+        <ClipsBoard msg={msg} />
+      </div>
+    )
   }
   if (msg.status === 'complete') {
     return (
