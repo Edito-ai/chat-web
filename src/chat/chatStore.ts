@@ -125,6 +125,8 @@ interface ChatState {
   setReferenceLink: (url: string | null) => void
   /** The user picked a template on offer (or `null` = none of them): it leaves the screen at once, the server carries on. */
   chooseLook: (jobId: string, lookId: string | null) => Promise<void>
+  /** The final frames are fine: render the video (a change is typed in the composer instead). */
+  approveFrames: (jobId: string) => Promise<void>
   /** The user started giving a reference in the chooser (typing a link): the server waits longer. */
   holdLook: (jobId: string) => Promise<void>
   /** Copy the template of the video behind a link. Resolves with the reason when the link cannot be used (the chooser stays open). */
@@ -181,7 +183,8 @@ function absorb(snap: ChatJobSnapshot): void {
     canFollowUp: snap.canFollowUp,
     videoIds: snap.videoIds.length > 0 ? snap.videoIds : s.videoIds,
     projectId: snap.projectId ?? s.projectId,
-    placementJobId: snap.placementOpen ? snap.jobId : null,
+    // the job waits for a typed answer: where a picture goes, or what to change on the final frames
+    placementJobId: snap.placementOpen || snap.framesReview ? snap.jobId : null,
   }))
 }
 
@@ -564,7 +567,12 @@ export const useChat = create<ChatState>()(
         // The job is waiting for where a picture goes: this message is the answer, not a new turn.
         if (s0.placementJobId && rawPrompt.trim() && s0.attachments.length === 0 && s0.pictures.length === 0) {
           const answer = rawPrompt.trim()
-          set((s) => ({ messages: [...s.messages, { id: newId(), role: 'user', text: answer, attachments: [] }] }))
+          set((s) => ({
+            messages: [
+              ...s.messages.map((m): ChatMessage => (m.role === 'assistant' && m.jobId === s0.placementJobId ? { ...m, framesReview: null } : m)),
+              { id: newId(), role: 'user', text: answer, attachments: [] },
+            ],
+          }))
           try {
             absorb(await getChatApi().followUp(s0.placementJobId, answer))
           } catch (e) {
@@ -648,6 +656,19 @@ export const useChat = create<ChatState>()(
         } catch (e) {
           // Too late (the best one was already taken) or the network blinked: the edit goes on either way.
           console.warn('[chat] chooseLook failed', e)
+        }
+      },
+
+      approveFrames: async (jobId) => {
+        set((s) => ({
+          placementJobId: s.placementJobId === jobId ? null : s.placementJobId,
+          messages: s.messages.map((m): ChatMessage => (m.role === 'assistant' && m.jobId === jobId ? { ...m, framesReview: null } : m)),
+        }))
+        try {
+          await getChatApi().answerFrames?.(jobId, { continue: true })
+        } catch (e) {
+          // Too late (it already rendered by itself) or the network blinked: the video comes either way.
+          console.warn('[chat] approveFrames failed', e)
         }
       },
 
