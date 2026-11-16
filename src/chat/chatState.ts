@@ -58,6 +58,7 @@ export function applySnapshot(messages: readonly ChatMessage[], snap: ChatJobSna
       ...(snap.clips ? { clips: snap.clips } : {}),
       ...(snap.source !== undefined ? { source: snap.source } : {}),
       placementQuestion: terminal ? null : (snap.placementQuestion ?? null),
+      framesReview: terminal ? null : (snap.framesReview ?? null),
       analysis: snap.analysis ?? m.analysis ?? null,
     }
     if (snap.status === 'complete') {

@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { toClips, toClipsSource } from './clips'
-import type { ActivityEvent, ChatAnalysis, ChatApi, ChatJobSnapshot, ChatJobStatus, LookChoice, StageEvent, ChatSuggestion } from './chatTypes'
+import type { ActivityEvent, ChatAnalysis, ChatApi, ChatJobSnapshot, ChatJobStatus, FramesReview, LookChoice, StageEvent, ChatSuggestion } from './chatTypes'
 
 /** The adapter the chat store talks to: the real `/chat/*` backend. Tests inject their own via `setChatApi`. */
 
@@ -64,6 +64,14 @@ export interface ChatJobWire {
     secondsLeft?: number
     seconds?: number
     options?: { id?: string; label?: string; desc?: string; best?: boolean; imageUrl?: string }[]
+  } | null
+  /** The final frames before the render (backend2): continue, or type a change. */
+  framesReview?: {
+    open?: boolean
+    secondsLeft?: number
+    seconds?: number
+    round?: number
+    frames?: { n?: number; t?: number; template?: string; imageUrl?: string }[]
   } | null
   /** Stream clipping (kind `clips`): the clips, best first, and the footage they came from. */
   clips?: unknown[]
@@ -129,6 +137,20 @@ export function toLookChoice(raw: ChatJobWire['lookChoice'], receivedAt = Date.n
   return { open: true, secondsLeft, seconds: typeof raw.seconds === 'number' ? raw.seconds : secondsLeft, receivedAt, options }
 }
 
+/** Wire final frames -> the typed ones; frames without a picture are dropped, and no frames means nothing to show. */
+export function toFramesReview(raw: ChatJobWire['framesReview'], receivedAt = Date.now()): FramesReview | null {
+  if (!raw || raw.open !== true) return null
+  const frames = (raw.frames ?? [])
+    .filter((f) => typeof f.imageUrl === 'string' && typeof f.n === 'number')
+    .map((f) => ({ n: f.n!, t: typeof f.t === 'number' ? f.t : 0, template: f.template ?? '', imageUrl: f.imageUrl! }))
+  if (frames.length === 0) return null
+  const secondsLeft = typeof raw.secondsLeft === 'number' ? Math.max(0, raw.secondsLeft) : 0
+  return {
+    open: true, secondsLeft, seconds: typeof raw.seconds === 'number' ? raw.seconds : secondsLeft, receivedAt,
+    round: typeof raw.round === 'number' ? raw.round : 1, frames,
+  }
+}
+
 const TERMINAL: Record<string, ChatJobStatus> = { complete: 'complete', failed: 'failed', cancelled: 'cancelled' }
 
 /** Wire -> snapshot. `state` is also the stage key (analyzing | planning | assembling | rendering). */
@@ -175,6 +197,7 @@ export function toSnapshot(w: ChatJobWire): ChatJobSnapshot {
     ...(w.kind === 'clips' ? { clips: toClips(w.clips), source: toClipsSource(w.source) } : {}),
     placementOpen: w.placementOpen ?? false,
     placementQuestion: w.placementQuestion ?? null,
+    framesReview: status === 'running' ? toFramesReview(w.framesReview) : null,
   }
 }
 
@@ -216,6 +239,9 @@ export const httpChatApi: ChatApi = {
   },
   async answerLook(jobId, answer) {
     await apiClient.post(`${jobPath(jobId)}/look`, answer)
+  },
+  async answerFrames(jobId, answer) {
+    await apiClient.post(`${jobPath(jobId)}/frames`, answer)
   },
 }
 

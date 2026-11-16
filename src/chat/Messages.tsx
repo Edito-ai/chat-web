@@ -11,6 +11,7 @@ import { useChat } from './chatStore'
 import { ResultCard, SeenFrames } from './ResultCard'
 import { ClipsBoard } from './ClipsBoard'
 import { ThinkingTrail } from './Thinking'
+import { FramesReview } from './FramesReview'
 import { LookChoice } from './LookChoice'
 import type { ChatAssistantMessage, ChatMessage, ChatSuggestion } from './chatTypes'
 
@@ -158,6 +159,7 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
     <div className="space-y-3">
       <ThinkingTrail msg={msg} />
       <LookChoice msg={msg} />
+      <FramesReview msg={msg} />
       {msg.analysis && (
         <div className="w-full max-w-xl">
           <SeenFrames analysis={msg.analysis} />
