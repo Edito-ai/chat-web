@@ -70,6 +70,30 @@ export interface LookChoice {
   options: LookOption[]
 }
 
+/** One frame of the edit as it will look, drawn from the plan before the video is rendered (backend2). */
+export interface ReviewFrame {
+  /** 1-based, the number the user can name in a change ("frame 3"). */
+  n: number
+  /** Seconds into the edit. */
+  t: number
+  template: string
+  imageUrl: string
+}
+
+/**
+ * The final frames, shown before the full-size render: the job waits for "continue" (render) or a typed change (re-plan,
+ * frames again). Renders by itself when `secondsLeft` runs out; that was true at `receivedAt` (epoch ms).
+ */
+export interface FramesReview {
+  open: boolean
+  secondsLeft: number
+  seconds: number
+  receivedAt: number
+  /** 1 = first look, 2+ = after a change. */
+  round: number
+  frames: ReviewFrame[]
+}
+
 /** The user's answer to the template chooser: one of the offered templates, none, a link to copy, an uploaded reference, or "wait for me". */
 export type LookAnswer = { look: string } | { skip: true } | { url: string } | { referenceVideoId: string } | { hold: true }
 
@@ -159,6 +183,8 @@ export interface ChatJobSnapshot {
   /** The job waits for the answer about where a picture goes (the next message is the answer). */
   placementOpen?: boolean
   placementQuestion?: string | null
+  /** The final frames wait for "continue" or a change (the next message is the change). */
+  framesReview?: FramesReview | null
   /** Epoch ms the turn began: first recorded step, else the job's creation for turn 1. */
   startedAt?: number | null
   /** Epoch ms of the job's last write (the finish time once terminal). */
@@ -211,6 +237,8 @@ export interface ChatApi {
   cancelJob(jobId: string): Promise<ChatJobSnapshot>
   /** The user's answer to the template chooser (backend2 only). Rejects with the server's reason, e.g. a link that cannot be opened. */
   answerLook?(jobId: string, answer: LookAnswer): Promise<void>
+  /** The final frames are fine: render the video. */
+  answerFrames?(jobId: string, answer: { continue: true }): Promise<void>
 }
 
 export interface ChatUserMessage {
@@ -245,6 +273,8 @@ export interface ChatAssistantMessage {
   lookChoice?: LookChoice | null
   /** The job asks where an attached picture goes; the user's next message is the answer (backend2 only). */
   placementQuestion?: string | null
+  /** The final frames, waiting for "continue" or a typed change before the render (backend2 only). */
+  framesReview?: FramesReview | null
   /** What was seen in the footage and the before / after frame sheets. */
   analysis?: ChatAnalysis | null
   /** `chat` = this turn is a plain reply, with no video behind it. */
