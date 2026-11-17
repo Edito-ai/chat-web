@@ -37,6 +37,8 @@ export interface TokenUsage {
   periodEnd: string
   isWeekly: boolean
   isExceeded: boolean
+  /** The allowance is a granted credit (the $1 for finishing onboarding), not a paid plan. */
+  isCredit?: boolean
 }
 
 export interface FreeCreditStatus {

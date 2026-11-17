@@ -428,6 +428,8 @@ export const en = {
   'acct.newTab': 'Opens in a new tab',
 
   'acct.plan.aria': 'Current plan',
+  'acct.plan.credit': 'Starter credit',
+  'acct.plan.creditLeft': '{left} left',
   'acct.plan.free': 'Free',
   'acct.plan.weekly': 'Pro · Weekly',
   'acct.plan.monthly': 'Pro · Monthly',
@@ -454,6 +456,8 @@ export const en = {
   'acct.usage.title': 'Usage',
   'acct.usage.tokens': 'AI tokens',
   'acct.usage.weekly': 'This week (Weekly Pass)',
+  'acct.usage.credit.badge': 'Starter credit',
+  'acct.usage.exceededCredit': 'You have used your starter credit. Pick a plan to keep going.',
   'acct.usage.monthly': 'This month',
   'acct.usage.of': '{used} of {limit}',
   'acct.usage.pct': '{pct}% used',

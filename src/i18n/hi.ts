@@ -429,6 +429,8 @@ export const hi: Record<MessageKey, string> = {
   'acct.newTab': 'नए टैब में खुलता है',
 
   'acct.plan.aria': 'मौजूदा प्लान',
+  'acct.plan.credit': 'स्टार्टर क्रेडिट',
+  'acct.plan.creditLeft': '{left} बाकी',
   'acct.plan.free': 'फ्री',
   'acct.plan.weekly': 'प्रो · साप्ताहिक',
   'acct.plan.monthly': 'प्रो · मासिक',
@@ -455,6 +457,8 @@ export const hi: Record<MessageKey, string> = {
   'acct.usage.title': 'उपयोग',
   'acct.usage.tokens': 'AI टोकन',
   'acct.usage.weekly': 'इस हफ़्ते (वीकली पास)',
+  'acct.usage.credit.badge': 'स्टार्टर क्रेडिट',
+  'acct.usage.exceededCredit': 'आपका स्टार्टर क्रेडिट खत्म हो गया है। जारी रखने के लिए प्लान चुनें।',
   'acct.usage.monthly': 'इस महीने',
   'acct.usage.of': '{limit} में से {used}',
   'acct.usage.pct': '{pct}% इस्तेमाल हुआ',

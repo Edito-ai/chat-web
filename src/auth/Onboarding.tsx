@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, Check, Gift, Loader2, PartyPopper } from 'lucide-react'
 import { useT, type MessageKey } from '@/i18n'
+import { useAccount } from '@/account/accountStore'
 import { Button, InlineError } from '@/components/ui'
 import { TERMS_URL } from '@/lib/links'
 import { AuthShell } from './AuthShell'
@@ -310,6 +311,10 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
 /** The party popup: confetti, what happened to the $1, and the way into the chat. */
 function Celebration({ credit }: { credit: OnboardingCredit }) {
   const { t } = useT()
+  // The credit is on the account now: the plan badge and the Usage dialog read it fresh from here on.
+  useEffect(() => {
+    void useAccount.getState().refresh()
+  }, [])
   const granted = credit.status === 'granted'
   const body: Record<OnboardingCredit['status'], MessageKey> = {
     granted: 'onb.done.granted', already_claimed: 'onb.done.already', phone_in_use: 'onb.done.phoneUsed', off: 'onb.done.off',

@@ -1,16 +1,18 @@
 'use client'
 
 import clsx from 'clsx'
-import { Crown, Zap } from 'lucide-react'
+import { Crown, Gift, Zap } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useT } from '@/i18n'
 import { useAccount } from '../accountStore'
 import { formatDate, planView, tierLabel, timeLeft } from '../lib/planView'
+import { formatTokens } from '../lib/usage'
 
 /** The plan pill in the profile menu header: Free, Pro · Weekly, Pro · Monthly, or Trial with its end date. */
 export function PlanBadge({ onUpgrade }: { onUpgrade: () => void }) {
   const { t, locale } = useT()
   const entitlement = useAccount((s) => s.entitlement)
+  const usage = useAccount((s) => s.tokenUsage)
   const status = useAccount((s) => s.status)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -24,6 +26,26 @@ export function PlanBadge({ onUpgrade }: { onUpgrade: () => void }) {
   if (status === 'error' && !entitlement) return null
 
   const view = planView(entitlement)
+  // No paid plan, only a granted credit (the $1 for finishing onboarding; the server calls that plan tier "beta"): show what is left of it.
+  if ((view.kind === 'free' || view.tier === 'beta') && usage?.isCredit && !usage.isExceeded) {
+    return (
+      <button
+        type="button"
+        role="menuitem"
+        tabIndex={-1}
+        data-testid="plan-badge"
+        data-plan="credit"
+        onClick={onUpgrade}
+        className="mt-2 flex min-h-[32px] w-full items-center justify-between gap-2 rounded-lg border border-accent-line bg-accent-soft px-2.5 text-caption text-ink-0 transition-colors hover:brightness-110"
+      >
+        <span className="inline-flex items-center gap-1.5 font-semibold">
+          <Gift size={11} strokeWidth={2.25} aria-hidden className="text-accent" />
+          {t('acct.plan.credit')}
+        </span>
+        <span className="text-ink-2">{t('acct.plan.creditLeft', { left: formatTokens(Math.max(0, usage.limitTokens - usage.usedTokens)) })}</span>
+      </button>
+    )
+  }
   if (view.kind === 'free') {
     return (
       <button
