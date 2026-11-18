@@ -101,3 +101,22 @@
 @media (prefers-reduced-motion: reduce) {
   .confetti-piece { display: none; }
 }
+
+/* The product tour's lit window (see tour/ProductTour.tsx): one huge shadow dims everything around it. */
+.tour-hole {
+  box-shadow: 0 0 0 200vmax rgb(4 5 14 / 0.74);
+}
+.tour-ring {
+  box-shadow:
+    0 0 0 1.5px rgb(255 158 140 / 0.95),
+    0 0 0 6px rgb(255 158 140 / 0.14),
+    0 0 46px 6px rgb(255 122 92 / 0.32);
+  animation: tourBreathe 2.4s ease-in-out infinite;
+}
+@keyframes tourBreathe {
+  0%, 100% { box-shadow: 0 0 0 1.5px rgb(255 158 140 / 0.95), 0 0 0 6px rgb(255 158 140 / 0.14), 0 0 46px 6px rgb(255 122 92 / 0.32); }
+  50% { box-shadow: 0 0 0 1.5px rgb(255 158 140 / 1), 0 0 0 10px rgb(255 158 140 / 0.08), 0 0 64px 12px rgb(255 122 92 / 0.42); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-ring { animation: none; }
+}

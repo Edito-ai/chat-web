@@ -15,6 +15,8 @@ export interface AuthUser {
   phone?: string | null
   /** True until the onboarding screen was completed with a phone number (also for accounts older than the screen). */
   needsOnboarding?: boolean
+  /** When the product tour was finished or skipped (ISO time). Null/absent = never; see tour/persistence.ts. */
+  tourCompletedAt?: string | null
 }
 
 /** An address whose code (or Google account) was confirmed but that has no account yet: onboarding creates it. */

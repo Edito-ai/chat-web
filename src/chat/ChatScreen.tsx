@@ -19,6 +19,9 @@ import { NeedPlanNotice } from './NeedPlanNotice'
 import { takeFreshStart } from './freshStart'
 import { TID } from './testIds'
 import { isSubscriptionRequired } from '@/account/lib/freeCredit'
+import { ProductTour } from '@/tour/ProductTour'
+import { useAutoStartTour } from '@/tour/useAutoStartTour'
+import { useTour, useTourWants } from '@/tour/tourStore'
 
 const VIDEO_ACCEPT = 'video/*,.mp4,.mov,.avi,.mkv,.webm,.m4v'
 /** A logo or photo to place in the video (see the picture placement in backend2). */
@@ -85,6 +88,29 @@ export function ChatScreen() {
   const endRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const now = useNow(history.length > 0, 60_000)
+
+  // First-run product tour: it may open the drawer (phones) or the collapsed sidebar (desktop) to point at what is in it.
+  useAutoStartTour()
+  const touring = useTour((s) => s.active)
+  const tourDrawer = useTourWants('drawer')
+  const tourSidebar = useTourWants('sidebar')
+  const railHidden = collapsed && !tourSidebar
+  // The tour starts from a clean screen: the chat, with the drawer shut (it may be replayed from the account menu in the drawer).
+  useEffect(() => {
+    if (!touring) return
+    setView('chat')
+    setDrawer(false)
+  }, [touring])
+  const tourHadDrawer = useRef(false)
+  useEffect(() => {
+    if (tourDrawer) {
+      tourHadDrawer.current = true
+      setDrawer(true)
+    } else if (tourHadDrawer.current) {
+      tourHadDrawer.current = false
+      setDrawer(false)
+    }
+  }, [tourDrawer])
 
   const running = activeAssistant(messages) !== null
   const empty = messages.length === 0
@@ -230,7 +256,7 @@ export function ChatScreen() {
       onDrop={onDrop}
     >
       {/* Desktop rail */}
-      <aside className={clsx('hidden w-[17.5rem] shrink-0 border-r border-white/[0.08] bg-gradient-to-b from-white/[0.02] to-black/25 backdrop-blur-md md:block', collapsed && 'md:hidden')}>
+      <aside className={clsx('hidden w-[17.5rem] shrink-0 border-r border-white/[0.08] bg-gradient-to-b from-white/[0.02] to-black/25 backdrop-blur-md md:block', railHidden && 'md:hidden')}>
         {renderSidebar(false)}
       </aside>
 
@@ -274,7 +300,7 @@ export function ChatScreen() {
             onClick={() => setDrawer(true)}
             className="md:hidden"
           />
-          {collapsed && (
+          {railHidden && (
             <IconButton
               data-testid="chat-expand"
               icon={PanelLeftOpen}
@@ -283,7 +309,7 @@ export function ChatScreen() {
               className="hidden md:inline-flex"
             />
           )}
-          <div className={clsx('hidden', collapsed && 'md:block')}>
+          <div className={clsx('hidden', railHidden && 'md:block')}>
             <Logo />
           </div>
           <span className="md:hidden">
@@ -296,7 +322,7 @@ export function ChatScreen() {
             icon={SquarePen}
             disabled={busy}
             onClick={startNew}
-            className={clsx(!collapsed && 'md:hidden')}
+            className={clsx(!railHidden && 'md:hidden')}
           >
             <span className="hidden sm:inline">{t('chat.new')}</span>
             <span className="sr-only sm:hidden">{t('chat.new')}</span>
@@ -416,6 +442,8 @@ export function ChatScreen() {
 
       {/* Signed-in users get the dialogs from the profile menu. */}
       {!user && <AccountDialogs />}
+
+      <ProductTour />
 
       {dragging && (
         <div className="pointer-events-none absolute inset-0 z-50 grid place-items-center bg-surface-0/80 font-display text-heading text-ink-0 backdrop-blur-sm">
