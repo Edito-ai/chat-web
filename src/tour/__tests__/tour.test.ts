@@ -42,12 +42,22 @@ describe('tour persistence', () => {
     expect(patch).toHaveBeenCalledTimes(2)
   })
 
-  it('copies the account flag to a new browser without calling the server', async () => {
+  it('trusts the account flag on a new browser without copying it there or calling the server', async () => {
     const user = { id: 'u1', tourCompletedAt: '2026-01-01T00:00:00Z' }
     expect(hasSeenTour(user)).toBe(true)
     await syncTour(user)
-    expect(seenLocally('u1')).toBe(true)
+    expect(seenLocally('u1')).toBe(false)
     expect(patch).not.toHaveBeenCalled()
+  })
+
+  it('comes back when the account flag is cleared, if it was never finished in this browser', async () => {
+    await syncTour({ id: 'u1', tourCompletedAt: '2026-01-01T00:00:00Z' })
+    expect(hasSeenTour({ id: 'u1', tourCompletedAt: null })).toBe(false)
+  })
+
+  it('ignores the old v1 browser flag (it could be a copy of the account flag)', () => {
+    localStorage.setItem('edito.chat-web.tour.v1.u1', 'done')
+    expect(hasSeenTour({ id: 'u1', tourCompletedAt: null })).toBe(false)
   })
 
   it('is per account', async () => {

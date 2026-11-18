@@ -1,8 +1,13 @@
 import { apiClient } from '@/lib/apiClient'
 import { useAuth, type AuthUser } from '@/auth/authStore'
 
-/** Seen-the-tour is kept in two places: this browser (instant, works offline) and the account (`tourCompletedAt`). */
-export const tourKey = (userId: string) => `edito.chat-web.tour.v1.${userId}`
+/**
+ * Seen-the-tour is kept in two places: the account (`tourCompletedAt`, the source of truth) and this browser. The browser flag
+ * is only written when the tour was finished or skipped HERE, so it covers the moment before the account call lands (or when
+ * that call failed). It is never copied from the account: clearing the account flag must bring the tour back.
+ * v2: v1 also copied the account flag into the browser, which kept the tour away after the account flag was cleared.
+ */
+export const tourKey = (userId: string) => `edito.chat-web.tour.v2.${userId}`
 
 export function seenLocally(userId: string): boolean {
   try {
@@ -39,10 +44,8 @@ export function markTourDone(user: Pick<AuthUser, 'id' | 'tourCompletedAt'>): Pr
   return user.tourCompletedAt ? Promise.resolve() : tellServer()
 }
 
-/** Brings the two flags together: the account's flag is copied to this browser, and a browser-only one is sent up. */
+/** A tour finished in this browser whose account call failed is sent up again. */
 export function syncTour(user: Pick<AuthUser, 'id' | 'tourCompletedAt'>): Promise<void> {
-  const local = seenLocally(user.id)
-  if (user.tourCompletedAt && !local) rememberLocally(user.id)
-  if (!user.tourCompletedAt && local) return tellServer()
+  if (!user.tourCompletedAt && seenLocally(user.id)) return tellServer()
   return Promise.resolve()
 }
