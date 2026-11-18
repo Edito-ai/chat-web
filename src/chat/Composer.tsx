@@ -174,7 +174,7 @@ export function Composer(p: ComposerProps) {
   const stylesOn = useStyles((s) => s.items) !== null
   const styleChosen = useChosenStyle()
   return (
-    <div className="rounded-[1.75rem] border border-white/15 bg-surface-1/75 backdrop-blur-xl shadow-composer transition-[border-color,box-shadow] duration-200 focus-within:border-accent-line focus-within:shadow-[0_0_0_4px_rgb(255_158_140/0.10),0_20px_50px_-20px_rgb(0_0_0/0.9)]">
+    <div data-tour="composer" className="rounded-[1.75rem] border border-white/15 bg-surface-1/75 backdrop-blur-xl shadow-composer transition-[border-color,box-shadow] duration-200 focus-within:border-accent-line focus-within:shadow-[0_0_0_4px_rgb(255_158_140/0.10),0_20px_50px_-20px_rgb(0_0_0/0.9)]">
       {p.clipsMode && p.clipsOptions && p.onClipsOptions && (
         <ClipsBar options={p.clipsOptions} onOptions={p.onClipsOptions} onOff={() => p.onClipsMode?.(false)} />
       )}

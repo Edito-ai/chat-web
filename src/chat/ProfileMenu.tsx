@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { TERMS_URL } from '@/lib/links'
-import { BarChart3, ChevronsUpDown, CreditCard, ExternalLink, LifeBuoy, LogOut, ShieldCheck, SquareArrowOutUpRight, Trash2, type LucideIcon } from 'lucide-react'
+import { BarChart3, ChevronsUpDown, Compass, CreditCard, ExternalLink, LifeBuoy, LogOut, ShieldCheck, SquareArrowOutUpRight, Trash2, type LucideIcon } from 'lucide-react'
 import { useT } from '@/i18n'
 import { EDITOR_URL } from '@/lib/env'
 import { AccountDialogs } from '@/account/components/AccountDialogs'
@@ -11,6 +11,7 @@ import { useAccount, type AccountDialog } from '@/account/accountStore'
 import { useAuth } from '@/auth/authStore'
 import { displayName, initialOf, type ProfileUser } from './profile'
 import { DeleteAccountDialog } from './DeleteAccountDialog'
+import { isInsideTour, useTour, useTourWants } from '@/tour/tourStore'
 
 const ITEM =
   'flex min-h-[36px] w-full items-center gap-2.5 rounded-lg px-3 text-left text-body text-ink-1 transition-colors hover:bg-white/[0.06] hover:text-ink-0 focus-visible:bg-white/[0.08] focus-visible:text-ink-0 focus-visible:outline-none'
@@ -55,13 +56,19 @@ export function ProfileMenu({ user, onSignOut }: { user: ProfileUser; onSignOut:
     if (open && authed) void refresh()
   }, [open, authed, refresh])
 
+  // The product tour opens this menu on its account step.
+  const tourOpen = useTourWants('profileMenu')
+  useEffect(() => {
+    setOpen(tourOpen)
+  }, [tourOpen])
+
   const items = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])
 
   useEffect(() => {
     if (!open) return
     items()[0]?.focus()
     const onDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+      if (!isInsideTour(e.target) && !rootRef.current?.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
@@ -116,6 +123,15 @@ export function ProfileMenu({ user, onSignOut }: { user: ProfileUser; onSignOut:
           <MenuButton icon={CreditCard} label={t('acct.menu.billing')} testId="chat-menu-billing" onClick={() => pick('billing')} />
           <Sep />
           <MenuButton icon={LifeBuoy} label={t('acct.menu.help')} testId="chat-menu-help" onClick={() => pick('help')} />
+          <MenuButton
+            icon={Compass}
+            label={t('tour.replay')}
+            testId="chat-menu-tour"
+            onClick={() => {
+              setOpen(false)
+              if (!useTour.getState().active) useTour.getState().start()
+            }}
+          />
           {EDITOR_URL ? (
             <>
               <Sep />

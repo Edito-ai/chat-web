@@ -1,7 +1,7 @@
 'use client'
 
 import clsx from 'clsx'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Gift } from 'lucide-react'
 import { useT } from '@/i18n'
 import { formatDate } from '../lib/planView'
 import { barPercent, formatTokens, meterTone } from '../lib/usage'
@@ -16,8 +16,11 @@ export function TokenMeter({ usage }: { usage: TokenUsage }) {
   return (
     <section aria-label={label} data-testid="usage-tokens" data-tone={tone} className="rounded-xl border border-line bg-black/20 p-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-label font-medium text-ink-1">{label}</h3>
-        <span className="text-caption text-ink-3">{usage.isWeekly ? t('acct.usage.weekly') : t('acct.usage.monthly')}</span>
+        <h3 className="inline-flex items-center gap-1.5 text-label font-medium text-ink-1">
+          {usage.isCredit && <Gift size={14} strokeWidth={1.75} aria-hidden className="text-accent" />}
+          {label}
+        </h3>
+        <span className="text-caption text-ink-3">{usage.isCredit ? t('acct.usage.credit.badge') : usage.isWeekly ? t('acct.usage.weekly') : t('acct.usage.monthly')}</span>
       </div>
       <p className="mt-2 font-mono text-heading tabular-nums text-ink-0">
         {t('acct.usage.of', { used: formatTokens(usage.usedTokens), limit: formatTokens(usage.limitTokens) })}
@@ -43,7 +46,7 @@ export function TokenMeter({ usage }: { usage: TokenUsage }) {
       {usage.isExceeded ? (
         <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg bg-danger-soft px-3 py-2 text-label text-danger">
           <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
-          {usage.isWeekly ? t('acct.usage.exceededWeekly') : t('acct.usage.exceeded')}
+          {usage.isCredit ? t('acct.usage.exceededCredit') : usage.isWeekly ? t('acct.usage.exceededWeekly') : t('acct.usage.exceeded')}
         </p>
       ) : null}
     </section>

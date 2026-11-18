@@ -1,12 +1,14 @@
 import { create } from 'zustand'
 import { accountApi } from './accountApi'
 import { clearDismissed, readDismissed, writeDismissed, type CreditLoad } from './lib/freeCredit'
-import type { Entitlement, FreeCreditStatus } from './types'
+import type { Entitlement, FreeCreditStatus, TokenUsage } from './types'
 
 export type AccountDialog = 'usage' | 'billing' | 'help' | 'legal'
 
 interface AccountState {
   entitlement: Entitlement | null
+  /** The token allowance (a plan's, or the starter credit); read with the plan so the profile menu can show the credit left. */
+  tokenUsage: TokenUsage | null
   /** `loading` only until the first answer; a later failed refresh keeps the plan we already know. */
   status: 'idle' | 'loading' | 'loaded' | 'error'
   dialog: AccountDialog | null
@@ -30,6 +32,7 @@ interface AccountState {
 
 export const useAccount = create<AccountState>()((set, get) => ({
   entitlement: null,
+  tokenUsage: null,
   status: 'idle',
   dialog: null,
   billingFocus: null,
@@ -48,6 +51,7 @@ export const useAccount = create<AccountState>()((set, get) => ({
     if (get().status !== 'loaded') set({ status: 'loading' })
     try {
       set({ entitlement: await accountApi().entitlement(), status: 'loaded' })
+      accountApi().tokenUsage().then((tokenUsage) => set({ tokenUsage })).catch(() => undefined) // the badge works without it
     } catch {
       set((s) => ({ status: s.status === 'loaded' ? 'loaded' : 'error' }))
     }
@@ -69,5 +73,5 @@ export const useAccount = create<AccountState>()((set, get) => ({
   },
   openDialog: (dialog, opts) => set({ dialog, billingFocus: opts?.focus ?? null }),
   closeDialog: () => set({ dialog: null, billingFocus: null }),
-  reset: () => set({ entitlement: null, status: 'idle', dialog: null, billingFocus: null, credit: null, creditLoad: 'idle', creditDismissed: false }),
+  reset: () => set({ entitlement: null, tokenUsage: null, status: 'idle', dialog: null, billingFocus: null, credit: null, creditLoad: 'idle', creditDismissed: false }),
 }))

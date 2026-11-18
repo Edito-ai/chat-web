@@ -6,6 +6,7 @@ import { Check, ChevronLeft, ChevronRight, Film, Paperclip, Palette, Scissors, t
 import { useT } from '@/i18n'
 import { StylePanel } from './StylePicker'
 import { useStyles } from './styles'
+import { isInsideTour, useTourWants } from '@/tour/tourStore'
 
 /**
  * The paperclip of the composer. It opens a menu instead of going straight to the file picker:
@@ -38,9 +39,17 @@ export function AttachMenu({ disabled, clipsMode, onFootage, onClipsMode, onRefe
     setPage('menu')
   }
 
+  // The product tour opens the menu to show what is in it, and closes it again on the next step.
+  const tourOpen = useTourWants('attachMenu')
+  useEffect(() => {
+    setOpen(tourOpen)
+    setPage('menu')
+  }, [tourOpen])
+
   useEffect(() => {
     if (!open) return
     const outside = (e: MouseEvent) => {
+      if (isInsideTour(e.target)) return
       if (box.current && !box.current.contains(e.target as Node)) close()
     }
     const esc = (e: globalThis.KeyboardEvent) => {

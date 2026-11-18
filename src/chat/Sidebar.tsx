@@ -232,7 +232,7 @@ export function Sidebar({ items, loadState, signedIn, restoring, activeJobId, no
         )}
       </div>
 
-      <nav aria-label={t('nav.aria')} className="scroll-thin min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4 pt-2">
+      <nav data-tour="history" aria-label={t('nav.aria')} className="scroll-thin min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4 pt-2">
         <h2 className="px-2 pb-1 text-body font-medium text-ink-2">{t('nav.recent')}</h2>
         {!signedIn ? (
           restoring ? null : (
