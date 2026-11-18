@@ -22,7 +22,11 @@ interface TourState {
   ui: TourUi
   /** Called once when the tour ends (done or skipped): saves that it was seen. Set by the component that mounts it. */
   onEnd: ((reason: TourEnd) => void) | null
-  start: () => void
+  /** Set by the onboarding screen's last button: the chat starts the tour as soon as it opens (see useAutoStartTour). */
+  queued: boolean
+  queue: () => void
+  /** `from` 1 skips the welcome card (right after onboarding, which already said welcome). */
+  start: (from?: number) => void
   next: (count: number) => void
   back: () => void
   finish: (reason: TourEnd) => void
@@ -36,7 +40,9 @@ export const useTour = create<TourState>((set, get) => ({
   dir: 1,
   ui: CLOSED_UI,
   onEnd: null,
-  start: () => set({ active: true, index: 0, dir: 1, ui: CLOSED_UI }),
+  queued: false,
+  queue: () => set({ queued: true }),
+  start: (from = 0) => set({ active: true, index: from, dir: 1, ui: CLOSED_UI, queued: false }),
   next: (count) => {
     const { index } = get()
     if (index >= count - 1) return get().finish('done')

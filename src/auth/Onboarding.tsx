@@ -9,6 +9,7 @@ import { Button, InlineError } from '@/components/ui'
 import { TERMS_URL } from '@/lib/links'
 import { AuthShell } from './AuthShell'
 import { secondsLeft, useAuth, type OnboardingCredit } from './authStore'
+import { useTour } from '@/tour/tourStore'
 import { Confetti } from './Confetti'
 import { fetchLegalVersions, type LegalVersions } from './legal'
 import {
@@ -337,7 +338,11 @@ function Celebration({ credit }: { credit: OnboardingCredit }) {
           variant="primary"
           className="h-11 w-full"
           data-testid="onboarding-start"
-          onClick={() => useAuth.getState().dismissCelebration()}
+          onClick={() => {
+            // First time in: the chat opens straight into the product tour.
+            useTour.getState().queue()
+            useAuth.getState().dismissCelebration()
+          }}
         >
           {t('onb.done.start')}
         </Button>

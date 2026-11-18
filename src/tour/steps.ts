@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Compass, FolderKanban, LibraryBig, MessageSquareText, Paperclip, Send, SquarePen, Sparkles, UserRound } from 'lucide-react'
+import { Compass, Film, FolderKanban, LibraryBig, MessageSquareText, Palette, Scissors, Send, SquarePen, Sparkles, UserRound } from 'lucide-react'
 import type { MessageKey } from '@/i18n'
 import type { Placement } from './place'
 import type { TourUi } from './tourStore'
@@ -14,6 +14,10 @@ export interface TourStep {
   /** CSS selector of what to light up. None = a centred card (welcome, finish). The first VISIBLE match is used. */
   target?: string | ((mobile: boolean) => string)
   placement?: Placement
+  /** Draw an arrow beside the target that points at it (single menu lines). */
+  point?: boolean
+  /** A looping demo played over the target (see ComposerDemo). */
+  demo?: 'composer' | 'send'
   /** What the tour opens for this step. */
   ui?: (mobile: boolean) => Partial<TourUi>
 }
@@ -28,18 +32,42 @@ export const TOUR_STEPS: TourStep[] = [
     icon: MessageSquareText,
     title: 'tour.composer.title',
     body: 'tour.composer.body',
-    points: ['tour.composer.p1', 'tour.composer.p2'],
+    points: ['tour.composer.p1', 'tour.composer.p2', 'tour.composer.p3'],
     target: '[data-tour="composer"]',
-    placement: 'top',
+    placement: 'left',
+    demo: 'composer',
+  },
+  // The paperclip menu, one line at a time. A line that is not there (no templates on this backend) is skipped.
+  {
+    id: 'attach-footage',
+    icon: Film,
+    title: 'tour.attach.footage.title',
+    body: 'tour.attach.footage.body',
+    target: '[data-testid="chat-attach-footage"]',
+    placement: 'right',
+    point: true,
+    ui: () => ({ attachMenu: true }),
   },
   {
-    id: 'attach',
-    icon: Paperclip,
-    title: 'tour.attach.title',
-    body: 'tour.attach.body',
-    points: ['tour.attach.p1', 'tour.attach.p2', 'tour.attach.p3'],
-    target: '[data-testid="chat-attach-menu"]',
+    id: 'attach-reference',
+    icon: Palette,
+    title: 'tour.attach.reference.title',
+    body: 'tour.attach.reference.body',
+    points: ['tour.attach.reference.p1', 'tour.attach.reference.p2'],
+    target: '[data-testid="chat-attach-template"]',
     placement: 'right',
+    point: true,
+    ui: () => ({ attachMenu: true }),
+  },
+  {
+    id: 'attach-clips',
+    icon: Scissors,
+    title: 'tour.attach.clips.title',
+    body: 'tour.attach.clips.body',
+    points: ['tour.attach.clips.p1', 'tour.attach.clips.p2'],
+    target: '[data-testid="chat-attach-clips"]',
+    placement: 'right',
+    point: true,
     ui: () => ({ attachMenu: true }),
   },
   {
@@ -47,9 +75,10 @@ export const TOUR_STEPS: TourStep[] = [
     icon: Send,
     title: 'tour.send.title',
     body: 'tour.send.body',
-    points: ['tour.send.p1', 'tour.send.p2'],
-    target: '[data-testid="chat-send"]',
-    placement: 'top',
+    points: ['tour.send.p1', 'tour.send.p2', 'tour.send.p3'],
+    target: '[data-tour="composer"]',
+    placement: 'left',
+    demo: 'send',
   },
   {
     id: 'new',
