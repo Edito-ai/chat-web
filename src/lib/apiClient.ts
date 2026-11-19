@@ -1,5 +1,6 @@
 import { useAuth } from '@/auth/authStore'
 import { API_BASE } from './env'
+import { WAKE_MAX_MS, WAKE_RETRY_MS, isWakeResponse, markAwake, markWaking, waitOrAbort, wakeRetryEnabled } from './serverWake'
 
 export class ApiError extends Error {
   constructor(
@@ -12,13 +13,32 @@ export class ApiError extends Error {
   }
 }
 
-/** A network-level failure (backend down, wrong port, CORS) is a bare `TypeError: Failed to fetch`; name the suspect. */
+/**
+ * A network-level failure (backend down, wrong port, CORS) is a bare `TypeError: Failed to fetch`; name the suspect.
+ * In the browser, a request that finds the API asleep (network error, or the load balancer's own 502/503/504) waits and
+ * retries every few seconds for up to 4 minutes while the server wakes, and the "Waking up" banner shows meanwhile.
+ */
 export async function fetchOrExplain(url: string, init?: RequestInit): Promise<Response> {
-  try {
-    return await fetch(url, init)
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') throw e
-    throw new Error(`Can't reach the server at ${API_BASE}. Is the backend running?`)
+  const startedAt = Date.now()
+  const retry = wakeRetryEnabled()
+  for (;;) {
+    let res: Response | null = null
+    try {
+      res = await fetch(url, init)
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') throw e
+    }
+    if (res && !isWakeResponse(res)) {
+      markAwake()
+      return res
+    }
+    if (!retry || Date.now() - startedAt >= WAKE_MAX_MS) {
+      markAwake()
+      if (res) return res
+      throw new Error(`Can't reach the server at ${API_BASE}. Is the backend running?`)
+    }
+    markWaking(startedAt)
+    await waitOrAbort(WAKE_RETRY_MS, init?.signal)
   }
 }
 
