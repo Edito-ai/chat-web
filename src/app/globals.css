@@ -169,3 +169,23 @@
 @media (prefers-reduced-motion: reduce) {
   .tour-bounce-up { animation: none; }
 }
+
+/* Clip studio: a new caption line in the live preview comes up softly (like a burned-in line appearing). */
+.caption-line-in {
+  animation: captionLineIn 0.14s ease-out both;
+}
+@keyframes captionLineIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+/* Apply, when there are changes to apply: a soft coral ring that pulls the eye. */
+.studio-apply-ready {
+  animation: studioApplyReady 1.6s ease-out infinite;
+}
+@keyframes studioApplyReady {
+  0% { box-shadow: 0 0 0 0 rgb(255 122 92 / 0.55), 0 8px 22px -10px rgb(255 90 80 / 0.8); }
+  100% { box-shadow: 0 0 0 12px rgb(255 122 92 / 0), 0 8px 22px -10px rgb(255 90 80 / 0.8); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .caption-line-in, .studio-apply-ready { animation: none; }
+}

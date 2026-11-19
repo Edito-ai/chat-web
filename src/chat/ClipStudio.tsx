@@ -4,13 +4,15 @@ import clsx from 'clsx'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Captions, Check, Download, Loader2, Music, Pause, Play, Sparkles, Upload, VolumeX } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Captions, Check, CheckCircle2, Download, Eye, Film, Loader2, Music, Pause, Play, Sparkles, Upload, VolumeX, Wand2 } from 'lucide-react'
 import { Button, InlineError } from '@/components/ui'
 import { useSession } from '@/auth/useSession'
 import { useT } from '@/i18n'
 import { uploadVideo } from './chatUploads'
 import { useChat } from './chatStore'
-import { clock, getClipsApi, sameLook, type CaptionTemplate, type StudioLook, type StudioState } from './clips'
+import { clock, getClipsApi, sameLook, type CaptionTemplate, type ClipCaptions, type StudioLook, type StudioState } from './clips'
+import { CaptionOverlay } from './CaptionOverlay'
+import { useMusicPreview } from './useMusicPreview'
 import { looksLikeAudio, probeAudio } from './music'
 
 export const STUDIO_POLL_MS = 2000
@@ -18,8 +20,10 @@ const pct = (v: number) => Math.round(v * 100)
 
 /**
  * The clip studio (a page of its own): one clip of a stream with captions in a chosen style, background music (three
- * suggestions, or the person's own file) and sound effects the model places by itself. Apply renders it on the server;
- * the page follows the render and then plays and downloads the result. Only clipping chats lead here.
+ * suggestions, or the person's own file) and sound effects the model places by itself. Every choice plays at once in a live
+ * preview in the browser (captions drawn over the clip, the track playing along). Apply makes the final file on the server
+ * (captions burned in, music mixed); the page follows that render and then plays and downloads the result. A sticky bar
+ * always shows where things stand and holds Apply. Only clipping chats lead here.
  */
 export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string }) {
   const { t } = useT()
@@ -36,6 +40,13 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
   const [playing, setPlaying] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
+  /** The clip's words for the live caption preview: loading, there, or not available (the overlay is then left out). */
+  const [captions, setCaptions] = useState<ClipCaptions | null>(null)
+  const [captionsState, setCaptionsState] = useState<'loading' | 'ready' | 'none'>('loading')
+  /** The <video> on screen (it is re-created when its file changes): the overlay and the music follow it. */
+  const [video, setVideo] = useState<HTMLVideoElement | null>(null)
+  /** What the person chose to watch; null = automatic (the final file once it matches the choices, else the live preview). */
+  const [viewPick, setViewPick] = useState<'preview' | 'final' | null>(null)
 
   const take = useCallback(
     (st: StudioState, resetDraft: boolean) => {
@@ -61,6 +72,26 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
     return () => ctl.abort()
   }, [status, jobId, clipId, take])
 
+  // The words for the live preview: once per clip version (a trim makes new ones). The first time the server works them out.
+  const clipVersion = state?.clip.version
+  const clipReady = state?.clip.state === 'ready'
+  useEffect(() => {
+    if (clipVersion === undefined || !clipReady) return
+    const api = getClipsApi()
+    if (!api.captions) return setCaptionsState('none')
+    const ctl = new AbortController()
+    setCaptionsState('loading')
+    api
+      .captions(jobId, clipId, ctl.signal)
+      .then((c) => {
+        if (ctl.signal.aborted) return
+        setCaptions(c)
+        setCaptionsState(c.words.length ? 'ready' : 'none')
+      })
+      .catch(() => !ctl.signal.aborted && setCaptionsState('none'))
+    return () => ctl.abort()
+  }, [jobId, clipId, clipVersion, clipReady])
+
   // Follow a render until it is done.
   const rendering = state?.clip.styled?.state === 'rendering'
   useEffect(() => {
@@ -78,6 +109,12 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
     }
   }, [rendering, state, jobId, clipId, take])
 
+  // A render that just finished is shown (automatic view again).
+  const styledVersion = state?.clip.styled?.state === 'ready' ? state.clip.styled.version : null
+  useEffect(() => {
+    if (styledVersion !== null) setViewPick(null)
+  }, [styledVersion])
+
   useEffect(
     () => () => {
       audioRef.current?.pause()
@@ -85,6 +122,13 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
     },
     [],
   )
+
+  const styled = state?.clip.styled
+  const finalReady = styled?.state === 'ready' && !!styled.videoUrl
+  const dirty = !!state && !!draft && (!sameLook(draft, state.look) || styled?.state === 'failed')
+  const view: 'preview' | 'final' = finalReady && (viewPick ?? (dirty ? 'preview' : 'final')) === 'final' ? 'final' : 'preview'
+  const previewTrack = draft?.music.source === 'library' ? state?.tracks.find((tr) => tr.id === draft.music.trackId) ?? null : null
+  useMusicPreview(view === 'preview' ? video : null, previewTrack?.previewUrl ?? null, draft?.music.volume ?? 0)
 
   if (loadError) {
     return (
@@ -104,16 +148,16 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
   }
 
   const { clip } = state
-  const styled = clip.styled
-  const showStyled = styled?.state !== 'failed' && !!styled?.videoUrl
-  const videoUrl = showStyled ? styled!.videoUrl! : clip.videoUrl
+  const videoUrl = view === 'final' ? styled!.videoUrl! : clip.videoUrl
   const saved = state.look
-  const dirty = !sameLook(draft, saved) || styled?.state === 'failed'
   const nothing = !draft.captions.on && draft.music.source === 'none' && !draft.sfx.on
   const busy = applying || rendering || uploading || clip.state !== 'ready'
+  const template = state.templates.find((tp) => tp.id === draft.captions.template) ?? state.templates[0]
+  const showOverlay = view === 'preview' && draft.captions.on && captionsState === 'ready' && !!captions && !!template
 
   const set = (patch: (d: StudioLook) => StudioLook) => {
     setProblem(null)
+    setViewPick(null) // a new choice is watched in the live preview
     setDraft((d) => (d ? patch(d) : d))
   }
 
@@ -129,11 +173,14 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
     }
   }
 
+  const stopListening = () => {
+    audioRef.current?.pause()
+    setPlaying(null)
+  }
+
   const listen = (id: string, url: string) => {
-    if (playing === id) {
-      audioRef.current?.pause()
-      return setPlaying(null)
-    }
+    if (playing === id) return stopListening()
+    video?.pause() // one sound at a time
     const a = audioRef.current ?? (audioRef.current = new Audio())
     a.src = url
     a.onended = () => setPlaying(null)
@@ -160,32 +207,92 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
     }
   }
 
+  // The action bar: what state the clip is in, and the one thing to do next.
+  const working = applying || rendering
+  const bar =
+    styled?.state === 'failed' && !working
+      ? { tone: 'failed' as const, title: t('chat.studio.failed'), sub: styled.error ?? '' }
+      : working
+        ? { tone: 'working' as const, title: t('chat.studio.bar.rendering'), sub: t('chat.studio.bar.renderingSub') }
+        : dirty
+          ? { tone: 'changes' as const, title: t('chat.studio.bar.changes'), sub: t('chat.studio.bar.changesSub') }
+          : finalReady
+            ? { tone: 'done' as const, title: t('chat.studio.bar.applied'), sub: t('chat.studio.bar.appliedSub') }
+            : { tone: 'idle' as const, title: t('chat.studio.bar.idle'), sub: t('chat.studio.bar.idleSub') }
+
   return (
     <Shell back={t('chat.studio.back')}>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <section className="space-y-3">
+          {/* Live preview / final file */}
+          <div className="flex items-center justify-between gap-3">
+            <div role="tablist" aria-label={t('chat.studio.view.label')} className="inline-flex rounded-xl border border-line bg-surface-1 p-1">
+              {(['preview', 'final'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="tab"
+                  data-testid={`studio-view-${v}`}
+                  aria-selected={view === v}
+                  disabled={v === 'final' && !finalReady}
+                  onClick={() => setViewPick(v)}
+                  className={clsx(
+                    'inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-label font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                    view === v ? 'bg-white/[0.1] text-ink-0' : 'text-ink-3 hover:text-ink-1',
+                  )}
+                >
+                  {v === 'preview' ? <Eye size={14} aria-hidden /> : <Film size={14} aria-hidden />}
+                  {t(v === 'preview' ? 'chat.studio.view.preview' : 'chat.studio.view.final')}
+                </button>
+              ))}
+            </div>
+            {view === 'preview' && (
+              <span className="inline-flex items-center gap-1.5 text-caption text-ink-3">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+                </span>
+                {t('chat.studio.view.live')}
+              </span>
+            )}
+          </div>
+
           <div className="relative overflow-hidden rounded-2xl border border-line-strong bg-black">
             {videoUrl ? (
               <video
                 key={videoUrl}
+                ref={setVideo}
                 data-testid="studio-video"
                 src={videoUrl}
                 poster={clip.thumbUrl ?? undefined}
                 controls
                 playsInline
-                className={clsx('mx-auto aspect-[9/16] max-h-[72vh] w-auto bg-black object-contain', rendering && 'opacity-50')}
+                onPlay={() => playing && stopListening()}
+                className="mx-auto block aspect-[9/16] max-h-[72vh] w-auto bg-black object-contain"
               />
             ) : (
               <div className="mx-auto grid aspect-[9/16] max-h-[72vh] place-items-center text-label text-ink-3">{t('chat.clips.cutting')}</div>
             )}
-            {rendering && (
-              <span className="absolute inset-0 grid place-items-center">
-                <span className="inline-flex items-center gap-2 rounded-full bg-black/75 px-3 py-1.5 text-label text-white">
-                  <Loader2 size={14} className="animate-spin" aria-hidden /> {t('chat.studio.rendering')}
+            {showOverlay && <CaptionOverlay video={video} captions={captions!} template={template!} />}
+            {view === 'preview' && draft.captions.on && captionsState === 'loading' && (
+              <span className="pointer-events-none absolute inset-x-0 bottom-[22%] flex justify-center">
+                <span className="inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-1.5 text-caption text-white backdrop-blur">
+                  <Loader2 size={13} className="animate-spin" aria-hidden /> {t('chat.studio.preview.preparing')}
                 </span>
               </span>
             )}
+            {working && (
+              <span className="pointer-events-none absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-caption text-white backdrop-blur">
+                <Loader2 size={12} className="animate-spin" aria-hidden /> {t('chat.studio.rendering')}
+              </span>
+            )}
           </div>
+          {view === 'preview' && draft.captions.on && captionsState === 'none' && (
+            <p className="text-caption text-ink-3">{t('chat.studio.preview.unavailable')}</p>
+          )}
+          {view === 'preview' && draft.music.source === 'upload' && (
+            <p className="text-caption text-ink-3">{t('chat.studio.preview.uploadMusic')}</p>
+          )}
           <div>
             <h1 className="font-display text-heading font-bold text-ink-0">{clip.title}</h1>
             <p className="font-mono text-caption tabular-nums text-ink-3">
@@ -193,39 +300,12 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
               {t('chat.clips.at', { t: clock(clip.start) })} · {clip.durationSec.toFixed(0)} s
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {showStyled && styled?.state === 'ready' && styled.downloadUrl && (
-              <a
-                href={styled.downloadUrl}
-                download={styled.downloadFilename}
-                data-testid="studio-download-styled"
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] px-4 text-body font-semibold text-white hover:brightness-110"
-              >
-                <Download size={15} aria-hidden /> {t('chat.studio.download')}
-              </a>
-            )}
-            {clip.downloadUrl && (
-              <a
-                href={clip.downloadUrl}
-                download={clip.downloadFilename}
-                data-testid="studio-download-raw"
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-surface-3 px-4 text-body font-semibold text-ink-0 hover:bg-surface-4"
-              >
-                <Download size={15} aria-hidden /> {t('chat.studio.downloadRaw')}
-              </a>
-            )}
-          </div>
-          {styled?.state === 'failed' && (
-            <p role="alert" className="text-label text-danger">
-              {t('chat.studio.failed')} {styled.error ?? ''}
-            </p>
-          )}
           {styled?.state === 'ready' && styled.noWords && saved.captions.on && (
             <p className="text-label text-ink-3">{t('chat.clips.noWords')}</p>
           )}
         </section>
 
-        <aside className="space-y-4">
+        <aside className="scroll-thin space-y-4 lg:sticky lg:top-5 lg:max-h-[calc(100dvh-9rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
           {/* captions */}
           <Panel icon={<Captions size={15} aria-hidden />} title={t('chat.studio.captions')}>
             <Toggle
@@ -342,22 +422,87 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
             />
             <p className="text-caption text-ink-4">{t('chat.studio.sfxHint')}</p>
           </Panel>
-
-          {problem && (
-            <p role="alert" className="text-label text-danger">
-              {problem}
-            </p>
-          )}
-          <Button
-            variant="primary"
-            className="h-11 w-full"
-            data-testid="studio-apply"
-            disabled={busy || !dirty}
-            onClick={() => void apply()}
-          >
-            {applying || rendering ? t('chat.studio.rendering') : nothing ? t('chat.studio.applyPlain') : t('chat.studio.apply')}
-          </Button>
         </aside>
+      </div>
+
+      {/* The action bar: always on screen, says where things stand and holds Apply and the downloads. */}
+      <div
+        data-testid="studio-bar"
+        data-tone={bar.tone}
+        className="sticky bottom-3 z-30 rounded-2xl border border-line-strong bg-[linear-gradient(160deg,rgb(30_34_70/0.92),rgb(14_16_34/0.95))] p-3 shadow-[0_24px_60px_-20px_rgb(0_0_0/0.9)] backdrop-blur-xl sm:p-4"
+        style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <span
+              aria-hidden
+              className={clsx(
+                'grid h-10 w-10 shrink-0 place-items-center rounded-xl',
+                bar.tone === 'changes' && 'bg-accent/20 text-accent',
+                bar.tone === 'working' && 'bg-white/[0.08] text-ink-0',
+                bar.tone === 'done' && 'bg-success/15 text-success',
+                bar.tone === 'failed' && 'bg-danger/15 text-danger',
+                bar.tone === 'idle' && 'bg-white/[0.06] text-ink-2',
+              )}
+            >
+              {bar.tone === 'working' ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : bar.tone === 'done' ? (
+                <CheckCircle2 size={18} />
+              ) : bar.tone === 'failed' ? (
+                <AlertCircle size={18} />
+              ) : bar.tone === 'changes' ? (
+                <Wand2 size={18} />
+              ) : (
+                <Eye size={18} />
+              )}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-body font-semibold text-ink-0">{bar.title}</p>
+              <p className="line-clamp-2 text-caption text-ink-3">{bar.sub}</p>
+              {problem && (
+                <p role="alert" className="mt-0.5 text-caption text-danger">
+                  {problem}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:justify-end">
+            {clip.downloadUrl && (
+              <a
+                href={clip.downloadUrl}
+                download={clip.downloadFilename}
+                data-testid="studio-download-raw"
+                className="inline-flex h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-line bg-surface-3 px-3.5 text-label font-semibold text-ink-1 hover:bg-surface-4 md:flex-none"
+              >
+                <Download size={15} aria-hidden /> {t('chat.studio.downloadRaw')}
+              </a>
+            )}
+            {finalReady && styled?.downloadUrl && (
+              <a
+                href={styled.downloadUrl}
+                download={styled.downloadFilename}
+                data-testid="studio-download-styled"
+                className={clsx(
+                  'inline-flex h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-body font-semibold md:flex-none',
+                  dirty ? 'border border-line bg-surface-3 text-ink-0 hover:bg-surface-4' : 'bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white hover:brightness-110',
+                )}
+              >
+                <Download size={15} aria-hidden /> {t('chat.studio.download')}
+              </a>
+            )}
+            <Button
+              variant="primary"
+              icon={working ? Loader2 : Wand2}
+              className={clsx('h-11 w-full whitespace-nowrap px-6 text-body md:w-auto', dirty && !busy && 'studio-apply-ready', working && '[&>svg]:animate-spin')}
+              data-testid="studio-apply"
+              disabled={busy || !dirty}
+              onClick={() => void apply()}
+            >
+              {working ? t('chat.studio.rendering') : nothing ? t('chat.studio.applyPlain') : t('chat.studio.apply')}
+            </Button>
+          </div>
+        </div>
       </div>
     </Shell>
   )
