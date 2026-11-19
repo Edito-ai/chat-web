@@ -29,7 +29,7 @@ describe('caption timing (same rules as the burn-in)', () => {
   it('reads the server answer and drops broken lines', () => {
     const c = toCaptions({ version: 2, words: [{ t: 'a', s: 0, e: 0.4 }, { t: 'b', s: 0.5, e: 0.9 }, { bad: 1 }],
                            plan: { lines: [[0, 1], [1, 9], [2, 1]], emphasis: [1, 7], sfx: [{ at: 0.1, sound: 'pop' }] } })
-    expect(c).toEqual({ version: 2, words: [{ t: 'a', s: 0, e: 0.4 }, { t: 'b', s: 0.5, e: 0.9 }],
+    expect(c).toEqual({ version: 2, lang: 'original', words: [{ t: 'a', s: 0, e: 0.4 }, { t: 'b', s: 0.5, e: 0.9 }],
                         plan: { lines: [[0, 1]], emphasis: [1], sfx: [{ at: 0.1, sound: 'pop' }] } })
   })
 })
