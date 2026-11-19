@@ -57,8 +57,9 @@ describe('clips: wire mapping and helpers', () => {
 
   it('formats times and clamps options', () => {
     expect([clock(0), clock(75), clock(3725)]).toEqual(['0:00', '1:15', '1:02:05'])
-    expect(clampOptions({ count: 99, minSec: 300, maxSec: 2 })).toEqual({ count: 20, minSec: 10, maxSec: 15 })
-    expect(clampOptions({})).toEqual({ count: 12, minSec: 20, maxSec: 75 })
+    expect(clampOptions({ count: 99, minSec: 300, maxSec: 2 })).toEqual({ count: 20, minSec: 10, maxSec: 15, liveMin: 30 })
+    expect(clampOptions({})).toEqual({ count: 12, minSec: 20, maxSec: 75, liveMin: 30 })
+    expect(clampOptions({ liveMin: 500 }).liveMin).toBe(60)
   })
 })
 
@@ -97,7 +98,7 @@ describe('chat store: clipping', () => {
     useChat.getState().setClipsOptions({ count: 8 })
     expect(await useChat.getState().send('only the funny moments')).toBeNull()
     expect(api.createJob).toHaveBeenCalledWith(expect.objectContaining({
-      kind: 'clips', videoIds: ['v1'], prompt: 'only the funny moments', clips: { count: 8, minSec: 20, maxSec: 75 },
+      kind: 'clips', videoIds: ['v1'], prompt: 'only the funny moments', clips: { count: 8, minSec: 20, maxSec: 75, liveMin: 30 },
     }))
     expect(api.createJob.mock.calls[0]![0].sourceUrl).toBeUndefined()
     expect(useChat.getState().clipsMode).toBe(false) // one run per switch-on

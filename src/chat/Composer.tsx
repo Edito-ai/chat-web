@@ -8,6 +8,7 @@ import { useTypewriter } from './useTypewriter'
 import { IconButton } from '@/components/ui'
 import type { ChatAttachment, ChatPicture } from './chatStore'
 import type { ClipOptions } from './chatTypes'
+import { LIVE_MINUTES } from './clips'
 import { AttachMenu } from './AttachMenu'
 import { StyleChip, useChosenStyle } from './StylePicker'
 import { useStyles } from './styles'
@@ -138,6 +139,19 @@ function ClipsBar({ options, onOptions, onOff }: { options: ClipOptions; onOptio
         >
           {LENGTHS.map((l, i) => (
             <option key={i} value={i}>{t('chat.clips.seconds', { min: l.minSec, max: l.maxSec })}</option>
+          ))}
+        </select>
+      </label>
+      <label className="inline-flex items-center gap-1.5 text-caption text-ink-3" title={t('chat.clips.liveHint')}>
+        {t('chat.clips.live')}
+        <select
+          data-testid="chat-clips-live"
+          value={options.liveMin}
+          onChange={(e) => onOptions({ liveMin: Number(e.target.value) })}
+          className={select}
+        >
+          {[...new Set([...LIVE_MINUTES, options.liveMin])].sort((a, b) => a - b).map((m) => (
+            <option key={m} value={m}>{t('chat.clips.liveLast', { min: m })}</option>
           ))}
         </select>
       </label>

@@ -148,6 +148,8 @@ export interface ClipOptions {
   count: number
   minSec: number
   maxSec: number
+  /** A link that is still live: how many of its last minutes are recorded and clipped. */
+  liveMin: number
 }
 
 /** One poll of a job, already normalised by the adapter. */
