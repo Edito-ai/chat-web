@@ -12,7 +12,7 @@ import { ResultCard, SeenFrames } from './ResultCard'
 import { ClipsBoard } from './ClipsBoard'
 import { ThinkingTrail } from './Thinking'
 import { FramesReview } from './FramesReview'
-import { LookChoice } from './LookChoice'
+import { LiveActivity } from './ActivityPanel'
 import type { ChatAssistantMessage, ChatMessage, ChatSuggestion } from './chatTypes'
 
 function ErrorCard({ msg }: { msg: ChatAssistantMessage }) {
@@ -122,6 +122,9 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
         <ThinkingTrail msg={msg} />
         {msg.result ? (
           <ResultCard msg={{ ...msg, result: msg.result }} />
+        ) : msg.reply && msg.reply.trim() ? (
+          // The edit answered with words, not a video (e.g. it asks what the video should be about): a reply to answer.
+          <ChatReply msg={msg} chips={chips} onSuggest={onSuggest} />
         ) : (
           <div className="max-w-lg space-y-1">
             <p className="text-prose text-ink-0">{msg.reply ?? t('chat.result.ready')}</p>
@@ -155,10 +158,11 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
       </div>
     )
   }
+  // Still running: the live card (what the AI is doing now, a moving progress bar, the steps with their times, time left
+  // and a tip), so a long edit always shows something happening. The card carries the look choice itself.
   return (
     <div className="space-y-3">
-      <ThinkingTrail msg={msg} />
-      <LookChoice msg={msg} />
+      <LiveActivity msg={msg} />
       <FramesReview msg={msg} />
       {msg.analysis && (
         <div className="w-full max-w-xl">
