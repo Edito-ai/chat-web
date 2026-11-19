@@ -18,7 +18,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', memoryStorage())
   patch.mockReset()
   useAuth.setState({ user: { id: 'u1', email: 'a@b.c', name: 'A', tourCompletedAt: null } })
-  useTour.setState({ active: false, index: 0, onEnd: null })
+  useTour.setState({ active: false, index: 0, onEnd: null, queued: false })
 })
 
 describe('tour persistence', () => {
@@ -77,6 +77,14 @@ describe('tour store', () => {
     useTour.getState().next(TOUR_STEPS.length)
     expect(useTour.getState().active).toBe(false)
     expect(onEnd).toHaveBeenCalledWith('done')
+  })
+
+  it('a start queued by onboarding skips the welcome card and clears the queue', () => {
+    useTour.getState().queue()
+    expect(useTour.getState().queued).toBe(true)
+    useTour.getState().start(1)
+    expect(useTour.getState()).toMatchObject({ active: true, index: 1, queued: false })
+    useTour.getState().finish('skip')
   })
 
   it('skipping ends it once and closes what it opened', () => {

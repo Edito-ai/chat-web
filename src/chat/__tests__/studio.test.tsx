@@ -97,7 +97,7 @@ describe('ClipStudio', () => {
     await click(q('studio-apply'))
     await flush()
     expect(setLook).toHaveBeenCalledWith('job', 'c01', {
-      captions: { on: true, template: 'neon' }, music: { source: 'library', trackId: 't2', volume: 0.12 }, sfx: { on: true },
+      captions: { on: true, template: 'neon', lang: 'original' }, music: { source: 'library', trackId: 't2', volume: 0.12 }, sfx: { on: true },
     })
     expect(host.textContent).toContain('Rendering')
     await act(async () => { await vi.advanceTimersByTimeAsync(STUDIO_POLL_MS + 10) })

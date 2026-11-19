@@ -92,25 +92,21 @@ export function ChatScreen() {
   // First-run product tour: it may open the drawer (phones) or the collapsed sidebar (desktop) to point at what is in it.
   useAutoStartTour()
   const touring = useTour((s) => s.active)
+  const tourIndex = useTour((s) => s.index)
   const tourDrawer = useTourWants('drawer')
   const tourSidebar = useTourWants('sidebar')
   const railHidden = collapsed && !tourSidebar
   // The tour starts from a clean screen: the chat, with the drawer shut (it may be replayed from the account menu in the drawer).
   useEffect(() => {
     if (!touring) return
-    setView('chat')
     setDrawer(false)
   }, [touring])
-  const tourHadDrawer = useRef(false)
+  // Every step starts on the chat (the person may have opened the Library from the tour's Library step).
   useEffect(() => {
-    if (tourDrawer) {
-      tourHadDrawer.current = true
-      setDrawer(true)
-    } else if (tourHadDrawer.current) {
-      tourHadDrawer.current = false
-      setDrawer(false)
-    }
-  }, [tourDrawer])
+    if (touring) setView('chat')
+  }, [touring, tourIndex])
+  // While a tour step wants the drawer it stays open, even if something in it closes it (New chat, a chat row).
+  const drawerOpen = drawer || tourDrawer
 
   const running = activeAssistant(messages) !== null
   const empty = messages.length === 0
@@ -261,7 +257,7 @@ export function ChatScreen() {
       </aside>
 
       {/* Mobile drawer */}
-      {drawer && (
+      {drawerOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <button
             type="button"

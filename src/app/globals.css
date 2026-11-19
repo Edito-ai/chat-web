@@ -120,3 +120,72 @@
 @media (prefers-reduced-motion: reduce) {
   .tour-ring { animation: none; }
 }
+
+/* A click outside the lit part: the tour card nudges once (the tour is still running). */
+.tour-nudge {
+  animation: tourNudge 0.5s ease-out both;
+  box-shadow: 0 0 0 2px rgb(255 158 140 / 0.7), 0 0 30px 4px rgb(255 122 92 / 0.35);
+}
+@keyframes tourNudge {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-nudge { animation: none; opacity: 0; }
+}
+
+/* The arrow that points at one menu line during the tour. */
+.tour-pointer > svg {
+  filter: drop-shadow(0 0 8px rgb(255 122 92 / 0.55));
+  animation: tourPoint 1.1s ease-in-out infinite;
+}
+@keyframes tourPoint {
+  0%, 100% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-pointer > svg { animation: none; }
+}
+
+/* The send arrow in the tour's Send demo: a soft ring that says "press me". */
+.tour-send-pulse {
+  animation: tourSendPulse 1.2s ease-out infinite;
+}
+@keyframes tourSendPulse {
+  0% { box-shadow: 0 0 0 0 rgb(255 122 92 / 0.65), 0 8px 22px -8px rgb(255 90 80 / 0.9); }
+  100% { box-shadow: 0 0 0 14px rgb(255 122 92 / 0), 0 8px 22px -8px rgb(255 90 80 / 0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-send-pulse { animation: none; }
+}
+
+.tour-bounce-up {
+  animation: tourBounceUp 0.9s ease-in-out infinite;
+}
+@keyframes tourBounceUp {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-bounce-up { animation: none; }
+}
+
+/* Clip studio: a new caption line in the live preview comes up softly (like a burned-in line appearing). */
+.caption-line-in {
+  animation: captionLineIn 0.14s ease-out both;
+}
+@keyframes captionLineIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+/* Apply, when there are changes to apply: a soft coral ring that pulls the eye. */
+.studio-apply-ready {
+  animation: studioApplyReady 1.6s ease-out infinite;
+}
+@keyframes studioApplyReady {
+  0% { box-shadow: 0 0 0 0 rgb(255 122 92 / 0.55), 0 8px 22px -10px rgb(255 90 80 / 0.8); }
+  100% { box-shadow: 0 0 0 12px rgb(255 122 92 / 0), 0 8px 22px -10px rgb(255 90 80 / 0.8); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .caption-line-in, .studio-apply-ready { animation: none; }
+}
