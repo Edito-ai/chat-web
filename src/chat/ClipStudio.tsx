@@ -595,7 +595,7 @@ function LanguagePicker({ value, main, other, disabled, onPick }: {
       'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-label transition-colors',
       on ? 'border-accent-line bg-accent/15 text-ink-0' : 'border-line bg-white/[0.03] text-ink-2 hover:bg-white/[0.07] hover:text-ink-0',
     )
-  const use = (name: string) => {
+  const pickName = (name: string) => {
     const m = main.find((l) => l.name.toLowerCase() === name.toLowerCase())
     onPick(m ? m.id : name.toLowerCase())
     setTyping(false)
@@ -604,7 +604,7 @@ function LanguagePicker({ value, main, other, disabled, onPick }: {
   }
   const submit = () => {
     const c = checkLanguage(typed, known)
-    if (c.kind === 'ok') return use(c.name)
+    if (c.kind === 'ok') return pickName(c.name)
     setCheck(c)
   }
   const otherName = !isMain ? other.find((n) => n.toLowerCase() === value) ?? value : null
@@ -674,11 +674,11 @@ function LanguagePicker({ value, main, other, disabled, onPick }: {
             <div data-testid="studio-lang-suggest" className="space-y-2 rounded-lg bg-accent/10 p-2.5">
               <p className="text-label text-ink-1">{t('chat.studio.lang.didYouMean', { name: check.name })}</p>
               <div className="flex flex-wrap gap-1.5">
-                <button type="button" data-testid="studio-lang-yes" onClick={() => use(check.name)} className={chip(true)}>
+                <button type="button" data-testid="studio-lang-yes" onClick={() => pickName(check.name)} className={chip(true)}>
                   <Check size={13} aria-hidden /> {t('chat.studio.lang.yes', { name: check.name })}
                 </button>
                 {check.others.map((n) => (
-                  <button key={n} type="button" onClick={() => use(n)} className={chip(false)}>
+                  <button key={n} type="button" onClick={() => pickName(n)} className={chip(false)}>
                     {n}
                   </button>
                 ))}
@@ -694,7 +694,7 @@ function LanguagePicker({ value, main, other, disabled, onPick }: {
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-caption text-ink-3">{t('chat.studio.lang.closest')}</span>
                 {check.closest.map((n) => (
-                  <button key={n} type="button" onClick={() => use(n)} className={chip(false)}>
+                  <button key={n} type="button" onClick={() => pickName(n)} className={chip(false)}>
                     {n}
                   </button>
                 ))}
