@@ -2,6 +2,12 @@ import type { MessageKey } from './en'
 
 export const hi: Record<MessageKey, string> = {
   'app.name': 'Broll',
+  'common.reference': 'संदर्भ: {id}',
+  'err.page.title': 'कुछ गड़बड़ हो गई',
+  'err.page.body': 'इस पेज में दिक्कत आ गई। पेज दोबारा लोड करने से आम तौर पर ठीक हो जाता है।',
+  'err.page.reload': 'पेज दोबारा लोड करें',
+  'err.page.home': 'शुरुआत पर जाएँ',
+  'err.page.stale': 'ऐप का नया वर्शन आ गया है। दोबारा लोड करने पर मिल जाएगा।',
   'common.retry': 'फिर कोशिश करें',
   'common.clear': 'हटाएँ',
   'common.close': 'बंद करें',

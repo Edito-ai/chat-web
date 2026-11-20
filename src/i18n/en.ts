@@ -1,6 +1,12 @@
 /** English strings: the source of truth for the key set (hi.ts must provide every key). */
 export const en = {
   'app.name': 'Broll',
+  'common.reference': 'Reference: {id}',
+  'err.page.title': 'Something went wrong',
+  'err.page.body': 'This page hit a problem. Reloading usually fixes it.',
+  'err.page.reload': 'Reload the page',
+  'err.page.home': 'Go to the start',
+  'err.page.stale': 'A new version of the app is available. Reloading will get it.',
   'common.retry': 'Retry',
   'common.clear': 'Clear',
   'common.close': 'Close',

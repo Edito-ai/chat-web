@@ -5,6 +5,7 @@ import { useT } from '@/i18n'
 import { FolderOpen, Sparkles, Upload } from 'lucide-react'
 import { InlineError, LogoMark } from '@/components/ui'
 import { ORB_ENABLED } from '@/lib/features'
+import { isDevMode, isHumanText } from '@/lib/friendlyError'
 import { Presence } from './Presence'
 import { boldRuns, replyBlocks } from './replyText'
 import { useChat } from './chatStore'
@@ -17,11 +18,15 @@ import type { ChatAssistantMessage, ChatMessage, ChatSuggestion } from './chatTy
 
 function ErrorCard({ msg }: { msg: ChatAssistantMessage }) {
   const { t } = useT()
-  const detail = msg.error && msg.error !== 'failed' && msg.error !== 'missing_result' ? msg.error : undefined
+  const raw = msg.error && msg.error !== 'failed' && msg.error !== 'missing_result' ? msg.error : undefined
+  // The server already turns a failure into a plain sentence in production. A text that still reads like developer output (an old
+  // job, another backend) is not shown to a person; in development the real text stays, in monospace.
+  const dev = isDevMode()
+  const detail = raw && (dev || isHumanText(raw)) ? raw : undefined
   return (
     <div role="alert" className="w-full max-w-lg">
       <p className="flex items-center gap-2 text-prose font-medium text-ink-0"><AlertTriangle size={15} className="shrink-0 text-danger" aria-hidden />{t('chat.error.title')}</p>
-      {detail && <p className="mt-1.5 break-words font-mono text-label text-danger">{detail}</p>}
+      {detail && <p className={dev && !isHumanText(detail) ? 'mt-1.5 break-words font-mono text-label text-danger' : 'mt-1.5 break-words text-label text-ink-2'}>{detail}</p>}
       <p className="mt-2 text-label text-ink-3">{t('chat.error.next')}</p>
     </div>
   )
