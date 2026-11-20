@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { toClips, toClipsSource } from './clips'
-import type { ActivityEvent, ChatAnalysis, ChatApi, ChatJobSnapshot, ChatJobStatus, FramesReview, LookChoice, StageEvent, ChatSuggestion } from './chatTypes'
+import type { ActivityEvent, ChatAnalysis, ChatApi, ChatJobSnapshot, ChatJobStatus, FramesReview, LivePlayer, LookChoice, StageEvent, ChatSuggestion } from './chatTypes'
 
 /** The adapter the chat store talks to: the real `/chat/*` backend. Tests inject their own via `setChatApi`. */
 
@@ -74,6 +74,8 @@ export interface ChatJobWire {
     seconds?: number
     round?: number
     frames?: { n?: number; t?: number; template?: string; imageUrl?: string }[]
+    /** The live preview page for the plan on screen (backend2 renderer/player); absent until its files are ready. */
+    player?: { url?: string; version?: string; bytes?: number } | null
   } | null
   /** Stream clipping (kind `clips`): the clips, best first, and the footage they came from. */
   clips?: unknown[]
@@ -149,8 +151,14 @@ export function toFramesReview(raw: ChatJobWire['framesReview'], receivedAt = Da
   const secondsLeft = typeof raw.secondsLeft === 'number' ? Math.max(0, raw.secondsLeft) : 0
   return {
     open: true, secondsLeft, seconds: typeof raw.seconds === 'number' ? raw.seconds : secondsLeft, receivedAt,
-    round: typeof raw.round === 'number' ? raw.round : 1, frames,
+    round: typeof raw.round === 'number' ? raw.round : 1, frames, player: toLivePlayer(raw.player),
   }
+}
+
+/** Wire live preview -> typed; only an http(s) page is accepted (it is put in an iframe). */
+export function toLivePlayer(raw: NonNullable<ChatJobWire['framesReview']>['player']): LivePlayer | null {
+  if (!raw || typeof raw.url !== 'string' || !/^https?:\/\//i.test(raw.url)) return null
+  return { url: raw.url, version: String(raw.version ?? raw.url), bytes: typeof raw.bytes === 'number' && raw.bytes > 0 ? raw.bytes : 0 }
 }
 
 const TERMINAL: Record<string, ChatJobStatus> = { complete: 'complete', failed: 'failed', cancelled: 'cancelled' }

@@ -92,6 +92,17 @@ export interface FramesReview {
   /** 1 = first look, 2+ = after a change. */
   round: number
   frames: ReviewFrame[]
+  /** The same edit playing live on this device (no video is rendered for it); null until the server has its files ready. */
+  player: LivePlayer | null
+}
+
+/** The live preview page (backend2 renderer/player) for one version of the plan. */
+export interface LivePlayer {
+  url: string
+  /** Changes when the plan changes (a change typed on the frames): the page is loaded again. */
+  version: string
+  /** What the page downloads before it plays, in bytes (0 = unknown). */
+  bytes: number
 }
 
 /** The user's answer to the template chooser: one of the offered templates, none, a link to copy, an uploaded reference, or "wait for me". */

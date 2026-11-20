@@ -273,6 +273,12 @@ export const en = {
   'chat.frames.rendering': 'Rendering...',
   'chat.frames.auto': 'Renders by itself in {n} min',
   'chat.frames.frame': 'Frame {n}',
+  'chat.live.title': 'Live preview of the edit',
+  'chat.live.hint': 'Live preview, played on your phone. The final video is rendered at full quality.',
+  'chat.live.ask': 'Play the live preview',
+  'chat.live.askSize': 'Play the live preview ({size})',
+  'chat.live.slow': 'This phone could not play the live preview smoothly, so here are the frames instead.',
+  'chat.live.failed': 'The live preview could not start. The frames below show the edit.',
   'chat.look.title': 'Pick a template',
   'chat.look.best': 'Best',
   'chat.look.auto': 'The best one is picked in {n}s',
@@ -679,6 +685,9 @@ export const en = {
   'tour.profile.p3': 'Help, and "Take the tour" to see this guide again.',
   'tour.done.title': 'You are ready to create',
   'tour.done.body': 'Add a video, describe the edit, and send. Your first cut is a message away.',
+  'wake.title': 'Waking up the server',
+  'wake.detail': 'It rests when nobody is editing. This takes about 3–6 minutes, and what you asked for goes through on its own.',
+  'wake.elapsed': '{time} so far',
 } as const
 
 export type MessageKey = keyof typeof en
