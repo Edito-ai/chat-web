@@ -6,12 +6,11 @@ import { useT, type MessageKey } from '@/i18n'
 import { Button, IconButton, InlineError, Logo } from '@/components/ui'
 import { useAuth } from '@/auth/authStore'
 import { AccountDialogs } from '@/account/components/AccountDialogs'
-import { useChat, type ChatSendProblem } from './chatStore'
+import { openQuestion, useChat, type ChatSendProblem } from './chatStore'
 import type { ChatSuggestion } from './chatTypes'
 import { activeAssistant, lastCompleted } from './chatState'
 import { Bubble } from './Messages'
 import { Composer } from './Composer'
-import { useStyles } from './styles'
 import { LibraryPage } from './LibraryPage'
 import { Sidebar } from './Sidebar'
 import { useNow } from './ActivityPanel'
@@ -32,8 +31,6 @@ const PROBLEM_KEY: Record<ChatSendProblem, MessageKey> = {
   noPrompt: 'chat.problem.noPrompt',
   uploading: 'chat.problem.uploading',
   uploadFailed: 'chat.problem.uploadFailed',
-  twoReferences: 'chat.problem.twoReferences',
-  noStream: 'chat.problem.noStream',
 }
 
 const EXAMPLES = [1, 2, 3, 4] as const
@@ -48,10 +45,6 @@ export function ChatScreen() {
   const attachments = useChat((s) => s.attachments)
   const pictures = useChat((s) => s.pictures)
   const placementJobId = useChat((s) => s.placementJobId)
-  const referenceLink = useChat((s) => s.referenceLink)
-  const clipsMode = useChat((s) => s.clipsMode)
-  const clipsOptions = useChat((s) => s.clipsOptions)
-  const { setClipsMode, setClipsOptions } = useChat.getState()
   const busy = useChat((s) => s.busy)
   const actionError = useChat((s) => s.actionError)
   const lostJobId = useChat((s) => s.pollLostJobId)
@@ -74,9 +67,8 @@ export function ChatScreen() {
     if (authStatus !== 'restoring') router.push('/login')
     return false
   }
-  const { attach, removeAttachment, removePicture, toggleReference, attachReference, setReferenceLink, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob, pinChat, deleteChat } =
+  const { attach, removeAttachment, removePicture, send, cancel, startFresh, newChat, clearActionError, loadHistory, openJob, pinChat, deleteChat } =
     useChat.getState()
-  const loadStyles = useStyles((s) => s.load)
   const [text, setText] = useState('')
   const [problem, setProblem] = useState<ChatSendProblem | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -114,8 +106,9 @@ export function ChatScreen() {
   const library = view === 'library'
   const hasVideo = lastCompleted(messages) !== null
   const uploading = attachments.some((a) => a.state === 'uploading') || pictures.some((p) => p.state === 'uploading')
-  // While the job asks where a picture goes, the box takes the answer (the job is still running, but not blocked)
-  const sendBlocked = running && placementJobId === null
+  // While the job asks where a picture goes, or the backend asks a question, the box takes the answer (the job is still running, but not blocked)
+  const asking = !remote && openQuestion(messages) !== null
+  const sendBlocked = running && placementJobId === null && !asking
   // While nothing is happening the empty box types example prompts: first the starter ideas, then follow-up changes.
   const hints = (messages.length === 0 ? EXAMPLES.map((n) => t(`chat.example.${n}.prompt` as MessageKey)) : ([1, 2, 3, 4] as const).map((n) => t(`chat.nudge.${n}` as MessageKey)))
 
@@ -125,8 +118,7 @@ export function ChatScreen() {
     if (!signedIn) return
     if (takeFreshStart()) startFresh()
     void loadHistory()
-    void loadStyles()
-  }, [startFresh, loadHistory, loadStyles, signedIn])
+  }, [startFresh, loadHistory, signedIn])
 
   useEffect(() => {
     try {
@@ -408,26 +400,18 @@ export function ChatScreen() {
                 if (problem) setProblem(null)
               }}
               textareaRef={textareaRef}
-              placeholder={t(clipsMode ? 'chat.clips.placeholder' : hasVideo ? 'chat.composer.placeholderFollowUp' : 'chat.composer.placeholder')}
+              placeholder={t(asking ? 'chat.question.placeholder' : hasVideo ? 'chat.composer.placeholderFollowUp' : 'chat.composer.placeholder')}
               hints={hints}
               attachments={attachments}
               onRemoveAttachment={removeAttachment}
               pictures={pictures}
               onRemovePicture={removePicture}
-              onToggleReference={toggleReference}
-              onAttachReference={(files) => (requireAuth() ? void attachReference(files) : undefined)}
-              referenceLink={referenceLink}
-              onReferenceLink={(url) => (url === null || requireAuth() ? setReferenceLink(url) : undefined)}
               onAttachClick={() => (requireAuth() ? fileRef.current?.click() : undefined)}
               attachDisabled={busy || sendBlocked}
               running={sendBlocked}
               sendDisabled={sendDisabled}
               onSend={() => void submit()}
               onStop={() => void cancel()}
-              clipsMode={clipsMode}
-              clipsOptions={clipsOptions}
-              onClipsMode={(on) => (requireAuth() ? setClipsMode(on) : undefined)}
-              onClipsOptions={setClipsOptions}
             />
             {/* Disclaimer under the box: hidden for now. Bring it back with the link pointing at TERMS_URL (the website).
             <p data-testid="chat-disclaimer" className="px-3 pt-0.5 text-center text-caption leading-snug text-ink-4">

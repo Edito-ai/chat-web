@@ -152,6 +152,40 @@ export interface ClipOptions {
   liveMin: number
 }
 
+/** One choice of a question the backend asks. */
+export interface QuestionOption {
+  id: string
+  label: string
+  hint: string | null
+  recommended: boolean
+  imageUrl: string | null
+}
+
+/**
+ * A question the backend asks instead of guessing (any job state, even before anything runs). The job waits for the
+ * answer: a click on an option, a typed line, an upload or a link, as allowed here.
+ */
+export interface ChatQuestion {
+  id: string
+  kind: 'intent' | 'look' | 'clarify' | 'clips_settings' | 'elements'
+  text: string
+  options: QuestionOption[]
+  /** Checkboxes + a confirm button; else one click answers. */
+  multi: boolean
+  allowText: boolean
+  allowUpload: boolean
+  allowLink: boolean
+}
+
+/** Body of `POST /chat/jobs/{id}/answer`. */
+export interface QuestionAnswer {
+  questionId: string
+  optionIds: string[]
+  text: string | null
+  videoId: string | null
+  link: string | null
+}
+
 /** One poll of a job, already normalised by the adapter. */
 export interface ChatJobSnapshot {
   jobId: string
@@ -189,6 +223,8 @@ export interface ChatJobSnapshot {
   placementQuestion?: string | null
   /** The final frames wait for "continue" or a change (the next message is the change). */
   framesReview?: FramesReview | null
+  /** The question the backend waits on, whatever the job state; null = none. */
+  question?: ChatQuestion | null
   /** Epoch ms the turn began: first recorded step, else the job's creation for turn 1. */
   startedAt?: number | null
   /** Epoch ms of the job's last write (the finish time once terminal). */
@@ -209,26 +245,8 @@ export interface CreateChatJobInput {
   /** Backend ids of the videos uploaded for THIS message (empty on a follow-up). */
   videoIds: string[]
   prompt: string
-  /** A saved style the edit follows (backend2 only). */
-  styleId?: string
-  /** A video whose LOOK is read into a new template and followed (backend2 only). */
-  referenceVideoId?: string
-  /** The same, given as a link (an Instagram reel, a YouTube short ...). */
-  referenceUrl?: string
-  /** `clips`: cut the best short clips out of a long stream (the video, or `sourceUrl`) instead of editing it. */
-  kind?: 'clips'
-  /** The stream as a link (a YouTube / Twitch VOD), when no video is uploaded. */
-  sourceUrl?: string
-  clips?: ClipOptions
   /** A picture (logo, photo) the edit places in the video (backend2 only). */
   overlayIds?: string[]
-}
-
-/** Style options a follow-up may carry (backend2 only). */
-export interface StyleOptions {
-  styleId?: string
-  referenceVideoId?: string
-  referenceUrl?: string
 }
 
 /** The seam between the chat screen and whichever backend answers. */
@@ -236,13 +254,15 @@ export interface ChatApi {
   /** Starts a new job; resolves with its first snapshot. */
   createJob(input: CreateChatJobInput, signal?: AbortSignal): Promise<ChatJobSnapshot>
   /** Starts the next turn of a finished job; resolves with the new turn's first snapshot. */
-  followUp(jobId: string, prompt: string, signal?: AbortSignal, videoIds?: string[], style?: StyleOptions, overlayIds?: string[]): Promise<ChatJobSnapshot>
+  followUp(jobId: string, prompt: string, signal?: AbortSignal, videoIds?: string[], overlayIds?: string[]): Promise<ChatJobSnapshot>
   getJob(jobId: string, signal?: AbortSignal): Promise<ChatJobSnapshot>
   cancelJob(jobId: string): Promise<ChatJobSnapshot>
   /** The user's answer to the template chooser (backend2 only). Rejects with the server's reason, e.g. a link that cannot be opened. */
   answerLook?(jobId: string, answer: LookAnswer): Promise<void>
   /** The final frames are fine: render the video. */
   answerFrames?(jobId: string, answer: { continue: true }): Promise<void>
+  /** The user's answer to the question the backend asked (`question` on the job). Rejects with an ApiError (409 = no longer open). */
+  answer?(jobId: string, body: QuestionAnswer): Promise<ChatJobSnapshot>
 }
 
 export interface ChatUserMessage {
@@ -279,6 +299,8 @@ export interface ChatAssistantMessage {
   placementQuestion?: string | null
   /** The final frames, waiting for "continue" or a typed change before the render (backend2 only). */
   framesReview?: FramesReview | null
+  /** The backend's question, waiting for a click / a typed line (the card is shown until it is answered). */
+  question?: ChatQuestion | null
   /** What was seen in the footage and the before / after frame sheets. */
   analysis?: ChatAnalysis | null
   /** `chat` = this turn is a plain reply, with no video behind it. */

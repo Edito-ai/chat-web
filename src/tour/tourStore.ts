@@ -1,16 +1,15 @@
 import { create } from 'zustand'
 
-/** Parts of the screen the tour opens while it points at them. ChatScreen, AttachMenu and ProfileMenu follow these. */
+/** Parts of the screen the tour opens while it points at them. ChatScreen and ProfileMenu follow these. */
 export interface TourUi {
   /** Mobile: the sidebar drawer. */
   drawer: boolean
   /** Desktop: show the sidebar even when the person collapsed it (not saved). */
   sidebar: boolean
-  attachMenu: boolean
   profileMenu: boolean
 }
 
-export const CLOSED_UI: TourUi = { drawer: false, sidebar: false, attachMenu: false, profileMenu: false }
+export const CLOSED_UI: TourUi = { drawer: false, sidebar: false, profileMenu: false }
 
 export type TourEnd = 'done' | 'skip'
 

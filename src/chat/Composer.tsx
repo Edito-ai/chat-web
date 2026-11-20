@@ -2,16 +2,11 @@
 
 import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import clsx from 'clsx'
-import { ArrowUp, Check, Link2, Scissors, Square, X, AlertCircle, Wand2 } from 'lucide-react'
+import { ArrowUp, Check, Paperclip, Square, X, AlertCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useTypewriter } from './useTypewriter'
 import { IconButton } from '@/components/ui'
 import type { ChatAttachment, ChatPicture } from './chatStore'
-import type { ClipOptions } from './chatTypes'
-import { LIVE_MINUTES } from './clips'
-import { AttachMenu } from './AttachMenu'
-import { StyleChip, useChosenStyle } from './StylePicker'
-import { useStyles } from './styles'
 
 /** A small ring that fills with upload progress; a check when ready, an alert when failed. */
 function ProgressRing({ item }: { item: ChatAttachment }) {
@@ -31,7 +26,7 @@ function ProgressRing({ item }: { item: ChatAttachment }) {
   )
 }
 
-function AttachmentChip({ item, onRemove, onReference }: { item: ChatAttachment; onRemove: () => void; onReference?: () => void }) {
+function AttachmentChip({ item, onRemove }: { item: ChatAttachment; onRemove: () => void }) {
   const { t } = useT()
   const pct = Math.round(item.progress * 100)
   const status =
@@ -41,26 +36,11 @@ function AttachmentChip({ item, onRemove, onReference }: { item: ChatAttachment;
       data-testid={`chat-attachment-${item.id}`}
       className={clsx(
         'flex max-w-full items-center gap-2 rounded-xl border bg-surface-2 py-1 pl-2.5 pr-1 text-label',
-        item.state === 'failed' ? 'border-danger/40' : item.reference ? 'border-accent-line' : 'border-line',
+        item.state === 'failed' ? 'border-danger/40' : 'border-line',
       )}
     >
       <ProgressRing item={item} />
       <span className="min-w-0 truncate text-ink-1">{item.name}</span>
-      {onReference && (
-        <button
-          type="button"
-          data-testid={`chat-reference-${item.id}`}
-          aria-pressed={!!item.reference}
-          onClick={onReference}
-          title={t('chat.reference.hint')}
-          className={clsx(
-            'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-caption transition-colors',
-            item.reference ? 'bg-accent/20 text-ink-0' : 'text-ink-3 hover:bg-white/[0.06] hover:text-ink-1',
-          )}
-        >
-          <Wand2 size={12} aria-hidden /> {item.reference ? t('chat.reference.on') : t('chat.reference.off')}
-        </button>
-      )}
       <span className={clsx('shrink-0 font-mono text-caption tabular-nums', item.state === 'failed' ? 'text-danger' : 'text-ink-3')}>
         {status}
       </span>
@@ -81,83 +61,12 @@ export interface ComposerProps {
   pictures: ChatPicture[]
   onRemovePicture: (id: string) => void
   onRemoveAttachment: (id: string) => void
-  onToggleReference?: (id: string) => void
-  onAttachReference?: (files: File[]) => void
-  /** A link whose look the next message copies (shown as a chip); null = none. */
-  referenceLink?: string | null
-  onReferenceLink?: (url: string | null) => void
   onAttachClick: () => void
   attachDisabled: boolean
   running: boolean
   sendDisabled: boolean
   onSend: () => void
   onStop: () => void
-  /** Clip mode (backend2): the next message cuts the best clips out of a long stream. Absent = no Clips button. */
-  clipsMode?: boolean
-  clipsOptions?: ClipOptions
-  onClipsMode?: (on: boolean) => void
-  onClipsOptions?: (o: Partial<ClipOptions>) => void
-}
-
-const COUNTS = [5, 8, 12, 15, 20] as const
-const LENGTHS = [
-  { minSec: 15, maxSec: 30 },
-  { minSec: 20, maxSec: 75 },
-  { minSec: 45, maxSec: 120 },
-] as const
-
-/** The clip-mode strip above the text box: what will happen, how many clips, how long each. */
-function ClipsBar({ options, onOptions, onOff }: { options: ClipOptions; onOptions: (o: Partial<ClipOptions>) => void; onOff: () => void }) {
-  const { t } = useT()
-  const len = LENGTHS.findIndex((l) => l.minSec === options.minSec && l.maxSec === options.maxSec)
-  const select = 'rounded-lg border border-line bg-surface-2 px-2 py-1 text-caption text-ink-0'
-  return (
-    <div data-testid="chat-clips-bar" className="flex flex-wrap items-center gap-2 px-3 pt-3 text-label">
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/20 px-2.5 py-1 text-caption text-ink-0">
-        <Scissors size={12} aria-hidden /> {t('chat.clips.on')}
-      </span>
-      <label className="inline-flex items-center gap-1.5 text-caption text-ink-3">
-        {t('chat.clips.count')}
-        <select
-          data-testid="chat-clips-count"
-          value={options.count}
-          onChange={(e) => onOptions({ count: Number(e.target.value) })}
-          className={select}
-        >
-          {[...new Set([...COUNTS, options.count])].sort((a, b) => a - b).map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-        </select>
-      </label>
-      <label className="inline-flex items-center gap-1.5 text-caption text-ink-3">
-        {t('chat.clips.length')}
-        <select
-          data-testid="chat-clips-length"
-          value={len < 0 ? 1 : len}
-          onChange={(e) => onOptions(LENGTHS[Number(e.target.value)] ?? LENGTHS[1])}
-          className={select}
-        >
-          {LENGTHS.map((l, i) => (
-            <option key={i} value={i}>{t('chat.clips.seconds', { min: l.minSec, max: l.maxSec })}</option>
-          ))}
-        </select>
-      </label>
-      <label className="inline-flex items-center gap-1.5 text-caption text-ink-3" title={t('chat.clips.liveHint')}>
-        {t('chat.clips.live')}
-        <select
-          data-testid="chat-clips-live"
-          value={options.liveMin}
-          onChange={(e) => onOptions({ liveMin: Number(e.target.value) })}
-          className={select}
-        >
-          {[...new Set([...LIVE_MINUTES, options.liveMin])].sort((a, b) => a - b).map((m) => (
-            <option key={m} value={m}>{t('chat.clips.liveLast', { min: m })}</option>
-          ))}
-        </select>
-      </label>
-      <IconButton icon={X} size="sm" aria-label={t('chat.clips.off')} onClick={onOff} className="ml-auto h-6 w-6" />
-    </div>
-  )
 }
 
 /** Pill-shaped composer: attach chips on top, auto-growing textarea, attach on the left, send/stop on the right. */
@@ -183,28 +92,11 @@ export function Composer(p: ComposerProps) {
     }
   }
   const typed = useTypewriter(p.hints ?? [], p.text === '' && !p.running)
-  const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0 || p.pictures.length > 0 || !!p.referenceLink)
-  const typedHint = p.clipsMode ? '' : typed
-  const stylesOn = useStyles((s) => s.items) !== null
-  const styleChosen = useChosenStyle()
+  const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0 || p.pictures.length > 0)
   return (
     <div data-tour="composer" className="rounded-[1.75rem] border border-white/15 bg-surface-1/75 backdrop-blur-xl shadow-composer transition-[border-color,box-shadow] duration-200 focus-within:border-accent-line focus-within:shadow-[0_0_0_4px_rgb(255_158_140/0.10),0_20px_50px_-20px_rgb(0_0_0/0.9)]">
-      {p.clipsMode && p.clipsOptions && p.onClipsOptions && (
-        <ClipsBar options={p.clipsOptions} onOptions={p.onClipsOptions} onOff={() => p.onClipsMode?.(false)} />
-      )}
-      {(p.attachments.length > 0 || p.pictures.length > 0 || p.referenceLink || (styleChosen && !p.clipsMode)) && (
+      {(p.attachments.length > 0 || p.pictures.length > 0) && (
         <ul className="flex flex-wrap gap-2 px-3 pt-3">
-          {!p.clipsMode && <StyleChip />}
-          {p.referenceLink && (
-            <li data-testid="chat-reference-link" className="flex max-w-full items-center gap-2 rounded-xl border border-accent-line bg-surface-2 py-1 pl-2.5 pr-1 text-label">
-              <Link2 size={14} className="shrink-0 text-accent" aria-hidden />
-              <span className="min-w-0 max-w-[16rem] truncate text-ink-1">{p.referenceLink.replace(/^https?:\/\/(www\.)?/, '')}</span>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-caption text-ink-0">
-                <Wand2 size={12} aria-hidden /> {t('chat.reference.on')}
-              </span>
-              <IconButton icon={X} size="sm" aria-label={t('chat.remove', { name: p.referenceLink })} onClick={() => p.onReferenceLink?.(null)} className="h-6 w-6" />
-            </li>
-          )}
           {p.pictures.map((pic) => (
             <li
               key={pic.id}
@@ -222,24 +114,23 @@ export function Composer(p: ComposerProps) {
             </li>
           ))}
           {p.attachments.map((a) => (
-            <AttachmentChip
-              key={a.id}
-              item={a}
-              onRemove={() => p.onRemoveAttachment(a.id)}
-              onReference={stylesOn && p.onToggleReference ? () => p.onToggleReference!(a.id) : undefined}
-            />
+            <AttachmentChip key={a.id} item={a} onRemove={() => p.onRemoveAttachment(a.id)} />
           ))}
         </ul>
       )}
       <div className="flex flex-wrap items-end gap-1.5 p-2 sm:flex-nowrap">
-        <AttachMenu
+        {/* One button: photos and videos both open the file picker. What to do with them is the backend's call. */}
+        <button
+          type="button"
+          data-testid="chat-attach"
           disabled={p.attachDisabled}
-          clipsMode={!!p.clipsMode}
-          onFootage={p.onAttachClick}
-          onClipsMode={p.onClipsMode}
-          onReference={p.onAttachReference}
-          onReferenceLink={p.onReferenceLink ?? undefined}
-        />
+          aria-label={t('chat.attach')}
+          title={t('chat.attach')}
+          onClick={p.onAttachClick}
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-white/[0.06] hover:text-ink-0 active:scale-95 disabled:pointer-events-none disabled:opacity-30"
+        >
+          <Paperclip size={20} strokeWidth={1.75} aria-hidden />
+        </button>
         <textarea
           ref={setRef}
           data-testid="chat-input"
@@ -248,7 +139,7 @@ export function Composer(p: ComposerProps) {
           rows={1}
           onChange={(e) => p.onText(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={typedHint || p.placeholder}
+          placeholder={typed || p.placeholder}
           className="scroll-thin order-first block max-h-44 min-h-[44px] w-full min-w-0 basis-full resize-none self-center bg-transparent px-2.5 py-2.5 text-[16px] leading-[1.5] text-ink-0 placeholder:text-ink-4 focus:!outline-none focus-visible:!outline-none sm:order-none sm:min-h-[40px] sm:w-auto sm:basis-0 sm:flex-1 sm:px-1 sm:text-prose"
         />
         {p.running ? (
