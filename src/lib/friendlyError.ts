@@ -169,6 +169,13 @@ export function friendlyError(e: unknown, fallback: string = COPY.generic): Frie
   return { message: prod, reference }
 }
 
+/** A failure text that came from the server inside a saved record (a clip, a job): shown as is in development, and in production
+ * only when it reads like a sentence for people (an old record may still hold raw ffmpeg / SQL text). */
+export function shownServerText(text: string | undefined | null): string | undefined {
+  if (!text) return undefined
+  return isDevMode() || isHumanText(text) ? text : undefined
+}
+
 /** The text for a place that keeps a plain string (a store's `error`, a dialog's `problem`). */
 export function userMessage(e: unknown, fallback: string = COPY.generic): string {
   const f = friendlyError(e, fallback)

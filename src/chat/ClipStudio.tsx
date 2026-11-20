@@ -8,7 +8,7 @@ import { AlertCircle, ArrowLeft, Captions, Check, CheckCircle2, Download, Eye, F
 import { Button, InlineError } from '@/components/ui'
 import { useSession } from '@/auth/useSession'
 import { useT } from '@/i18n'
-import { userMessage } from '@/lib/friendlyError'
+import { shownServerText, userMessage } from '@/lib/friendlyError'
 import { uploadVideo } from './chatUploads'
 import { useChat } from './chatStore'
 import { clock, getClipsApi, sameLook, type CaptionTemplate, type ClipCaptions, type StudioLook, type StudioState } from './clips'
@@ -246,7 +246,7 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
   const bar = cutting
     ? { tone: 'working' as const, title: t('chat.studio.bar.cutting'), sub: t('chat.studio.bar.cuttingSub') }
     : styled?.state === 'failed' && !working
-      ? { tone: 'failed' as const, title: t('chat.studio.failed'), sub: styled.error ?? '' }
+      ? { tone: 'failed' as const, title: t('chat.studio.failed'), sub: shownServerText(styled.error) ?? '' }
       : working
         ? { tone: 'working' as const, title: t('chat.studio.bar.rendering'), sub: t('chat.studio.bar.renderingSub') }
         : dirty
