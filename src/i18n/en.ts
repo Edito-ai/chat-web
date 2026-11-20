@@ -171,6 +171,7 @@ export const en = {
   'chat.example.4.title': 'Best moments',
   'chat.example.4.prompt': 'Pick the best moments and cut a 30-second highlight.',
   'chat.composer.hint': 'Enter to send. Shift+Enter for a new line.',
+  'chat.remote': 'This chat was made on the {server} server with this account. You can watch and download it here; a new message starts a new chat.',
   'chat.nudge.1': 'Make the captions bigger',
   'chat.nudge.2': 'Remove the silences and filler words',
   'chat.nudge.3': 'Give me the best 30 seconds',

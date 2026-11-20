@@ -58,6 +58,7 @@ export function ChatScreen() {
   const history = useChat((s) => s.history)
   const historyState = useChat((s) => s.historyState)
   const currentJobId = useChat((s) => s.jobId)
+  const remote = useChat((s) => s.remote)
   const projectId = useChat((s) => s.projectId)
   const user = useAuth((s) => s.user)
   const signOut = () => {
@@ -395,6 +396,11 @@ export function ChatScreen() {
                 e.target.value = ''
               }}
             />
+            {remote && !running && (
+              <p className="mx-auto mb-2 max-w-3xl rounded-lg border border-white/10 px-3 py-2 text-xs opacity-80" role="note">
+                {t('chat.remote', { server: remote })}
+              </p>
+            )}
             <Composer
               text={text}
               onText={(v) => {

@@ -18,6 +18,8 @@ export interface ChatJobWire {
   downloadFilename?: string | null
   error?: string | null
   canFollowUp?: boolean
+  /** Made with this account on the other server (`prod` / `dev`): read only here. */
+  remote?: string | null
   projectId?: string
   title?: string | null
   stageTimings?: { state: string; stage?: string | null; at: string }[]
@@ -182,6 +184,7 @@ export function toSnapshot(w: ChatJobWire): ChatJobSnapshot {
     reply: w.reply ?? null,
     videoIds: w.videoIds ?? [],
     canFollowUp: w.canFollowUp ?? false,
+    remote: w.remote ?? null,
     kind: w.kind,
     suggestions: toSuggestions(w.suggestions),
     projectId: w.projectId ?? null,

@@ -173,6 +173,8 @@ export interface ChatJobSnapshot {
   videoIds: string[]
   /** A follow-up may be sent now. */
   canFollowUp: boolean
+  /** Made on the other server (`prod` / `dev`) with this account: shown read only, it cannot be continued here. */
+  remote?: string | null
   /** `chat` = a plain reply (no video), `graphics` = built without footage; anything else is an edit. */
   kind?: string
   /** Quick replies for the finished turn. */
