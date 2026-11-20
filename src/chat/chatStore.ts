@@ -632,7 +632,13 @@ export const useChat = create<ChatState>()(
           clearCard()
           // a typed answer shows as the person's message
           if (label) set((s) => ({ messages: [...s.messages, { id: newId(), role: 'user', text: label, attachments: [] }] }))
-          set((s) => ({ messages: applySnapshot(s.messages, snap) }))
+          set((s) => {
+            // A question asked before anything ran is answered by starting the work as the chat's NEXT turn (or a new chat
+            // for a different kind of job): give that turn its own assistant message, or its progress would have nowhere to go.
+            const has = s.messages.some((m) => m.role === 'assistant' && m.jobId === snap.jobId && m.turn === snap.turn)
+            const messages = has ? s.messages : capMessages([...s.messages, newAssistant(newId(), snap.jobId, snap.turn)])
+            return { messages: applySnapshot(messages, snap) }
+          })
           absorb(snap)
           if (!isTerminal(snap.status) && !pollCtl) void pollJob(snap.jobId)
           return null

@@ -227,3 +227,33 @@ describe('the template chooser actions (still sent by the backend)', () => {
     expect(answerLook.mock.calls.map((c) => c[1])).toEqual([{ look: 't1' }, { skip: true }, { url: 'https://youtu.be/ok' }, { url: 'https://insta/private' }])
   })
 })
+
+describe('a question asked before anything ran', () => {
+  it('answering it shows the work as the next turn of the same chat', async () => {
+    const api = fakeApi()
+    answer.mockImplementation(async (id: string) => ({ ...running(id), turn: 2 }))
+    setChatApi(api)
+    const asked: ChatAssistantMessage = { ...newAssistant('a1', 'job-1'), status: 'complete', kind: 'chat', question: q() }
+    useChat.setState({ messages: [asked], jobId: 'job-1', projectId: 'proj-1' })
+    await act(async () => void (await useChat.getState().answerQuestion('job-1', { questionId: 'q1', optionIds: ['edit'], text: null, videoId: null, link: null })))
+    stopPolling()
+    const turns = useChat.getState().messages.filter((m) => m.role === 'assistant')
+    expect(turns.map((m) => (m.role === 'assistant' ? [m.turn, m.status, m.question ?? null] : null))).toEqual([
+      [1, 'complete', null],
+      [2, 'running', null],
+    ])
+  })
+
+  it('stays on screen after a reload', async () => {
+    const { rebuildMessages } = await import('../history')
+    const wire = {
+      id: 'job-1', state: 'complete', kind: 'chat', turn: 1, title: 'ye dekh', reply: 'What should I do?',
+      turns: [{ turn: 1, prompt: 'ye dekh', kind: 'chat', reply: 'What should I do?', state: 'complete' }],
+      question: { ...q(), options: q().options },
+    }
+    const last = rebuildMessages(wire as never).at(-1)
+    expect(last?.role === 'assistant' && last.question?.id).toBe('q1')
+    const remote = rebuildMessages({ ...wire, remote: 'prod' } as never).at(-1)
+    expect(remote?.role === 'assistant' && remote.question).toBeFalsy()
+  })
+})
