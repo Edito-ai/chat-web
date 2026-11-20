@@ -69,6 +69,8 @@ interface ChatState {
   jobId: string | null
   /** Latest `canFollowUp` from the backend. */
   canFollowUp: boolean
+  /** The open chat was made on the other server (`prod` / `dev`): read only. */
+  remote: string | null
   /** Videos the job edits, so a retry after a failed first turn does not need a re-upload. */
   videoIds: string[]
   messages: ChatMessage[]
@@ -181,6 +183,7 @@ function absorb(snap: ChatJobSnapshot): void {
   useChat.setState((s) => ({
     jobId: snap.jobId,
     canFollowUp: snap.canFollowUp,
+    remote: snap.remote ?? null,
     videoIds: snap.videoIds.length > 0 ? snap.videoIds : s.videoIds,
     projectId: snap.projectId ?? s.projectId,
     // the job waits for a typed answer: where a picture goes, or what to change on the final frames
@@ -339,7 +342,7 @@ async function sendClips(rawPrompt: string): Promise<ChatSendProblem | null> {
 const EMPTY_CHAT = {
   messages: [] as ChatMessage[], attachments: [] as ChatAttachment[], pictures: [] as ChatPicture[], placementJobId: null as string | null,
   referenceLink: null as string | null, projectId: null, jobId: null,
-  canFollowUp: false, videoIds: [] as string[], actionError: null, pollLostJobId: null, clipsMode: false,
+  canFollowUp: false, remote: null as string | null, videoIds: [] as string[], actionError: null, pollLostJobId: null, clipsMode: false,
 }
 
 export const useChat = create<ChatState>()(
@@ -349,6 +352,7 @@ export const useChat = create<ChatState>()(
       projectId: null,
       jobId: null,
       canFollowUp: false,
+      remote: null,
       videoIds: [],
       messages: [],
       attachments: [],
@@ -447,7 +451,7 @@ export const useChat = create<ChatState>()(
           const snap = toSnapshot(wire)
           set({
             ...EMPTY_CHAT, messages, jobId: wire.id, projectId: wire.projectId ?? null, userId: currentUserId(),
-            canFollowUp: snap.canFollowUp, videoIds: snap.videoIds,
+            canFollowUp: snap.canFollowUp, remote: snap.remote ?? null, videoIds: snap.videoIds,
           })
           if (!isTerminal(snap.status)) void pollJob(wire.id)
         } catch (e) {

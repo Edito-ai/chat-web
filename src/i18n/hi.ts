@@ -172,6 +172,7 @@ export const hi: Record<MessageKey, string> = {
   'chat.example.4.title': 'सबसे अच्छे पल',
   'chat.example.4.prompt': 'सबसे अच्छे पल चुनकर 30 सेकंड का हाइलाइट बनाओ।',
   'chat.composer.hint': 'भेजने के लिए Enter। नई पंक्ति के लिए Shift+Enter।',
+  'chat.remote': 'यह चैट इसी अकाउंट से {server} सर्वर पर बनी थी। यहाँ आप इसे देख और डाउनलोड कर सकते हैं; नया मैसेज नई चैट शुरू करेगा।',
   'chat.nudge.1': 'कैप्शन बड़े करो',
   'chat.nudge.2': 'ख़ामोशी और फ़िलर शब्द हटाओ',
   'chat.nudge.3': 'मुझे सबसे अच्छे 30 सेकंड दो',
