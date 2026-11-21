@@ -126,7 +126,7 @@ describe('sign-in with Google', () => {
     useAuth.setState({ status: 'unauthenticated', user: null, accessToken: null, refreshToken: null })
     handler = () => json(503, { error: 'Google sign-in is not set up on this server.', code: 'google_not_configured' })
     await expect(useAuth.getState().loginWithGoogle('t')).rejects.toBeTruthy()
-    expect(useAuth.getState()).toMatchObject({ status: 'unauthenticated', error: 'Google sign-in is not set up on this server.' })
+    expect(useAuth.getState()).toMatchObject({ status: 'unauthenticated', error: expect.stringContaining('Google sign-in is not set up on this server.') })
   })
 })
 

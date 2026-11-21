@@ -30,7 +30,11 @@ describe('claimErrorKind', () => {
   })
   it('shows other backend sentences plainly and network trouble in friendly words', () => {
     expect(claimErrorKind(new ApiError(404, '404 Free credit is not available')).message).toBe('Free credit is not available')
+    // a person reads the friendly words (production); a developer reads the raw failure (development)
+    vi.stubEnv('NODE_ENV', 'production')
     expect(claimErrorKind(new TypeError('Failed to fetch')).message).toMatch(/reach the server/)
+    vi.unstubAllEnvs()
+    expect(claimErrorKind(new TypeError('Failed to fetch')).message).toMatch(/Failed to fetch/)
   })
 })
 

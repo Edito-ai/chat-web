@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { TERMS_URL } from '@/lib/links'
-import { BarChart3, ChevronsUpDown, Compass, CreditCard, ExternalLink, LifeBuoy, LogOut, ShieldCheck, SquareArrowOutUpRight, Trash2, type LucideIcon } from 'lucide-react'
+import { BadgeCheck, BarChart3, ChevronsUpDown, Compass, CreditCard, ExternalLink, LifeBuoy, LogOut, ShieldCheck, SquareArrowOutUpRight, Trash2, type LucideIcon } from 'lucide-react'
 import { useT } from '@/i18n'
 import { EDITOR_URL } from '@/lib/env'
 import { AccountDialogs } from '@/account/components/AccountDialogs'
@@ -46,6 +46,9 @@ export function ProfileMenu({ user, onSignOut }: { user: ProfileUser; onSignOut:
   const name = displayName(user)
   const refresh = useAccount((s) => s.refresh)
   const openDialog = useAccount((s) => s.openDialog)
+  const cardVerify = useAccount((s) => s.cardVerify)
+  const loadCardVerify = useAccount((s) => s.loadCardVerify)
+  const claimWithCard = useAccount((s) => s.claimWithCard)
 
   // Plan badge: fetched once the session is confirmed and again whenever the menu opens (a purchase may have finished).
   const authed = useAuth((s) => s.status === 'authenticated')
@@ -55,6 +58,10 @@ export function ProfileMenu({ user, onSignOut }: { user: ProfileUser; onSignOut:
   useEffect(() => {
     if (open && authed) void refresh()
   }, [open, authed, refresh])
+  // The card / UPI verification offer (India only): asked once per session; the server says who may see it.
+  useEffect(() => {
+    if (open && authed) void loadCardVerify()
+  }, [open, authed, loadCardVerify])
 
   // The product tour opens this menu on its account step.
   const tourOpen = useTourWants('profileMenu')
@@ -123,6 +130,17 @@ export function ProfileMenu({ user, onSignOut }: { user: ProfileUser; onSignOut:
           <MenuButton icon={CreditCard} label={t('acct.menu.billing')} testId="chat-menu-billing" onClick={() => pick('billing')} />
           <Sep />
           <MenuButton icon={LifeBuoy} label={t('acct.menu.help')} testId="chat-menu-help" onClick={() => pick('help')} />
+          {cardVerify && cardVerify.enabled && cardVerify.eligible && !cardVerify.claimed ? (
+            <MenuButton
+              icon={BadgeCheck}
+              label={t('acct.card.menu')}
+              testId="chat-menu-card-claim"
+              onClick={() => {
+                pick('usage')
+                void claimWithCard(user.email)
+              }}
+            />
+          ) : null}
           <MenuButton
             icon={Compass}
             label={t('tour.replay')}

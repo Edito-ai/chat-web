@@ -49,6 +49,36 @@ export interface FreeCreditStatus {
   phoneMasked: string | null
 }
 
+/** `GET /billing/card-verify/status`: the card / UPI verification credit (India only; `eligible` is decided by the server). */
+export interface CardVerifyStatus {
+  enabled: boolean
+  eligible: boolean
+  claimed: boolean
+  tokens: number
+  amountInr: number
+}
+
+/** The Razorpay order the checkout modal pays (amount in paise). */
+export interface CardVerifyOrder {
+  orderId: string
+  keyId: string
+  amount: number
+  currency: string
+}
+
+/** What Razorpay Checkout hands back after a paid checkout. */
+export interface CardVerifyPayment {
+  razorpayOrderId: string
+  razorpayPaymentId: string
+  razorpaySignature: string
+}
+
+/** `granted` = tokens added; the rest say why not: already_claimed, card_in_use, invalid, not_paid, off. */
+export interface CardVerifyResult {
+  status: string
+  tokens: number
+}
+
 export interface WeeklyPassPricing {
   currency: string
   baseAmount: number

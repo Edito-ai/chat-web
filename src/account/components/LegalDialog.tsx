@@ -3,6 +3,7 @@
 import { ChevronLeft } from 'lucide-react'
 import { useState } from 'react'
 import { useT } from '@/i18n'
+import { userMessage } from '@/lib/friendlyError'
 import { Dialog } from '@/components/Dialog'
 import { InlineError } from '@/components/ui'
 import { accountApi } from '../accountApi'
@@ -11,7 +12,7 @@ import { formatDate } from '../lib/planView'
 import { useAsync } from '../useAsync'
 import { MarkdownView } from './MarkdownView'
 
-const reason = (e: unknown) => (e instanceof Error ? e.message : String(e))
+const reason = (e: unknown) => userMessage(e)
 
 function DocBody({ slug }: { slug: string }) {
   const { t, locale } = useT()

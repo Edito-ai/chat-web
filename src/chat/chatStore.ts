@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useAuth } from '@/auth/authStore'
 import { ApiError } from '@/lib/apiClient'
+import { userMessage } from '@/lib/friendlyError'
 import { getChatApi, toSnapshot, type LibraryVideo } from './chatApi'
 import { createChatProject, deleteAsset, uploadPicture, uploadVideo } from './chatUploads'
 import { looksLikeVideo, probeVideo, type VideoProbe } from './probe'
@@ -210,7 +211,7 @@ async function attachPicture(file: File): Promise<void> {
     const assetId = await uploadPicture(projectId, file)
     setPicture(id, { state: 'ready', assetId })
   } catch (e) {
-    setPicture(id, { state: 'failed', error: e instanceof Error ? e.message : String(e) })
+    setPicture(id, { state: 'failed', error: userMessage(e) })
   }
 }
 
@@ -254,7 +255,7 @@ async function runUpload(id: string, projectId: string, file: File, probe: Video
     if (ctl.signal.aborted) return void deleteAsset(videoId)
     patchAttachment(id, { state: 'ready', progress: 1, videoId, error: null })
   } catch (e) {
-    if (!ctl.signal.aborted) patchAttachment(id, { state: 'failed', error: e instanceof Error ? e.message : String(e) })
+    if (!ctl.signal.aborted) patchAttachment(id, { state: 'failed', error: userMessage(e) })
   } finally {
     if (uploads.get(id) === ctl) uploads.delete(id)
   }
@@ -283,7 +284,7 @@ async function pollJob(jobId: string): Promise<void> {
       if (ctl.signal.aborted) return
       // The server answered "no such job / not yours": retrying cannot help.
       if (e instanceof ApiError && (e.status === 404 || e.status === 403)) {
-        useChat.setState((s) => ({ messages: finishLocally(s.messages, jobId, 'failed', e.message) }))
+        useChat.setState((s) => ({ messages: finishLocally(s.messages, jobId, 'failed', userMessage(e)) }))
         break
       }
       misses++
@@ -380,7 +381,7 @@ export const useChat = create<ChatState>()(
           return null
         } catch (e) {
           if (old) setClips(jobId, old)
-          return e instanceof Error ? e.message : String(e)
+          return userMessage(e)
         }
       },
 
@@ -397,7 +398,7 @@ export const useChat = create<ChatState>()(
           if (st.clip.styled?.state === 'failed') return st.clip.styled.error ?? 'failed'
           return null
         } catch (e) {
-          return e instanceof Error ? e.message : String(e)
+          return userMessage(e)
         }
       },
 
@@ -687,7 +688,7 @@ export const useChat = create<ChatState>()(
           // The server fetches the video before it answers, so a link that does not work comes back as an error here.
           await getChatApi().answerLook?.(jobId, { url: url.trim() })
         } catch (e) {
-          return e instanceof Error ? e.message : String(e)
+          return userMessage(e)
         }
         closeLook(jobId)
         return null
@@ -713,7 +714,7 @@ export const useChat = create<ChatState>()(
           })
           await api.answerLook?.(jobId, { referenceVideoId: videoId })
         } catch (e) {
-          return e instanceof Error ? e.message : String(e)
+          return userMessage(e)
         }
         closeLook(jobId)
         return null
