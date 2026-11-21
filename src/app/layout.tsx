@@ -7,6 +7,7 @@ import '@fontsource/noto-sans-devanagari/devanagari-500.css'
 import '@fontsource/noto-sans-devanagari/devanagari-600.css'
 import './globals.css'
 import { LocaleSync } from '@/components/LocaleSync'
+import { ServerWaking } from '@/components/ServerWaking'
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site'
 
 const TITLE = `${SITE_NAME}: edit your video by chatting`
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark">
       <body>
         <LocaleSync />
+        <ServerWaking />
         {children}
       </body>
     </html>

@@ -5,6 +5,7 @@ import { useT } from '@/i18n'
 import { FolderOpen, Sparkles, Upload } from 'lucide-react'
 import { InlineError, LogoMark } from '@/components/ui'
 import { ORB_ENABLED } from '@/lib/features'
+import { isDevMode, isHumanText } from '@/lib/friendlyError'
 import { Presence } from './Presence'
 import { boldRuns, replyBlocks } from './replyText'
 import { useChat } from './chatStore'
@@ -12,17 +13,21 @@ import { ResultCard, SeenFrames } from './ResultCard'
 import { ClipsBoard } from './ClipsBoard'
 import { ThinkingTrail } from './Thinking'
 import { FramesReview } from './FramesReview'
-import { LookChoice } from './LookChoice'
 import { QuestionCard } from './QuestionCard'
+import { LiveActivity } from './ActivityPanel'
 import type { ChatAssistantMessage, ChatMessage, ChatSuggestion } from './chatTypes'
 
 function ErrorCard({ msg }: { msg: ChatAssistantMessage }) {
   const { t } = useT()
-  const detail = msg.error && msg.error !== 'failed' && msg.error !== 'missing_result' ? msg.error : undefined
+  const raw = msg.error && msg.error !== 'failed' && msg.error !== 'missing_result' ? msg.error : undefined
+  // The server already turns a failure into a plain sentence in production. A text that still reads like developer output (an old
+  // job, another backend) is not shown to a person; in development the real text stays, in monospace.
+  const dev = isDevMode()
+  const detail = raw && (dev || isHumanText(raw)) ? raw : undefined
   return (
     <div role="alert" className="w-full max-w-lg">
       <p className="flex items-center gap-2 text-prose font-medium text-ink-0"><AlertTriangle size={15} className="shrink-0 text-danger" aria-hidden />{t('chat.error.title')}</p>
-      {detail && <p className="mt-1.5 break-words font-mono text-label text-danger">{detail}</p>}
+      {detail && <p className={dev && !isHumanText(detail) ? 'mt-1.5 break-words font-mono text-label text-danger' : 'mt-1.5 break-words text-label text-ink-2'}>{detail}</p>}
       <p className="mt-2 text-label text-ink-3">{t('chat.error.next')}</p>
     </div>
   )
@@ -123,6 +128,9 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
         <ThinkingTrail msg={msg} />
         {msg.result ? (
           <ResultCard msg={{ ...msg, result: msg.result }} />
+        ) : msg.reply && msg.reply.trim() ? (
+          // The edit answered with words, not a video (e.g. it asks what the video should be about): a reply to answer.
+          <ChatReply msg={msg} chips={chips} onSuggest={onSuggest} />
         ) : (
           <div className="max-w-lg space-y-1">
             <p className="text-prose text-ink-0">{msg.reply ?? t('chat.result.ready')}</p>
@@ -156,10 +164,11 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
       </div>
     )
   }
+  // Still running: the live card (what the AI is doing now, a moving progress bar, the steps with their times, time left
+  // and a tip), so a long edit always shows something happening. The card carries the look choice itself.
   return (
     <div className="space-y-3">
-      <ThinkingTrail msg={msg} />
-      <LookChoice msg={msg} />
+      <LiveActivity msg={msg} />
       <FramesReview msg={msg} />
       {msg.analysis && (
         <div className="w-full max-w-xl">

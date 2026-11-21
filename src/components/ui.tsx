@@ -3,7 +3,7 @@
 import clsx from 'clsx'
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { AlertCircle, ChevronRight, RefreshCw, type LucideIcon } from 'lucide-react'
-import { friendlyError } from '@/lib/friendlyError'
+import { friendlyError, isDevMode, type FriendlyError } from '@/lib/friendlyError'
 import { useT } from '@/i18n'
 const logoUrl = '/broll-logo.png'
 
@@ -127,7 +127,7 @@ export function InlineError({
   className?: string
 }) {
   const { t } = useT()
-  const f = error !== undefined ? friendlyError(error) : { message: message ?? friendlyError(null).message, details: undefined }
+  const f: FriendlyError = error !== undefined ? friendlyError(error) : { message: message ?? friendlyError(null).message }
   return (
     <div role="alert" className={clsx('space-y-1 text-label text-danger', className)}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -144,7 +144,12 @@ export function InlineError({
           </button>
         )}
       </div>
-      {f.details && (
+      {f.reference && (
+        <p data-testid="error-reference" className="text-caption text-ink-4">
+          {t('common.reference', { id: f.reference.slice(0, 12) })}
+        </p>
+      )}
+      {f.details && isDevMode() && (
         <details className="group text-ink-4">
           <summary className="flex cursor-pointer list-none items-center gap-0.5 text-ink-3 hover:text-ink-1 [&::-webkit-details-marker]:hidden">
             <ChevronRight size={11} className="transition-transform group-open:rotate-90" aria-hidden />

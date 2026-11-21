@@ -31,6 +31,14 @@ describe('applySnapshot', () => {
     expect(m[0]).toMatchObject({ status: 'failed', result: null })
   })
 
+  it('an edit that answers with a question (words, no video, no error) is a finished reply, not a failure', () => {
+    const m = applySnapshot(start(), snap({ status: 'complete', kind: 'edit', result: null, reply: 'What subject should the video teach?' }))
+    expect(m[0]).toMatchObject({ status: 'complete', result: null, error: null, reply: 'What subject should the video teach?' })
+    // An empty reply or a server error still fails.
+    expect(applySnapshot(start(), snap({ status: 'complete', kind: 'edit', result: null, reply: '  ' }))[0]).toMatchObject({ status: 'failed' })
+    expect(applySnapshot(start(), snap({ status: 'complete', kind: 'edit', result: null, reply: 'x', error: 'boom' }))[0]).toMatchObject({ status: 'failed' })
+  })
+
   it('only updates the message of the matching turn', () => {
     const m = applySnapshot([newAssistant('a1', 'j1', 2)], snap({ turn: 1, status: 'complete', result }))
     expect(m[0]).toMatchObject({ status: 'queued' })

@@ -1,7 +1,9 @@
 'use client'
 
-import { Gift } from 'lucide-react'
+import { useEffect } from 'react'
+import { BadgeCheck, Gift } from 'lucide-react'
 import { useT } from '@/i18n'
+import { useAuth } from '@/auth/authStore'
 import { Button, InlineError } from '@/components/ui'
 import { Dialog } from '@/components/Dialog'
 import { accountApi } from '../accountApi'
@@ -28,6 +30,17 @@ export function UsageDialog() {
   const tokens = useAsync(() => accountApi().tokenUsage())
   const sub = useAsync(() => accountApi().subscription())
   const credit = useAsync(() => accountApi().freeCredit())
+  const email = useAuth((s) => s.user?.email)
+  const cardVerify = useAccount((s) => s.cardVerify)
+  const cardClaim = useAccount((s) => s.cardClaim)
+  const loadCardVerify = useAccount((s) => s.loadCardVerify)
+  const claimWithCard = useAccount((s) => s.claimWithCard)
+  useEffect(() => {
+    void loadCardVerify()
+  }, [loadCardVerify])
+  const busy = cardClaim.phase === 'opening' || cardClaim.phase === 'verifying'
+  const cardAmount = cardVerify ? formatTokens(cardVerify.tokens) : ''
+  const showCard = !!cardVerify && cardVerify.enabled && cardVerify.eligible
 
   const s = sub.data
   const footage = s ? (s.footageHoursCap != null ? t('acct.usage.footageVal', { used: formatHours(s.footageHoursUsed), cap: formatHours(s.footageHoursCap) }) : t('acct.usage.footageNoCap', { used: formatHours(s.footageHoursUsed) })) : '-'
@@ -87,6 +100,36 @@ export function UsageDialog() {
                   {t('acct.usage.creditClaimNow')}
                 </Button>
               )}
+            </div>
+          </section>
+        ) : null}
+
+        {showCard && cardVerify ? (
+          <section data-testid="usage-card" className="flex items-start gap-3 rounded-xl border border-line bg-black/20 p-3">
+            <BadgeCheck size={16} strokeWidth={1.75} aria-hidden className="mt-0.5 shrink-0 text-ink-3" />
+            <div className="min-w-0 flex-1">
+              <h3 className="text-label font-medium text-ink-1">{t('acct.card.title')}</h3>
+              {cardVerify.claimed && cardClaim.phase !== 'done' ? (
+                <p data-testid="usage-card-claimed" className="mt-0.5 text-label text-ink-3">{t('acct.card.claimed', { amount: cardAmount })}</p>
+              ) : (
+                <p className="mt-0.5 text-label text-ink-3">{t('acct.card.offer', { amount: cardAmount, inr: cardVerify.amountInr })}</p>
+              )}
+              {cardClaim.phase === 'done' ? (
+                <p role="status" data-testid="usage-card-result" className="mt-1.5 text-label text-ink-1">
+                  {t(cardClaim.result === 'granted' ? 'acct.card.done' : `acct.card.${cardClaim.result ?? 'invalid'}` as never, { amount: cardAmount, inr: cardVerify.amountInr })}
+                </p>
+              ) : null}
+              {cardClaim.phase === 'error' && cardClaim.error ? <InlineError message={cardClaim.error} className="mt-1.5" /> : null}
+              {busy ? (
+                <p role="status" data-testid="usage-card-busy" className="mt-1.5 text-label text-ink-3">
+                  {t(cardClaim.phase === 'opening' ? 'acct.card.opening' : 'acct.card.verifying')}
+                </p>
+              ) : null}
+              {!cardVerify.claimed && cardClaim.phase !== 'done' ? (
+                <Button variant="secondary" className="mt-2 h-8" data-testid="usage-card-claim" disabled={busy} onClick={() => void claimWithCard(email)}>
+                  {t('acct.card.claim')}
+                </Button>
+              ) : null}
             </div>
           </section>
         ) : null}

@@ -2,6 +2,7 @@ import * as billing from './services/billing'
 import * as weekly from './services/weeklyPass'
 import * as support from './services/supportApi'
 import { deleteAccount } from './services/accountDelete'
+import { openCardCheckout } from './lib/razorpayCheckout'
 
 /** Every network call the account UI makes, behind one seam so /dev/preview can swap in fixtures. */
 export const realAccountApi = {
@@ -10,6 +11,10 @@ export const realAccountApi = {
   tokenUsage: billing.fetchTokenUsage,
   freeCredit: billing.fetchFreeCredit,
   claimFreeCredit: billing.claimFreeCredit,
+  cardVerifyStatus: billing.fetchCardVerifyStatus,
+  cardVerifyOrder: billing.createCardVerifyOrder,
+  cardVerifyConfirm: billing.confirmCardVerify,
+  openCardCheckout,
   checkout: billing.createCheckoutSession,
   trial: billing.startFreeTrial,
   cancel: billing.cancelSubscription,

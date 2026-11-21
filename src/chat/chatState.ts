@@ -64,8 +64,10 @@ export function applySnapshot(messages: readonly ChatMessage[], snap: ChatJobSna
     }
     if (snap.status === 'complete') {
       if (snap.result) return { ...base, status: 'complete', progress: 1, result: snap.result, error: null }
-      // A plain reply has no video behind it, and that is a finished turn. Any other "complete" without one is a fault.
+      // A plain reply has no video behind it, and that is a finished turn. So is an edit that answered with a question
+      // ("What subject should the video teach?"): it has words and no error. Any other "complete" without a video is a fault.
       if (snap.kind === 'chat' || snap.kind === 'clips') return { ...base, status: 'complete', progress: 1, result: null, error: null }
+      if (snap.reply && snap.reply.trim() && !snap.error) return { ...base, status: 'complete', progress: 1, result: null, error: null }
       return { ...base, status: 'failed', progress, result: null, error: snap.error ?? 'missing_result' }
     }
     if (snap.status === 'failed') {

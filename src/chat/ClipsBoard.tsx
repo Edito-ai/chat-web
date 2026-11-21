@@ -7,6 +7,7 @@ import { Captions, Download, Loader2, Minus, Play, Plus, Scissors, Sparkles } fr
 import { Button } from '@/components/ui'
 import { useT } from '@/i18n'
 import { useChat } from './chatStore'
+import { shownServerText } from '@/lib/friendlyError'
 import { clock, getClipsApi, type ClipLine } from './clips'
 import type { ChatAssistantMessage, ClipItem } from './chatTypes'
 
@@ -173,7 +174,7 @@ function ClipCard({ jobId, clip, rank, sourceSec }: { jobId: string; clip: ClipI
         )}
         {(captionProblem || styled?.state === 'failed') && (
           <p role="alert" className="text-label text-danger">
-            {captionProblem ?? styled?.error ?? t('chat.clips.styleFailed')}
+            {captionProblem ?? shownServerText(styled?.error) ?? t('chat.clips.styleFailed')}
           </p>
         )}
         {styled?.state === 'ready' && styled.noWords && styled.captions === false && (

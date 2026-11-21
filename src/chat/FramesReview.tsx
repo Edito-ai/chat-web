@@ -5,6 +5,7 @@ import { Check, Loader2 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useNow } from './ActivityPanel'
 import { useChat } from './chatStore'
+import { LivePreview } from './LivePreview'
 import type { ChatAssistantMessage } from './chatTypes'
 
 const clock = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`
@@ -35,6 +36,7 @@ export function FramesReview({ msg }: { msg: ChatAssistantMessage }) {
         </p>
       </div>
       <p className="mt-1.5 text-label leading-relaxed text-ink-2">{t('chat.frames.hint')}</p>
+      {fr.player && <LivePreview player={fr.player} />}
       <ul className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
         {fr.frames.map((f) => (
           <li key={f.n} className="min-w-0">

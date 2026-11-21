@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { API_BASE } from '@/lib/env'
 import { apiClient, fetchOrExplain } from '@/lib/apiClient'
-import { friendlyError, isServerTrouble } from '@/lib/friendlyError'
+import { friendlyError, isServerTrouble, userMessage } from '@/lib/friendlyError'
 
 export interface AuthUser {
   id: string
@@ -84,6 +84,12 @@ interface AuthState {
 
 /** An /auth/* failure with the server's status and structured details (login branches on `details.reason`). */
 export class AuthApiError extends Error {
+  reason?: string
+  path?: string
+  method = 'POST'
+  reference?: string
+  debug?: unknown
+
   constructor(
     message: string,
     public details?: unknown,
@@ -114,7 +120,14 @@ async function authFetch(path: string, body: unknown, accessToken?: string | nul
   })
   const isJson = res.headers.get('content-type')?.includes('application/json')
   const data = isJson ? await res.json().catch(() => undefined) : undefined
-  if (!res.ok) throw new AuthApiError(extractErrorMessage(data, `Request failed (${res.status})`), data?.details, res.status, data?.code)
+  if (!res.ok) {
+    const err = new AuthApiError(extractErrorMessage(data, `Request failed (${res.status})`), data?.details, res.status, data?.code)
+    err.reason = typeof data?.error === 'string' ? data.error : undefined
+    err.path = path
+    if (typeof data?.reference === 'string') err.reference = data.reference
+    if (data?.debug !== undefined) err.debug = data.debug
+    throw err
+  }
   return data
 }
 
@@ -152,7 +165,7 @@ export const useAuth = create<AuthState>()(
           set({ accessToken: data.accessToken, refreshToken: data.refreshToken, status: 'authenticated' })
           return true
         } catch (e) {
-          const message = e instanceof Error ? e.message : 'Your session ended. Sign in again.'
+          const message = userMessage(e, 'Your session ended. Please sign in again.')
           if (isDefinitiveRejection(e)) {
             set({ user: null, accessToken: null, refreshToken: null, status: 'unauthenticated', error: message })
           } else {
@@ -254,7 +267,7 @@ export const useAuth = create<AuthState>()(
       /** A rejected sign-up token (too old / tampered) ends the onboarding: back to the sign-in screen with the reason. */
       const signupFailed = (e: unknown, fallback: string) => {
         const expired = e instanceof AuthApiError && e.code === 'signup_expired'
-        set({ loading: false, error: e instanceof Error ? e.message : fallback, ...(expired ? { pendingSignup: null } : {}) })
+        set({ loading: false, error: userMessage(e, fallback), ...(expired ? { pendingSignup: null } : {}) })
       }
 
       return {
@@ -273,7 +286,7 @@ export const useAuth = create<AuthState>()(
             await authFetch('/auth/otp/request', { email, allowSignup: true })
             set({ loading: false })
           } catch (e) {
-            set({ loading: false, error: e instanceof Error ? e.message : 'Failed to send code' })
+            set({ loading: false, error: userMessage(e, 'We could not send the code. Please try again.') })
             throw e
           }
         },
@@ -283,7 +296,7 @@ export const useAuth = create<AuthState>()(
           try {
             return afterIdentity(await authFetch('/auth/otp/verify', { email, code, allowSignup: true }))
           } catch (e) {
-            set({ loading: false, error: e instanceof Error ? e.message : 'Invalid or expired code' })
+            set({ loading: false, error: userMessage(e, 'That code did not work. Please check it or ask for a new one.') })
             throw e
           }
         },
@@ -293,7 +306,7 @@ export const useAuth = create<AuthState>()(
           try {
             return afterIdentity(await authFetch('/auth/google', { idToken }))
           } catch (e) {
-            set({ loading: false, error: e instanceof Error ? e.message : 'Google sign-in failed' })
+            set({ loading: false, error: userMessage(e, 'Google sign-in did not work. Please try again, or use your email.') })
             throw e
           }
         },
@@ -324,7 +337,7 @@ export const useAuth = create<AuthState>()(
               celebration: data.credit ?? { status: 'off', usd: 0, tokens: 0 },
             }))
           } catch (e) {
-            set({ loading: false, error: e instanceof Error ? e.message : 'Could not save your answers' })
+            set({ loading: false, error: userMessage(e, 'We could not save your answers. Please try again.') })
             throw e
           }
         },

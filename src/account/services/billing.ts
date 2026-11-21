@@ -1,5 +1,17 @@
 import { apiClient } from '@/lib/apiClient'
-import type { BillingTier, Entitlement, FreeCreditStatus, SubscriptionInfo, SubscriptionUsage, TokenUsage } from '../types'
+import { debugCountryHeaders } from './weeklyPass'
+import type {
+  BillingTier,
+  CardVerifyOrder,
+  CardVerifyPayment,
+  CardVerifyResult,
+  CardVerifyStatus,
+  Entitlement,
+  FreeCreditStatus,
+  SubscriptionInfo,
+  SubscriptionUsage,
+  TokenUsage,
+} from '../types'
 
 /** `GET /billing/entitlement`; `null` is the free state (no subscription, no active Weekly Pass). */
 export async function fetchEntitlement(): Promise<Entitlement | null> {
@@ -44,6 +56,35 @@ export async function fetchFreeCredit(): Promise<FreeCreditStatus> {
 /** `POST /billing/free-credit/claim {phone}`: needs a verified email; 400 bad number, 409 number already used. */
 export async function claimFreeCredit(phone: string): Promise<FreeCreditStatus> {
   return parseFreeCredit(await apiClient.post('/billing/free-credit/claim', { phone }))
+}
+
+/** Never throws on shape: anything unexpected reads as "not on offer" (so the button stays hidden). */
+export function parseCardVerifyStatus(raw: unknown): CardVerifyStatus {
+  const r = (raw ?? {}) as Record<string, unknown>
+  return {
+    enabled: r.enabled === true,
+    eligible: r.eligible === true,
+    claimed: r.claimed === true,
+    tokens: typeof r.tokens === 'number' ? r.tokens : 0,
+    amountInr: typeof r.amountInr === 'number' ? r.amountInr : 1,
+  }
+}
+
+/** `GET /billing/card-verify/status`: shown only to people in India; the server decides, not the browser. */
+export async function fetchCardVerifyStatus(): Promise<CardVerifyStatus> {
+  return parseCardVerifyStatus(await apiClient.get('/billing/card-verify/status', { headers: debugCountryHeaders() }))
+}
+
+/** `POST /billing/card-verify/order`: a Rs.1 Razorpay order for the checkout modal (refunded after the credit is given). */
+export async function createCardVerifyOrder(): Promise<CardVerifyOrder> {
+  const res = await apiClient.post('/billing/card-verify/order', undefined, { headers: debugCountryHeaders() })
+  return { orderId: String(res?.orderId ?? ''), keyId: String(res?.keyId ?? ''), amount: Number(res?.amount ?? 0), currency: String(res?.currency ?? 'INR') }
+}
+
+/** `POST /billing/card-verify/confirm`: the server re-reads the payment from Razorpay and gives the tokens once. */
+export async function confirmCardVerify(payment: CardVerifyPayment): Promise<CardVerifyResult> {
+  const res = await apiClient.post('/billing/card-verify/confirm', payment)
+  return { status: String(res?.status ?? 'invalid'), tokens: Number(res?.tokens ?? 0) }
 }
 
 /** `POST /billing/checkout-session {tier}`: returns the hosted checkout URL. Real money; only call on a user click. */
