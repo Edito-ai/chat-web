@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'rea
 import clsx from 'clsx'
 import { ArrowUp, Check, Paperclip, Square, X, AlertCircle } from 'lucide-react'
 import { useT } from '@/i18n'
+import { warmWorker } from '@/lib/warmWorker'
 import { useTypewriter } from './useTypewriter'
 import { IconButton } from '@/components/ui'
 import type { ChatAttachment, ChatPicture } from './chatStore'
@@ -137,7 +138,10 @@ export function Composer(p: ComposerProps) {
           aria-label={t('chat.composer.aria')}
           value={p.text}
           rows={1}
-          onChange={(e) => p.onText(e.target.value)}
+          onChange={(e) => {
+            if (e.target.value.trim()) warmWorker() // typing started: the server gets a render worker ready (throttled)
+            p.onText(e.target.value)
+          }}
           onKeyDown={onKeyDown}
           placeholder={typed || p.placeholder}
           className="scroll-thin order-first block max-h-44 min-h-[44px] w-full min-w-0 basis-full resize-none self-center bg-transparent px-2.5 py-2.5 text-[16px] leading-[1.5] text-ink-0 placeholder:text-ink-4 focus:!outline-none focus-visible:!outline-none sm:order-none sm:min-h-[40px] sm:w-auto sm:basis-0 sm:flex-1 sm:px-1 sm:text-prose"
