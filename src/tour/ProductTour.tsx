@@ -42,7 +42,7 @@ const sameBox = (a: Box | null, b: Box) => a !== null && Math.abs(a.top - b.top)
 
 /**
  * The first-run product tour: dims the app, cuts a glowing window around one part of the screen at a time and explains it in
- * a glass card next to it (a sheet at the top or bottom on phones). It opens the attach menu, the drawer and the account menu
+ * a glass card next to it (a sheet at the top or bottom on phones). It opens the drawer and the account menu
  * itself when a step needs them. The lit part stays live (it can be clicked and typed in) while the tour goes on; an app
  * dialog opened from it pauses the tour. Keys (outside text fields): → / Enter next, ← back, Esc skip.
  */
@@ -483,9 +483,9 @@ function litBox(r: Edges): Box {
   return { top, left, width: Math.max(0, right - left), height: Math.max(0, bottom - top) }
 }
 
-/** App menus open right now (outside the tour): the paperclip menu, the account menu, a chat row's menu. */
+/** App menus open right now (outside the tour): the account menu, a chat row's menu. */
 function openPopups(): DOMRect[] {
-  return Array.from(document.querySelectorAll<HTMLElement>('[role="menu"], [data-testid="chat-attach-menu"]'))
+  return Array.from(document.querySelectorAll<HTMLElement>('[role="menu"]'))
     .filter((el) => !el.closest('[data-tour-root]') && el.getClientRects().length > 0)
     .map((el) => el.getBoundingClientRect())
     .filter((r) => r.width > 0 && r.height > 0)

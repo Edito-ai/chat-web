@@ -13,6 +13,7 @@ import { ResultCard, SeenFrames } from './ResultCard'
 import { ClipsBoard } from './ClipsBoard'
 import { ThinkingTrail } from './Thinking'
 import { FramesReview } from './FramesReview'
+import { QuestionCard } from './QuestionCard'
 import { LiveActivity } from './ActivityPanel'
 import type { ChatAssistantMessage, ChatMessage, ChatSuggestion } from './chatTypes'
 
@@ -212,6 +213,8 @@ export function Bubble({ msg, chips = false, onSuggest }: { msg: ChatMessage; ch
           </p>
         )}
         <AssistantBody msg={msg} chips={chips} onSuggest={onSuggest} />
+        {/* The backend's question, whatever the job state: the job waits for the answer. */}
+        {msg.question && <QuestionCard msg={msg} />}
       </div>
     </li>
   )

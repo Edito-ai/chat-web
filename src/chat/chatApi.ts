@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { toClips, toClipsSource } from './clips'
-import type { ActivityEvent, ChatAnalysis, ChatApi, ChatJobSnapshot, ChatJobStatus, FramesReview, LivePlayer, LookChoice, StageEvent, ChatSuggestion } from './chatTypes'
+import type { ActivityEvent, ChatAnalysis, ChatApi, ChatQuestion, ChatJobSnapshot, ChatJobStatus, FramesReview, LivePlayer, LookChoice, StageEvent, ChatSuggestion } from './chatTypes'
 
 /** The adapter the chat store talks to: the real `/chat/*` backend. Tests inject their own via `setChatApi`. */
 
@@ -76,6 +76,17 @@ export interface ChatJobWire {
     frames?: { n?: number; t?: number; template?: string; imageUrl?: string }[]
     /** The live preview page for the plan on screen (backend2 renderer/player); absent until its files are ready. */
     player?: { url?: string; version?: string; bytes?: number } | null
+  } | null
+  /** The question the backend waits on (any state); null = none. */
+  question?: {
+    id?: string
+    kind?: string
+    text?: string
+    options?: { id?: string; label?: string; hint?: string | null; recommended?: boolean; imageUrl?: string | null }[]
+    multi?: boolean
+    allowText?: boolean
+    allowUpload?: boolean
+    allowLink?: boolean
   } | null
   /** Stream clipping (kind `clips`): the clips, best first, and the footage they came from. */
   clips?: unknown[]
@@ -155,6 +166,28 @@ export function toFramesReview(raw: ChatJobWire['framesReview'], receivedAt = Da
   }
 }
 
+const QUESTION_KINDS = ['intent', 'look', 'clarify', 'clips_settings', 'elements'] as const
+
+/** Wire question -> the typed one. Malformed options are dropped; no id / text means no question. */
+export function toQuestion(raw: ChatJobWire['question']): ChatQuestion | null {
+  if (!raw || typeof raw.id !== 'string' || !raw.id || typeof raw.text !== 'string') return null
+  const kind = (QUESTION_KINDS as readonly string[]).includes(raw.kind ?? '') ? (raw.kind as ChatQuestion['kind']) : 'clarify'
+  return {
+    id: raw.id,
+    kind,
+    text: raw.text,
+    options: (raw.options ?? [])
+      .filter((o) => typeof o?.id === 'string' && o.id && typeof o.label === 'string')
+      .map((o) => ({
+        id: o.id!, label: o.label!, hint: o.hint || null, recommended: o.recommended === true, imageUrl: o.imageUrl || null,
+      })),
+    multi: raw.multi === true,
+    allowText: raw.allowText === true,
+    allowUpload: raw.allowUpload === true,
+    allowLink: raw.allowLink === true,
+  }
+}
+
 /** Wire live preview -> typed; only an http(s) page is accepted (it is put in an iframe). */
 export function toLivePlayer(raw: NonNullable<ChatJobWire['framesReview']>['player']): LivePlayer | null {
   if (!raw || typeof raw.url !== 'string' || !/^https?:\/\//i.test(raw.url)) return null
@@ -209,6 +242,7 @@ export function toSnapshot(w: ChatJobWire): ChatJobSnapshot {
     placementOpen: w.placementOpen ?? false,
     placementQuestion: w.placementQuestion ?? null,
     framesReview: status === 'running' ? toFramesReview(w.framesReview) : null,
+    question: toQuestion(w.question),
   }
 }
 
@@ -221,24 +255,17 @@ export const httpChatApi: ChatApi = {
         '/chat/jobs',
         {
           projectId: input.projectId, videoIds: input.videoIds, prompt: input.prompt,
-          ...(input.styleId ? { styleId: input.styleId } : {}),
-          ...(input.referenceVideoId ? { referenceVideoId: input.referenceVideoId } : {}),
-          ...(input.referenceUrl ? { referenceUrl: input.referenceUrl } : {}),
-          ...(input.kind === 'clips'
-            ? { kind: 'clips', ...(input.sourceUrl ? { sourceUrl: input.sourceUrl } : {}), ...(input.clips ? { clips: input.clips } : {}) }
-            : {}),
           ...(input.overlayIds?.length ? { overlayIds: input.overlayIds } : {}),
         },
         { signal },
       )) as ChatJobWire,
     )
   },
-  async followUp(jobId, prompt, signal, videoIds, style, overlayIds) {
+  async followUp(jobId, prompt, signal, videoIds, overlayIds) {
     const body = {
       prompt,
       ...(videoIds && videoIds.length > 0 ? { videoIds } : {}),
       ...(overlayIds && overlayIds.length > 0 ? { overlayIds } : {}),
-      ...(style ?? {}),
     }
     return toSnapshot((await apiClient.post(`${jobPath(jobId)}/followup`, body, { signal })) as ChatJobWire)
   },
@@ -253,6 +280,9 @@ export const httpChatApi: ChatApi = {
   },
   async answerFrames(jobId, answer) {
     await apiClient.post(`${jobPath(jobId)}/frames`, answer)
+  },
+  async answer(jobId, body) {
+    return toSnapshot((await apiClient.post(`${jobPath(jobId)}/answer`, body)) as ChatJobWire)
   },
 }
 

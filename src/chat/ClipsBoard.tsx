@@ -26,6 +26,14 @@ export function ClipsBoard({ msg }: { msg: ChatAssistantMessage }) {
         <p className="text-label text-ink-3">
           {clips.length === 1 ? t('chat.clips.foundOne') : t('chat.clips.found', { n: clips.length })}
           {source?.title ? ` · ${t('chat.clips.from', { title: source.title })}` : ''}
+          {source?.url && (
+            <>
+              {' · '}
+              <a href={source.url} target="_blank" rel="noreferrer" className="underline decoration-dotted hover:text-ink-0">
+                {source.title ? t('chat.clips.openSource') : source.url.replace(/^https?:\/\/(www\.)?/i, '').slice(0, 48)}
+              </a>
+            </>
+          )}
           {source?.durationSec ? ` · ${clock(source.durationSec)}` : ''}
         </p>
       </div>

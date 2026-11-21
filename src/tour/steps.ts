@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Compass, Film, FolderKanban, LibraryBig, MessageSquareText, Palette, Scissors, Send, SquarePen, Sparkles, UserRound } from 'lucide-react'
+import { Compass, Film, FolderKanban, LibraryBig, MessageSquareText, Send, SquarePen, Sparkles, UserRound } from 'lucide-react'
 import type { MessageKey } from '@/i18n'
 import type { Placement } from './place'
 import type { TourUi } from './tourStore'
@@ -37,38 +37,15 @@ export const TOUR_STEPS: TourStep[] = [
     placement: 'left',
     demo: 'composer',
   },
-  // The paperclip menu, one line at a time. A line that is not there (no templates on this backend) is skipped.
+  // The paperclip: one button that takes photos and videos.
   {
     id: 'attach-footage',
     icon: Film,
     title: 'tour.attach.footage.title',
     body: 'tour.attach.footage.body',
-    target: '[data-testid="chat-attach-footage"]',
+    target: '[data-testid="chat-attach"]',
     placement: 'right',
     point: true,
-    ui: () => ({ attachMenu: true }),
-  },
-  {
-    id: 'attach-reference',
-    icon: Palette,
-    title: 'tour.attach.reference.title',
-    body: 'tour.attach.reference.body',
-    points: ['tour.attach.reference.p1', 'tour.attach.reference.p2'],
-    target: '[data-testid="chat-attach-template"]',
-    placement: 'right',
-    point: true,
-    ui: () => ({ attachMenu: true }),
-  },
-  {
-    id: 'attach-clips',
-    icon: Scissors,
-    title: 'tour.attach.clips.title',
-    body: 'tour.attach.clips.body',
-    points: ['tour.attach.clips.p1', 'tour.attach.clips.p2'],
-    target: '[data-testid="chat-attach-clips"]',
-    placement: 'right',
-    point: true,
-    ui: () => ({ attachMenu: true }),
   },
   {
     id: 'send',

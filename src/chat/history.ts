@@ -110,9 +110,11 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
     if (prompt) out.push({ id: `${w.id}:${current}:u`, role: 'user', text: prompt, attachments: [] })
     out.push(newAssistant(`${w.id}:${current}:a`, w.id, current))
   }
+  // an open question (asked before the work started, or while it runs) stays on the newest turn after a reload
+  const question = w.remote ? null : (snap.question ?? null)
   return out.map((m): ChatMessage => {
     if (m.role !== 'assistant' || m.turn !== current) return m
-    const a: ChatAssistantMessage = m
+    const a: ChatAssistantMessage = { ...m, question }
     if (snap.status === 'complete' && (snap.result || snap.kind === 'chat' || snap.kind === 'clips')) {
       return {
         ...a, status: 'complete', result: snap.result ?? null, reply: snap.reply ?? a.reply,

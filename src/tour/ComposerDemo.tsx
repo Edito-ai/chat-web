@@ -2,34 +2,27 @@
 
 import clsx from 'clsx'
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowUp, Check, Link2, Paperclip, Play, Scissors, Wand2 } from 'lucide-react'
+import { ArrowUp, Check, Paperclip, Play } from 'lucide-react'
 import { useT } from '@/i18n'
 import type { Box } from './place'
 
 /**
- * A scripted, looping demo played on top of the real composer during the tour: a video is dragged in and uploads, a second
- * video is marked as the template reference, a reel link is added as a reference too, a prompt types itself and Send is
- * pressed. Pure decoration over the real box: nothing is uploaded or sent, the chat state is never touched.
+ * A scripted, looping demo played on top of the real composer during the tour: a video is dragged in and uploads, a prompt
+ * types itself and Send is pressed. Pure decoration over the real box: nothing is uploaded or sent, the chat state is never touched.
  */
 
-const LOOP = 13_000
+const LOOP = 10_500
 /** Timeline (ms). Everything on screen is derived from the time, so the demo is the same on every loop. */
 const T = {
   drag1: [300, 1300],
   upload1: [1300, 2800],
-  drag2: [3000, 3900],
-  upload2: [3900, 4600],
-  clickRef: 5000,
-  link: [5600, 6500],
-  type: [6800, 10_200],
-  clickSend: 10_800,
-  sent: 11_200,
-  fade: [12_200, 13_000],
+  type: [3300, 6700],
+  clickSend: 7300,
+  sent: 7700,
+  fade: [9700, 10_500],
 } as const
 
 const VIDEO = 'my-vlog.mp4'
-const REFERENCE = 'reel-style.mp4'
-const LINK = 'instagram.com/reel/C8kD2xQy'
 
 const ease = (x: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3)
 const span = (t: number, [a, b]: readonly [number, number]) => ease((t - a) / (b - a))
@@ -128,29 +121,24 @@ export function ComposerDemo({ anchor, radius }: { anchor: Box; radius: number }
   // Reduced motion: one still frame with everything filled in, just before Send.
   const now = useLoopTime(LOOP, T.clickSend - 200)
   const box = useRef<HTMLDivElement>(null)
-  const refToggle = useRef<HTMLSpanElement>(null)
   const sendBtn = useRef<HTMLSpanElement>(null)
   const prompt = t('tour.demo.prompt')
 
   const up1 = span(now, T.upload1)
-  const up2 = span(now, T.upload2)
-  const refOn = now >= T.clickRef
-  const link = span(now, T.link)
   const typed = Math.round(span(now, T.type) * prompt.length)
   const ready = typed > 0
   const sent = now >= T.sent
   const fade = 1 - span(now, T.fade)
   const hasChips = now >= T.drag1[1] && now < T.fade[1] - 40
 
-  // The pointer: it clicks "Use as template" on the second video, then Send.
+  // The pointer clicks Send.
   const at = (el: HTMLElement | null, dx = 0.5, dy = 0.6) => {
     const b = box.current?.getBoundingClientRect()
     const r = el?.getBoundingClientRect()
     return b && r ? { left: r.left - b.left + r.width * dx, top: r.top - b.top + r.height * dy } : null
   }
   let pointer: { pos: { left: number; top: number } | null; pressed: boolean } | null = null
-  if (now >= T.upload2[1] && now < T.clickRef + 450) pointer = { pos: at(refToggle.current), pressed: now >= T.clickRef && now < T.clickRef + 300 }
-  else if (now >= T.type[1] && now < T.sent + 400) pointer = { pos: at(sendBtn.current), pressed: now >= T.clickSend && now < T.clickSend + 300 }
+  if (now >= T.type[1] && now < T.sent + 400) pointer = { pos: at(sendBtn.current), pressed: now >= T.clickSend && now < T.clickSend + 300 }
 
   return (
     <div
@@ -162,7 +150,6 @@ export function ComposerDemo({ anchor, radius }: { anchor: Box; radius: number }
     >
       <div ref={box} className="relative border border-white/15 bg-[linear-gradient(180deg,#121633,#0c0f24)] shadow-composer" style={{ borderRadius: Math.max(16, radius) }}>
         {now >= T.drag1[0] && now < T.drag1[1] + 120 && <DragCard name={VIDEO} meta="2:14 · 84 MB" p={span(now, T.drag1)} />}
-        {now >= T.drag2[0] && now < T.drag2[1] + 120 && <DragCard name={REFERENCE} meta="0:28 · 12 MB" tall p={span(now, T.drag2)} />}
 
         {hasChips && (
           <ul className="flex flex-wrap gap-2 px-3 pt-3" style={{ opacity: fade }}>
@@ -174,33 +161,6 @@ export function ComposerDemo({ anchor, radius }: { anchor: Box; radius: number }
                 {up1 >= 1 ? t('chat.upload.ready') : t('chat.upload.uploading', { pct: Math.round(up1 * 100) })}
               </span>
             </Chip>
-            {now >= T.drag2[1] - 100 && (
-              <Chip show={span(now, [T.drag2[1] - 100, T.drag2[1] + 250])} accent={refOn}>
-                <Ring p={up2} />
-                <Thumb tall />
-                <span className="min-w-0 truncate text-ink-1">{REFERENCE}</span>
-                <span
-                  ref={refToggle}
-                  className={clsx('inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-caption transition-colors duration-300', refOn ? 'bg-accent/20 text-ink-0' : 'bg-white/[0.04] text-ink-3')}
-                >
-                  <Wand2 size={12} /> {refOn ? t('chat.reference.on') : t('chat.reference.off')}
-                </span>
-              </Chip>
-            )}
-            {now >= T.link[0] && (
-              <Chip show={span(now, [T.link[0], T.link[0] + 350])} accent>
-                <Link2 size={14} className="shrink-0 text-accent" />
-                <span className="min-w-0 max-w-[13rem] truncate font-mono text-caption text-ink-1">
-                  {LINK.slice(0, Math.max(1, Math.round(link * LINK.length)))}
-                  {link < 1 && <span className="ml-px inline-block h-3 w-px translate-y-0.5 animate-pulse bg-accent" />}
-                </span>
-                {link >= 1 && (
-                  <span className="inline-flex shrink-0 animate-fade-in items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-caption text-ink-0">
-                    <Wand2 size={12} /> {t('chat.reference.on')}
-                  </span>
-                )}
-              </Chip>
-            )}
           </ul>
         )}
 
@@ -243,25 +203,16 @@ export function ComposerDemo({ anchor, radius }: { anchor: Box; radius: number }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// The Send step: the box already holds a video, a reference and a prompt; the pointer presses the arrow. Then the same for
-// clipping: clip mode on, a YouTube link with what to look for, send, done.
+// The Send step: the box already holds a video and a prompt; the pointer presses the arrow.
 // ---------------------------------------------------------------------------------------------------------------------
 
-const SEND_LOOP = 15_000
+const SEND_LOOP = 8000
 const S = {
   aim: [300, 1700],
   click1: 2600,
   sent1: 2800,
-  out1: [5200, 6000],
-  clipsIn: [6300, 6900],
-  typeClip: [7200, 10_400],
-  aim2: [10_500, 11_300],
-  click2: 11_700,
-  sent2: 11_900,
-  out2: [14_200, 15_000],
+  out1: [6200, 7000],
 } as const
-
-const CLIP_URL = 'youtube.com/live/k3Vx9QaB'
 
 export function SendDemo({ anchor, radius }: { anchor: Box; radius: number }) {
   const { t } = useT()
@@ -269,21 +220,15 @@ export function SendDemo({ anchor, radius }: { anchor: Box; radius: number }) {
   const box = useRef<HTMLDivElement>(null)
   const sendBtn = useRef<HTMLSpanElement>(null)
   const edit = t('tour.demo.prompt')
-  const clipText = `${CLIP_URL} ${t('tour.demo.clipPrompt')}`
 
-  const clips = now >= S.clipsIn[0]
-  const sent = clips ? now >= S.sent2 : now >= S.sent1
-  const pressed = (now >= S.click1 && now < S.click1 + 260) || (now >= S.click2 && now < S.click2 + 260)
-  const fadeOut = clips ? 1 - span(now, S.out2) : 1 - span(now, S.out1)
-  const fadeIn = clips ? span(now, S.clipsIn) : 1
-  const show = Math.min(fadeOut, fadeIn)
-  const typed = clips ? Math.round(span(now, S.typeClip) * clipText.length) : edit.length
-  const full = typed >= (clips ? clipText.length : edit.length)
+  const sent = now >= S.sent1
+  const pressed = now >= S.click1 && now < S.click1 + 260
+  const show = 1 - span(now, S.out1)
   // After Send the box empties, like the real one: the message has gone into the chat.
   const empty = sent
-  const aiming = clips ? now >= S.aim2[0] && now < S.sent2 + 300 : now >= S.aim[0] && now < S.sent1 + 300
-  const aimP = clips ? span(now, S.aim2) : span(now, S.aim)
-  const callout = !sent && full && (clips ? now >= S.aim2[0] : true)
+  const aiming = now >= S.aim[0] && now < S.sent1 + 300
+  const aimP = span(now, S.aim)
+  const callout = !sent
 
   // The pointer glides in from the left of the box to the send arrow.
   let pointer: CSSProperties | null = null
@@ -306,70 +251,23 @@ export function SendDemo({ anchor, radius }: { anchor: Box; radius: number }) {
       style={{ left: anchor.left, width: anchor.width, top: anchor.top + anchor.height, transform: 'translateY(-100%)' }}
     >
       <div ref={box} className="relative border border-white/15 bg-[linear-gradient(180deg,#121633,#0c0f24)] shadow-composer" style={{ borderRadius: Math.max(16, radius) }}>
-        {/* Scene label: which of the two ways of sending this is. */}
-        <span
-          className="absolute -top-9 left-2 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-surface-3/90 px-3 py-1 text-caption font-medium text-ink-1 backdrop-blur"
-          style={{ opacity: show }}
-        >
-          {clips ? <Scissors size={12} className="text-accent" /> : <Wand2 size={12} className="text-accent" />}
-          {t(clips ? 'tour.demo.sceneClips' : 'tour.demo.sceneEdit')}
-        </span>
-
         {!empty && (
-          <div style={{ opacity: show }}>
-            {clips ? (
-              <div className="flex flex-wrap items-center gap-2 px-3 pt-3 text-label" style={{ transform: `translateY(${(1 - fadeIn) * 6}px)` }}>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/20 px-2.5 py-1 text-caption text-ink-0">
-                  <Scissors size={12} /> {t('chat.clips.on')}
-                </span>
-                <span className="inline-flex items-center gap-1.5 text-caption text-ink-3">
-                  {t('chat.clips.count')} <span className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink-0">8</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 text-caption text-ink-3">
-                  {t('chat.clips.length')} <span className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink-0">{t('chat.clips.seconds', { min: 20, max: 75 })}</span>
-                </span>
-              </div>
-            ) : (
-              <ul className="flex flex-wrap gap-2 px-3 pt-3">
-                <Chip show={1}>
-                  <Ring p={1} />
-                  <Thumb />
-                  <span className="min-w-0 truncate text-ink-1">{VIDEO}</span>
-                  <span className="shrink-0 font-mono text-caption text-ink-3">{t('chat.upload.ready')}</span>
-                </Chip>
-                <Chip show={1} accent>
-                  <Ring p={1} />
-                  <Thumb tall />
-                  <span className="min-w-0 truncate text-ink-1">{REFERENCE}</span>
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-caption text-ink-0">
-                    <Wand2 size={12} /> {t('chat.reference.on')}
-                  </span>
-                </Chip>
-                <Chip show={1} accent>
-                  <Link2 size={14} className="shrink-0 text-accent" />
-                  <span className="min-w-0 max-w-[13rem] truncate font-mono text-caption text-ink-1">{LINK}</span>
-                </Chip>
-              </ul>
-            )}
-          </div>
+          <ul className="flex flex-wrap gap-2 px-3 pt-3" style={{ opacity: show }}>
+            <Chip show={1}>
+              <Ring p={1} />
+              <Thumb />
+              <span className="min-w-0 truncate text-ink-1">{VIDEO}</span>
+              <span className="shrink-0 font-mono text-caption text-ink-3">{t('chat.upload.ready')}</span>
+            </Chip>
+          </ul>
         )}
 
         <div className="flex items-end gap-1.5 p-2">
-          <span className={clsx('grid h-10 w-10 shrink-0 place-items-center rounded-full', clips && !empty ? 'bg-accent/15 text-ink-0' : 'text-ink-3')}>
+          <span className={clsx('grid h-10 w-10 shrink-0 place-items-center rounded-full', !empty ? 'bg-accent/15 text-ink-0' : 'text-ink-3')}>
             <Paperclip size={20} strokeWidth={1.75} />
           </span>
           <span className="min-h-[40px] min-w-0 flex-1 self-center px-1 py-2 text-[15px] leading-[1.5] sm:text-prose" style={{ opacity: empty ? 1 : show }}>
-            {empty || typed === 0 ? (
-              <span className="text-ink-4">{t(clips ? 'chat.clips.placeholder' : 'chat.composer.placeholder')}</span>
-            ) : clips ? (
-              <span className="text-ink-0">
-                <span className="text-accent">{clipText.slice(0, Math.min(typed, CLIP_URL.length))}</span>
-                {clipText.slice(CLIP_URL.length, typed)}
-                {!full && <span className="ml-px inline-block h-[1.05em] w-[2px] translate-y-[3px] animate-pulse rounded bg-accent" />}
-              </span>
-            ) : (
-              <span className="text-ink-0">{edit}</span>
-            )}
+            {empty ? <span className="text-ink-4">{t('chat.composer.placeholder')}</span> : <span className="text-ink-0">{edit}</span>}
           </span>
           <span className="relative shrink-0">
             {callout && (
@@ -385,7 +283,7 @@ export function SendDemo({ anchor, radius }: { anchor: Box; radius: number }) {
               ref={sendBtn}
               className={clsx(
                 'grid h-10 w-10 place-items-center rounded-full transition-all duration-200',
-                !empty && full ? 'bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white shadow-[0_8px_22px_-8px_rgb(255_90_80/0.9)]' : 'bg-white/[0.08] text-ink-3',
+                !empty ? 'bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white shadow-[0_8px_22px_-8px_rgb(255_90_80/0.9)]' : 'bg-white/[0.08] text-ink-3',
                 callout && 'tour-send-pulse',
                 pressed && 'scale-90',
               )}
@@ -397,9 +295,9 @@ export function SendDemo({ anchor, radius }: { anchor: Box; radius: number }) {
 
         {pointer && <Pointer style={pointer} pressed={pressed} />}
 
-        {sent && fadeOut > 0 && (
-          <span style={{ opacity: fadeOut }} className="absolute -top-9 right-2 inline-flex animate-rise items-center gap-1.5 rounded-full border border-success/30 bg-success/15 px-3 py-1 text-caption font-medium text-success">
-            <Check size={12} strokeWidth={3} /> {t(clips ? 'tour.demo.clipsDone' : 'tour.demo.sent')}
+        {sent && show > 0 && (
+          <span style={{ opacity: show }} className="absolute -top-9 right-2 inline-flex animate-rise items-center gap-1.5 rounded-full border border-success/30 bg-success/15 px-3 py-1 text-caption font-medium text-success">
+            <Check size={12} strokeWidth={3} /> {t('tour.demo.sent')}
           </span>
         )}
       </div>
