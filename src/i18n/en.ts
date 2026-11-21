@@ -294,6 +294,7 @@ export const en = {
   'chat.result.duration': 'Length {time}',
   'chat.clips.found': '{n} clips',
   'chat.clips.foundOne': '1 clip',
+  'chat.clips.openSource': 'open the stream',
   'chat.clips.from': 'from {title}',
   'chat.clips.score': 'Score {n}',
   'chat.clips.at': 'at {t}',

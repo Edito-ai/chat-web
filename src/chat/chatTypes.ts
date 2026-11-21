@@ -141,6 +141,8 @@ export interface ClipsSource {
   kind: 'upload' | 'link'
   title: string
   durationSec: number | null
+  /** The YouTube / Twitch page the stream came from (a link chat). */
+  url?: string | null
 }
 
 /** What the person asks of a clipping run: how many clips, and how long each may be. */

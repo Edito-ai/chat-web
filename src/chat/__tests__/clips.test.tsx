@@ -34,7 +34,7 @@ describe('clips: wire mapping and helpers', () => {
     expect(snap.status).toBe('complete')
     expect(snap.result).toBeNull()
     expect(snap.clips?.map((c) => [c.id, c.score, c.durationSec])).toEqual([['c01', 90, 30], ['c02', 50, 30]])
-    expect(snap.source).toEqual({ kind: 'upload', title: 'my stream', durationSec: 7200 })
+    expect(snap.source).toEqual({ kind: 'upload', title: 'my stream', durationSec: 7200, url: null })
   })
 
   it('drops malformed clips and fills safe defaults', () => {

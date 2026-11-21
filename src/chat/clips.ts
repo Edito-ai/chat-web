@@ -54,9 +54,10 @@ export function toStyled(raw: unknown): ClipStyled | null {
 }
 
 export function toClipsSource(raw: unknown): ClipsSource | null {
-  const r = raw as { kind?: unknown; title?: unknown; durationSec?: unknown } | null
+  const r = raw as { kind?: unknown; title?: unknown; durationSec?: unknown; url?: unknown } | null
   if (!r || (r.kind !== 'upload' && r.kind !== 'link')) return null
-  return { kind: r.kind, title: str(r.title), durationSec: num(r.durationSec) }
+  const url = typeof r.url === 'string' && /^https?:\/\//i.test(r.url) ? r.url : null
+  return { kind: r.kind, title: str(r.title), durationSec: num(r.durationSec), url }
 }
 
 /** 75 -> "1:15", 3725 -> "1:02:05". */

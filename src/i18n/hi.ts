@@ -295,6 +295,7 @@ export const hi: Record<MessageKey, string> = {
   'chat.result.duration': 'लंबाई {time}',
   'chat.clips.found': '{n} क्लिप्स',
   'chat.clips.foundOne': '1 क्लिप',
+  'chat.clips.openSource': 'स्ट्रीम खोलें',
   'chat.clips.from': '{title} से',
   'chat.clips.score': 'स्कोर {n}',
   'chat.clips.at': '{t} पर',
