@@ -512,7 +512,7 @@ export const en = {
   'acct.card.title': 'Verify your card or UPI',
   'acct.card.offer': 'Verify a card or UPI ID and get {amount} extra tokens. We charge ₹{inr} and refund it right away.',
   'acct.card.claim': 'Claim with card or UPI',
-  'acct.card.menu': 'Claim with card',
+  'acct.card.menu': 'Claim 1M tokens with card',
   'acct.card.opening': 'Opening secure checkout…',
   'acct.card.verifying': 'Verifying your payment…',
   'acct.card.claimed': 'Card verified: {amount} tokens added.',

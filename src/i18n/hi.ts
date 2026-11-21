@@ -513,7 +513,7 @@ export const hi: Record<MessageKey, string> = {
   'acct.card.title': 'अपना कार्ड या UPI वेरिफ़ाई करें',
   'acct.card.offer': 'कार्ड या UPI ID वेरिफ़ाई करें और {amount} एक्स्ट्रा टोकन पाएँ। हम ₹{inr} काटते हैं और तुरंत वापस कर देते हैं।',
   'acct.card.claim': 'कार्ड या UPI से क्लेम करें',
-  'acct.card.menu': 'कार्ड से क्लेम करें',
+  'acct.card.menu': 'कार्ड से 1M टोकन क्लेम करें',
   'acct.card.opening': 'सुरक्षित चेकआउट खुल रहा है…',
   'acct.card.verifying': 'आपका पेमेंट वेरिफ़ाई हो रहा है…',
   'acct.card.claimed': 'कार्ड वेरिफ़ाई हो गया: {amount} टोकन जुड़ गए।',
