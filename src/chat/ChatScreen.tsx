@@ -102,7 +102,9 @@ export function ChatScreen() {
   // While a tour step wants the drawer it stays open, even if something in it closes it (New chat, a chat row).
   const drawerOpen = drawer || tourDrawer
 
-  const running = activeAssistant(messages) !== null
+  // (the "typing" bubble shown while a message is being sent has no job yet: nothing is running)
+  const active = activeAssistant(messages)
+  const running = active !== null && active.jobId !== ''
   const empty = messages.length === 0
   const library = view === 'library'
   const hasVideo = lastCompleted(messages) !== null
@@ -166,9 +168,11 @@ export function ChatScreen() {
     if (busy || !requireAuth()) return
     if (sendBlocked && !whenBusy) return
     const prompt = text
+    // the box empties at once, like any chat; the words come back if the message could not be sent
+    if (prompt.trim()) setText('')
     const p = await send(prompt, sendBlocked ? whenBusy : undefined)
     setProblem(p)
-    if (p === null && prompt.trim()) setText('')
+    if ((p !== null || useChat.getState().actionError !== null) && prompt.trim()) setText((cur) => cur || prompt)
   }
   const { editMessage, retryTurn, removeQueued } = useChat.getState()
   const lastUserId = [...messages].reverse().find((m) => m.role === 'user')?.id

@@ -533,3 +533,31 @@ describe('chat store: edit, retry, queue, stop and send', () => {
     ])
   })
 })
+
+describe('chat store: the message shows at once', () => {
+  it('the message and a typing bubble show while the server reads it; the bubble becomes the answer', async () => {
+    let answer!: (s: ChatJobSnapshot) => void
+    const api = fakeApi(async (id) => running(id))
+    api.createJob.mockImplementationOnce(() => new Promise<ChatJobSnapshot>((r) => { answer = r }))
+    setChatApi(api)
+    const sent = useChat.getState().send('hi')
+    await tick(0)
+    const during = useChat.getState().messages
+    expect(during.map((m) => m.role)).toEqual(['user', 'assistant'])
+    expect(during[1]).toMatchObject({ kind: 'chat', status: 'queued', jobId: '' })
+    answer({ ...running('job-1'), kind: 'chat', videoIds: [] })
+    await sent
+    const after = useChat.getState().messages
+    expect(after).toHaveLength(2)
+    expect(after[0]).toMatchObject({ role: 'user', text: 'hi' })
+    expect(after[1]).toMatchObject({ role: 'assistant', jobId: 'job-1' })
+  })
+
+  it('a refused send takes the message and the typing bubble away again', async () => {
+    const api = fakeApi(async (id) => running(id))
+    api.createJob.mockRejectedValueOnce(new ApiError(500, '500 boom'))
+    setChatApi(api)
+    await useChat.getState().send('hi')
+    expect(useChat.getState().messages).toEqual([])
+  })
+})
