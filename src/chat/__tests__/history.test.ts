@@ -54,6 +54,20 @@ describe('rebuildMessages', () => {
     expect((m[3] as ChatAssistantMessage).result?.videoUrl).toBe('https://x/v.mp4')
     expect((m[3] as ChatAssistantMessage).durationSec).toBe(30)
   })
+  it('keeps every earlier turn\'s attachments, steps and error, not only the newest turn\'s', () => {
+    const step = { id: 'tool:step:cut', kind: 'tool', title: 'Cutting the pauses', detail: null, state: 'failed', at: '2026-11-22T10:00:00Z', endedAt: '2026-11-22T10:01:00Z' }
+    const m = rebuildMessages({
+      id: 'j', state: 'complete', turn: 2, kind: 'chat', reply: 'Hi!',
+      turns: [
+        { turn: 1, prompt: 'edit this', attachments: ['talk.mp4'], state: 'failed', error: 'The edit stopped responding.', activity: [step] },
+        { turn: 2, prompt: 'hi', state: 'complete', reply: 'Hi!' },
+      ],
+    })
+    expect(m[0]).toMatchObject({ role: 'user', text: 'edit this', attachments: ['talk.mp4'] })
+    const first = m[1] as ChatAssistantMessage
+    expect(first).toMatchObject({ status: 'failed', error: 'The edit stopped responding.' })
+    expect(first.activity?.map((a) => a.title)).toEqual(['Cutting the pauses'])
+  })
   it('adds the running first turn using the title as its prompt', () => {
     const m = rebuildMessages({ id: 'j', state: 'planning', turn: 1, title: 'my reel', progress: 0.3, turns: [] })
     expect(m).toHaveLength(2)

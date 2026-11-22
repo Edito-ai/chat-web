@@ -40,6 +40,10 @@ export interface ChatJobWire {
     state: string
     durationSec?: number | null
     suggestions?: { id: string; label: string; action: string; prompt?: string | null }[]
+    /** The steps that turn showed while it ran (backend2 keeps them per turn). */
+    activity?: ChatJobWire['activity']
+    /** Why that turn failed. */
+    error?: string | null
   }[]
   activity?: {
     id: string
@@ -256,6 +260,7 @@ export const httpChatApi: ChatApi = {
         {
           projectId: input.projectId, videoIds: input.videoIds, prompt: input.prompt,
           ...(input.overlayIds?.length ? { overlayIds: input.overlayIds } : {}),
+          ...(input.chatId ? { chatId: input.chatId } : {}),
         },
         { signal },
       )) as ChatJobWire,

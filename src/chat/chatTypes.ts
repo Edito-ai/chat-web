@@ -260,6 +260,9 @@ export interface CreateChatJobInput {
   prompt: string
   /** A picture (logo, photo) the edit places in the video (backend2 only). */
   overlayIds?: string[]
+  /** The chat this message was typed in, when its last job is over and cannot take a follow-up (a plain reply, a failed or
+   *  cancelled edit, clips): the backend starts the new job as that chat's next turn instead of a new chat. */
+  chatId?: string
 }
 
 /** The seam between the chat screen and whichever backend answers. */

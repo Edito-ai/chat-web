@@ -262,6 +262,44 @@ describe('chat store: polling, cancel, failure', () => {
     expect(useChat.getState().messages.at(-1)).toMatchObject({ status: 'failed', error: 'No speech found' })
   })
 
+  it('a message after a failed job starts the new job in the SAME chat (chatId), not a new one', async () => {
+    const api = fakeApi(async (id) => ({ ...running(id), status: 'failed' as const, error: 'The edit stopped responding.' }))
+    await started(api)
+    await tick(0)
+    expect(useChat.getState().canFollowUp).toBe(false)
+    api.createJob.mockResolvedValueOnce(running('job-1', 0.1, 2))
+    expect(await useChat.getState().send('try again')).toBeNull()
+    expect(api.followUp).not.toHaveBeenCalled()
+    expect(api.createJob).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: 'try again', chatId: 'job-1', videoIds: ['remote-a.mp4'] }))
+    const msgs = useChat.getState().messages
+    expect(msgs.filter((m) => m.role === 'user').map((m) => (m.role === 'user' ? m.text : ''))).toEqual(['go', 'try again'])
+    expect(msgs.at(-1)).toMatchObject({ role: 'assistant', jobId: 'job-1', turn: 2 })
+  })
+
+  it('a reply that takes no follow-up (canFollowUp false) also keeps the next message in the same chat', async () => {
+    const reply: ChatJobSnapshot = {
+      ...base, videoIds: [], jobId: 'job-1', status: 'complete', stage: null, progress: 1, result: null, canFollowUp: false, kind: 'chat',
+      reply: 'Hi!',
+    }
+    const api = fakeApi(async () => reply)
+    setChatApi(api)
+    await useChat.getState().send('hi')
+    await tick(2500)
+    await useChat.getState().send('make a promo')
+    expect(api.createJob).toHaveBeenCalledTimes(2)
+    expect(api.createJob.mock.calls[0]![0]).not.toHaveProperty('chatId')
+    expect(api.createJob.mock.calls[1]![0]).toMatchObject({ prompt: 'make a promo', chatId: 'job-1' })
+  })
+
+  it('a new chat never carries the old chat id', async () => {
+    const api = fakeApi(async (id) => ({ ...running(id), status: 'failed' as const, error: 'x' }))
+    await started(api)
+    await tick(0)
+    await useChat.getState().newChat()
+    await useChat.getState().send('hello')
+    expect(api.createJob.mock.calls.at(-1)![0]).not.toHaveProperty('chatId')
+  })
+
   it('tolerates a few failed polls, then reports lost contact and Retry resumes', async () => {
     let healthy = false
     const api = fakeApi(async (id) => {
