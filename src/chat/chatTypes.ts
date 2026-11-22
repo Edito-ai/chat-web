@@ -273,6 +273,12 @@ export interface ChatApi {
   followUp(jobId: string, prompt: string, signal?: AbortSignal, videoIds?: string[], overlayIds?: string[]): Promise<ChatJobSnapshot>
   getJob(jobId: string, signal?: AbortSignal): Promise<ChatJobSnapshot>
   cancelJob(jobId: string): Promise<ChatJobSnapshot>
+  /** Change the chat's last message (also while it runs: the server stops it and starts again with the new words). */
+  editTurn?(jobId: string, turn: number, prompt: string): Promise<ChatJobSnapshot>
+  /** The last message again (a failed or stopped turn). */
+  retryTurn?(jobId: string): Promise<ChatJobSnapshot>
+  /** Stop what runs and do this instead, as the next turn (the work done so far is reused). */
+  interrupt?(jobId: string, prompt: string): Promise<ChatJobSnapshot>
   /** The user's answer to the template chooser (backend2 only). Rejects with the server's reason, e.g. a link that cannot be opened. */
   answerLook?(jobId: string, answer: LookAnswer): Promise<void>
   /** The final frames are fine: render the video. */
@@ -287,6 +293,14 @@ export interface ChatUserMessage {
   text: string
   /** File names uploaded with this message. */
   attachments: string[]
+  /** The words were changed after they were sent. */
+  edited?: boolean
+}
+
+/** A message typed while a turn runs, sent by itself when that turn finishes. */
+export interface QueuedMessage {
+  id: string
+  text: string
 }
 
 export interface ChatAssistantMessage {

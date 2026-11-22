@@ -92,7 +92,10 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
   const current = w.turn ?? 1
   const out: ChatMessage[] = []
   for (const t of w.turns ?? []) {
-    out.push({ id: `${w.id}:${t.turn}:u`, role: 'user', text: t.prompt, attachments: t.attachments ?? [] })
+    out.push({
+      id: `${w.id}:${t.turn}:u`, role: 'user', text: t.prompt, attachments: t.attachments ?? [],
+      ...((t.edits?.length ?? 0) > 0 ? { edited: true } : {}),
+    })
     out.push({
       ...newAssistant(`${w.id}:${t.turn}:a`, w.id, t.turn),
       status: t.state === 'complete' ? 'complete' : t.state === 'cancelled' ? 'cancelled' : 'failed',

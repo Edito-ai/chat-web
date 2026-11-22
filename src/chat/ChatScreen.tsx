@@ -52,6 +52,7 @@ export function ChatScreen() {
   const historyState = useChat((s) => s.historyState)
   const currentJobId = useChat((s) => s.jobId)
   const remote = useChat((s) => s.remote)
+  const queued = useChat((s) => s.queue)
   const projectId = useChat((s) => s.projectId)
   const user = useAuth((s) => s.user)
   const signOut = () => {
@@ -160,13 +161,18 @@ export function ChatScreen() {
     return () => window.removeEventListener('keydown', onKey)
   }, [drawer])
 
-  const submit = async () => {
-    if (sendBlocked || busy || !requireAuth()) return
+  /** `whenBusy`: while a turn runs, queue the message or stop the turn and send it instead. */
+  const submit = async (whenBusy?: 'queue' | 'interrupt') => {
+    if (busy || !requireAuth()) return
+    if (sendBlocked && !whenBusy) return
     const prompt = text
-    const p = await send(prompt)
+    const p = await send(prompt, sendBlocked ? whenBusy : undefined)
     setProblem(p)
     if (p === null && prompt.trim()) setText('')
   }
+  const { editMessage, retryTurn, removeQueued } = useChat.getState()
+  const lastUserId = [...messages].reverse().find((m) => m.role === 'user')?.id
+  const lastAssistantId = [...messages].reverse().find((m) => m.role === 'assistant')?.id
 
   /** A quick reply under an assistant message: open the picker, open the library, or send its words. */
   const onSuggest = (chip: ChatSuggestion) => {
@@ -345,7 +351,14 @@ export function ChatScreen() {
             <div className="mx-auto min-h-full w-full max-w-3xl px-4 py-4">
               <ol data-testid="chat-log" role="log" aria-label={t('chat.log.aria')} className="space-y-6 pb-4">
                 {messages.map((m, i) => (
-                  <Bubble key={m.id} msg={m} chips={i === messages.length - 1 && !running} onSuggest={onSuggest} />
+                  <Bubble
+                    key={m.id}
+                    msg={m}
+                    chips={i === messages.length - 1 && !running}
+                    onSuggest={onSuggest}
+                    onEdit={m.id === lastUserId && !remote && signedIn ? (v) => editMessage(m.id, v) : undefined}
+                    onRetry={m.id === lastAssistantId && !running && !remote && !busy && signedIn ? () => void retryTurn(m.id) : undefined}
+                  />
                 ))}
               </ol>
               <div ref={endRef} />
@@ -412,6 +425,10 @@ export function ChatScreen() {
               sendDisabled={sendDisabled}
               onSend={() => void submit()}
               onStop={() => void cancel()}
+              onQueue={() => void submit('queue')}
+              onInterrupt={() => void submit('interrupt')}
+              queued={queued}
+              onRemoveQueued={removeQueued}
             />
             {/* Disclaimer under the box: hidden for now. Bring it back with the link pointing at TERMS_URL (the website).
             <p data-testid="chat-disclaimer" className="px-3 pt-0.5 text-center text-caption leading-snug text-ink-4">

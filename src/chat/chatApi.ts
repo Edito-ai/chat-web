@@ -44,6 +44,8 @@ export interface ChatJobWire {
     activity?: ChatJobWire['activity']
     /** Why that turn failed. */
     error?: string | null
+    /** Earlier words of that message, when it was changed. */
+    edits?: { prompt: string; at?: string }[]
   }[]
   activity?: {
     id: string
@@ -276,6 +278,15 @@ export const httpChatApi: ChatApi = {
   },
   async getJob(jobId, signal) {
     return toSnapshot((await apiClient.get(jobPath(jobId), { signal })) as ChatJobWire)
+  },
+  async editTurn(jobId, turn, prompt) {
+    return toSnapshot((await apiClient.post(`${jobPath(jobId)}/edit`, { prompt, turn })) as ChatJobWire)
+  },
+  async retryTurn(jobId) {
+    return toSnapshot((await apiClient.post(`${jobPath(jobId)}/retry`, {})) as ChatJobWire)
+  },
+  async interrupt(jobId, prompt) {
+    return toSnapshot((await apiClient.post(`${jobPath(jobId)}/interrupt`, { prompt })) as ChatJobWire)
   },
   async cancelJob(jobId) {
     return toSnapshot((await apiClient.post(`${jobPath(jobId)}/cancel`)) as ChatJobWire)

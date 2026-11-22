@@ -2,11 +2,12 @@
 
 import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import clsx from 'clsx'
-import { ArrowUp, Check, Paperclip, Square, X, AlertCircle } from 'lucide-react'
+import { ArrowUp, Check, Clock, Paperclip, Square, X, AlertCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useTypewriter } from './useTypewriter'
 import { IconButton } from '@/components/ui'
 import type { ChatAttachment, ChatPicture } from './chatStore'
+import type { QueuedMessage } from './chatTypes'
 
 /** A small ring that fills with upload progress; a check when ready, an alert when failed. */
 function ProgressRing({ item }: { item: ChatAttachment }) {
@@ -67,6 +68,13 @@ export interface ComposerProps {
   sendDisabled: boolean
   onSend: () => void
   onStop: () => void
+  /** While a turn runs: send the typed message when it finishes (Enter does this). */
+  onQueue?: () => void
+  /** While a turn runs: stop it and do the typed message instead. */
+  onInterrupt?: () => void
+  /** Messages waiting for the running turn to finish. */
+  queued?: QueuedMessage[]
+  onRemoveQueued?: (id: string) => void
 }
 
 /** Pill-shaped composer: attach chips on top, auto-growing textarea, attach on the left, send/stop on the right. */
@@ -88,13 +96,27 @@ export function Composer(p: ComposerProps) {
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      p.onSend()
+      if (p.running) p.onQueue?.()
+      else p.onSend()
     }
   }
   const typed = useTypewriter(p.hints ?? [], p.text === '' && !p.running)
   const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0 || p.pictures.length > 0)
+  const typedWhileRunning = p.running && p.text.trim().length > 0
   return (
     <div data-tour="composer" className="rounded-[1.75rem] border border-white/15 bg-surface-1/75 backdrop-blur-xl shadow-composer transition-[border-color,box-shadow] duration-200 focus-within:border-accent-line focus-within:shadow-[0_0_0_4px_rgb(255_158_140/0.10),0_20px_50px_-20px_rgb(0_0_0/0.9)]">
+      {(p.queued?.length ?? 0) > 0 && (
+        <ul data-testid="chat-queue" aria-label={t('chat.queued')} className="flex flex-col gap-1.5 px-3 pt-3">
+          {p.queued!.map((q) => (
+            <li key={q.id} data-testid="chat-queued" className="flex items-center gap-2 rounded-xl border border-dashed border-line-strong bg-surface-2/70 py-1 pl-2.5 pr-1 text-label">
+              <Clock size={13} className="shrink-0 text-ink-3" aria-hidden />
+              <span className="sr-only">{t('chat.queued')}: </span>
+              <span className="min-w-0 flex-1 truncate text-ink-1">{q.text}</span>
+              <IconButton icon={X} size="sm" aria-label={t('chat.queue.remove', { text: q.text })} onClick={() => p.onRemoveQueued?.(q.id)} className="h-6 w-6" />
+            </li>
+          ))}
+        </ul>
+      )}
       {(p.attachments.length > 0 || p.pictures.length > 0) && (
         <ul className="flex flex-wrap gap-2 px-3 pt-3">
           {p.pictures.map((pic) => (
@@ -142,7 +164,28 @@ export function Composer(p: ComposerProps) {
           placeholder={typed || p.placeholder}
           className="scroll-thin order-first block max-h-44 min-h-[44px] w-full min-w-0 basis-full resize-none self-center bg-transparent px-2.5 py-2.5 text-[16px] leading-[1.5] text-ink-0 placeholder:text-ink-4 focus:!outline-none focus-visible:!outline-none sm:order-none sm:min-h-[40px] sm:w-auto sm:basis-0 sm:flex-1 sm:px-1 sm:text-prose"
         />
-        {p.running ? (
+        {typedWhileRunning && p.onQueue && p.onInterrupt ? (
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:ml-0">
+            <button
+              type="button"
+              data-testid="chat-queue-send"
+              title={t('chat.queue.hint')}
+              onClick={p.onQueue}
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-line-strong bg-surface-3 px-3.5 text-label font-medium text-ink-0 transition-colors hover:bg-surface-4"
+            >
+              <Clock size={14} aria-hidden /> {t('chat.queue')}
+            </button>
+            <button
+              type="button"
+              data-testid="chat-stop-send"
+              title={t('chat.stopAndSend.hint')}
+              onClick={p.onInterrupt}
+              className="inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] px-3.5 text-label font-semibold text-white shadow-[0_8px_22px_-8px_rgb(255_90_80/0.8)] transition-all hover:brightness-110"
+            >
+              <Square size={11} fill="currentColor" aria-hidden /> {t('chat.stopAndSend')}
+            </button>
+          </div>
+        ) : p.running ? (
           <button
             type="button"
             data-testid="chat-stop"
