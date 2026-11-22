@@ -1,6 +1,7 @@
 'use client'
 
-import { AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
+import { AlertTriangle, Pencil, RotateCcw } from 'lucide-react'
 import { useT } from '@/i18n'
 import { FolderOpen, Sparkles, Upload } from 'lucide-react'
 import { InlineError, LogoMark } from '@/components/ui'
@@ -14,7 +15,7 @@ import { ClipsBoard } from './ClipsBoard'
 import { ThinkingTrail } from './Thinking'
 import { FramesReview } from './FramesReview'
 import { QuestionCard } from './QuestionCard'
-import { LiveActivity } from './ActivityPanel'
+import { LookChoice } from './LookChoice'
 import type { ChatAssistantMessage, ChatMessage, ChatSuggestion } from './chatTypes'
 
 function ErrorCard({ msg }: { msg: ChatAssistantMessage }) {
@@ -103,7 +104,25 @@ function ChatReply({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; chips
   )
 }
 
-function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; chips: boolean; onSuggest?: (s: ChatSuggestion) => void }) {
+/** Under a failed or stopped answer: run the same message again. */
+function RetryButton({ onRetry }: { onRetry?: () => void }) {
+  const { t } = useT()
+  if (!onRetry) return null
+  return (
+    <button
+      type="button"
+      data-testid="chat-retry"
+      onClick={onRetry}
+      className="inline-flex min-h-[32px] items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.05] px-3 text-label font-medium text-ink-0 transition-colors hover:border-accent-line hover:bg-white/[0.09]"
+    >
+      <RotateCcw size={13} aria-hidden /> {t('chat.retry')}
+    </button>
+  )
+}
+
+function AssistantBody({ msg, chips, onSuggest, onRetry }: {
+  msg: ChatAssistantMessage; chips: boolean; onSuggest?: (s: ChatSuggestion) => void; onRetry?: () => void
+}) {
   const { t } = useT()
   const lostJobId = useChat((s) => s.pollLostJobId)
   const retryPolling = useChat((s) => s.retryPolling)
@@ -145,6 +164,7 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
       <div className="space-y-3">
         <ThinkingTrail msg={msg} />
         <p className="text-prose text-ink-3">{t('chat.stopped')}</p>
+        <RetryButton onRetry={onRetry} />
       </div>
     )
   }
@@ -153,6 +173,7 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
       <div className="space-y-3">
         <ThinkingTrail msg={msg} />
         <ErrorCard msg={msg} />
+        <RetryButton onRetry={onRetry} />
       </div>
     )
   }
@@ -164,11 +185,11 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
       </div>
     )
   }
-  // Still running: the live card (what the AI is doing now, a moving progress bar, the steps with their times, time left
-  // and a tip), so a long edit always shows something happening. The card carries the look choice itself.
+  // Still running: the thinking (the AI's thoughts and the tools it runs, live), then the look choice when it asks for one.
   return (
     <div className="space-y-3">
-      <LiveActivity msg={msg} />
+      <ThinkingTrail msg={msg} />
+      <LookChoice msg={msg} />
       <FramesReview msg={msg} />
       {msg.analysis && (
         <div className="w-full max-w-xl">
@@ -179,21 +200,110 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
   )
 }
 
-export function Bubble({ msg, chips = false, onSuggest }: { msg: ChatMessage; chips?: boolean; onSuggest?: (s: ChatSuggestion) => void }) {
+/** The person's message; the last one can be changed in place (Save sends it again, the edit starts over from it). */
+function UserBubble({ msg, onEdit }: { msg: ChatMessage & { role: 'user' }; onEdit?: (text: string) => Promise<string | null> }) {
   const { t } = useT()
-  if (msg.role === 'user') {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(msg.text)
+  const [saving, setSaving] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+  const open = () => {
+    setDraft(msg.text)
+    setProblem(null)
+    setEditing(true)
+  }
+  const save = async () => {
+    if (!onEdit || saving) return
+    setSaving(true)
+    const why = await onEdit(draft)
+    setSaving(false)
+    if (why) setProblem(why)
+    else setEditing(false)
+  }
+  if (editing && onEdit) {
     return (
       <li data-testid={`chat-message-${msg.id}`} className="flex animate-rise justify-end">
-        <div className="max-w-[min(88%,34rem)] space-y-1.5 rounded-2xl rounded-br-md bg-white/[0.07] px-4 py-2.5 ring-1 ring-white/10">
-          <span className="sr-only">{t('chat.you')}: </span>
-          {msg.attachments.length > 0 && (
-            <p className="break-words font-mono text-caption text-ink-3">{msg.attachments.join(', ')}</p>
-          )}
-          <p className="whitespace-pre-wrap break-words text-prose text-ink-0">{msg.text}</p>
-        </div>
+        <form
+          className="w-full max-w-[min(100%,34rem)] space-y-2 rounded-2xl bg-white/[0.07] p-3 ring-1 ring-accent-line"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void save()
+          }}
+        >
+          <textarea
+            data-testid="chat-edit-input"
+            aria-label={t('chat.edit.aria')}
+            value={draft}
+            autoFocus
+            rows={Math.min(8, Math.max(2, draft.split('\n').length))}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setEditing(false)
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault()
+                void save()
+              }
+            }}
+            className="block w-full resize-none bg-transparent text-[16px] leading-[1.5] text-ink-0 focus:!outline-none sm:text-prose"
+          />
+          {problem && <p role="alert" className="text-label text-danger">{problem}</p>}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              data-testid="chat-edit-cancel"
+              onClick={() => setEditing(false)}
+              className="min-h-[34px] rounded-full px-3.5 text-label font-medium text-ink-2 hover:bg-white/[0.06] hover:text-ink-0"
+            >
+              {t('chat.edit.cancel')}
+            </button>
+            <button
+              type="submit"
+              data-testid="chat-edit-save"
+              disabled={saving || !draft.trim()}
+              className="min-h-[34px] rounded-full bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] px-3.5 text-label font-semibold text-white disabled:opacity-40"
+            >
+              {t('chat.edit.save')}
+            </button>
+          </div>
+        </form>
       </li>
     )
   }
+  return (
+    <li data-testid={`chat-message-${msg.id}`} className="group flex animate-rise items-start justify-end gap-1.5">
+      {onEdit && (
+        <button
+          type="button"
+          data-testid="chat-edit"
+          aria-label={t('chat.edit')}
+          title={t('chat.edit')}
+          onClick={open}
+          className="mt-1.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-3 transition-opacity hover:bg-white/[0.06] hover:text-ink-0 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+        >
+          <Pencil size={14} aria-hidden />
+        </button>
+      )}
+      <div className="max-w-[min(88%,34rem)] space-y-1.5 rounded-2xl rounded-br-md bg-white/[0.07] px-4 py-2.5 ring-1 ring-white/10">
+        <span className="sr-only">{t('chat.you')}: </span>
+        {msg.attachments.length > 0 && (
+          <p className="break-words font-mono text-caption text-ink-3">{msg.attachments.join(', ')}</p>
+        )}
+        <p className="whitespace-pre-wrap break-words text-prose text-ink-0">{msg.text}</p>
+        {msg.edited && <p data-testid="chat-edited" className="text-right text-caption text-ink-4">{t('chat.edited')}</p>}
+      </div>
+    </li>
+  )
+}
+
+export function Bubble({ msg, chips = false, onSuggest, onEdit, onRetry }: {
+  msg: ChatMessage; chips?: boolean; onSuggest?: (s: ChatSuggestion) => void
+  /** Only on the person's last message. */
+  onEdit?: (text: string) => Promise<string | null>
+  /** Only on the last answer, when it failed or was stopped. */
+  onRetry?: () => void
+}) {
+  const { t } = useT()
+  if (msg.role === 'user') return <UserBubble msg={msg} onEdit={onEdit} />
   return (
     <li data-testid={`chat-message-${msg.id}`} className="flex animate-rise justify-start gap-2.5 sm:gap-3">
       <div className="shrink-0">
@@ -212,7 +322,7 @@ export function Bubble({ msg, chips = false, onSuggest }: { msg: ChatMessage; ch
             {msg.placementQuestion}
           </p>
         )}
-        <AssistantBody msg={msg} chips={chips} onSuggest={onSuggest} />
+        <AssistantBody msg={msg} chips={chips} onSuggest={onSuggest} onRetry={onRetry} />
         {/* The backend's question, whatever the job state: the job waits for the answer. */}
         {msg.question && <QuestionCard msg={msg} />}
       </div>

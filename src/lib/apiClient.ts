@@ -9,6 +9,8 @@ export class ApiError extends Error {
   method?: string
   /** The server's request id for a server error: a person can quote it to support. */
   reference?: string
+  /** A machine-readable reason the server gave (its "code"), e.g. "stop_first". */
+  code?: string
   /** Development servers send what broke (`{type, message}`); never present in production. */
   debug?: unknown
 
@@ -96,6 +98,7 @@ async function parseOrThrow(res: Response, path = '', method = 'GET'): Promise<a
     err.method = method
     if (typeof body?.reference === 'string') err.reference = body.reference
     if (body?.debug !== undefined) err.debug = body.debug
+    if (typeof body?.code === 'string') err.code = body.code
     throw err
   }
   return body
