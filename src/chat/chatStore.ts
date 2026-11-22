@@ -556,6 +556,9 @@ export const useChat = create<ChatState>()(
             snap = await api.createJob({
               projectId, videoIds: attached.length > 0 ? attached : s0.videoIds, prompt,
               ...(overlayIds.length > 0 ? { overlayIds } : {}),
+              // this chat's last job is over but takes no follow-up (a reply, a failed edit, clips): the new job is its next
+              // turn, so the conversation stays one chat (a chat copied from another server cannot run anything here)
+              ...(s0.jobId && !s0.remote ? { chatId: s0.jobId } : {}),
             })
           }
           const user: ChatMessage = {

@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { newAssistant } from './chatState'
-import { toSnapshot, type ChatJobWire, toSuggestions } from './chatApi'
+import { toActivity, toSnapshot, type ChatJobWire, toSuggestions } from './chatApi'
 import type { ChatAssistantMessage, ChatMessage } from './chatTypes'
 
 export type HistoryStatus = 'running' | 'complete' | 'failed'
@@ -101,6 +101,9 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
       durationSec: t.durationSec ?? null,
       kind: t.kind,
       suggestions: toSuggestions(t.suggestions),
+      // each turn keeps its own steps ("thinking") and its error, so an earlier turn reads as it did while it ran
+      ...(t.activity?.length ? { activity: toActivity(t.activity) } : {}),
+      ...(t.state === 'failed' && t.error ? { error: t.error } : {}),
     })
   }
   const last = out[out.length - 1]
