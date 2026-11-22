@@ -617,7 +617,14 @@ export const useChat = create<ChatState>()(
         if (s0.pictures.some((p) => p.state === 'failed')) return 'uploadFailed'
         const overlayIds = s0.pictures.flatMap((p) => (p.assetId ? [p.assetId] : []))
 
-        set({ busy: true, actionError: null })
+        // The message shows at once with the assistant "typing" while the server reads it (a model call, a few seconds),
+        // like any chat. The typing bubble becomes the real answer when the server replies; both go if the send fails.
+        const user: ChatMessage = {
+          id: newId(), role: 'user', text: prompt,
+          attachments: [...s0.attachments.map((a) => a.name), ...s0.pictures.map((p) => `${p.name} (picture)`)],
+        }
+        const typing: ChatAssistantMessage = { ...newAssistant(newId(), '', 0), kind: 'chat' }
+        set((s) => ({ busy: true, actionError: null, messages: capMessages([...s.messages, user, typing]) }))
         try {
           const api = getChatApi()
           const attached = s0.attachments.map((a) => a.videoId!)
@@ -641,15 +648,11 @@ export const useChat = create<ChatState>()(
               ...(s0.jobId && !s0.remote ? { chatId: s0.jobId } : {}),
             })
           }
-          const user: ChatMessage = {
-            id: newId(), role: 'user', text: prompt,
-            attachments: [
-              ...s0.attachments.map((a) => a.name),
-              ...s0.pictures.map((p) => `${p.name} (picture)`),
-            ],
-          }
           set((s) => ({
-            messages: applySnapshot(capMessages([...s.messages, user, newAssistant(newId(), snap.jobId, snap.turn)]), snap),
+            messages: applySnapshot(
+              s.messages.map((m): ChatMessage => (m.id === typing.id ? newAssistant(newId(), snap.jobId, snap.turn) : m)),
+              snap,
+            ),
             attachments: [],
             pictures: [],
             userId: currentUserId(),
@@ -658,7 +661,7 @@ export const useChat = create<ChatState>()(
           if (!isTerminal(snap.status)) void pollJob(snap.jobId)
           void get().loadHistory()
         } catch (e) {
-          set({ actionError: e })
+          set((s) => ({ actionError: e, messages: s.messages.filter((m) => m.id !== user.id && m.id !== typing.id) }))
         } finally {
           set({ busy: false })
         }
@@ -809,7 +812,7 @@ export const useChat = create<ChatState>()(
 
       cancel: async () => {
         const active = activeAssistant(get().messages)
-        if (!active) return
+        if (!active || !active.jobId) return
         stopPolling()
         set((s) => ({ messages: finishLocally(s.messages, active.jobId, 'cancelled'), pollLostJobId: null, queue: [] }))
         try {
