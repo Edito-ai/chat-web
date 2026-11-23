@@ -17,7 +17,7 @@ Copy `.env.example` to `.env` (never committed):
 |---|---|
 | `NEXT_PUBLIC_API_BASE_URL` | Edito backend base URL. Default `http://127.0.0.1:4000`. |
 | `NEXT_PUBLIC_SITE_URL` | Public origin of this site, for canonical/OpenGraph URLs, robots and sitemap. Default `http://localhost:5174`. Set it in production. |
-| `NEXT_GOOGLE_CLIENT_ID` | Optional. The Google OAuth "Web application" client id; the "Continue with Google" button shows only when it is set (add `http://localhost:5174` and the production origin as authorised JavaScript origins in Google Cloud). The backend needs the same id as `GOOGLE_CLIENT_ID`. |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Optional. The Google OAuth "Web application" client id; the "Continue with Google" button shows only when it is set (add `http://localhost:5174` and the production origin as authorised JavaScript origins in Google Cloud). The backend needs the same id as `GOOGLE_CLIENT_ID`. |
 | `NEXT_PUBLIC_EDITOR_URL` | Optional. If set, a finished video shows an "Open in editor" link to this URL. Hidden when empty. |
 
 `NEXT_PUBLIC_*` values are inlined at build time, so set them before `npm run build`.
