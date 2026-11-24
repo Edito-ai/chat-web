@@ -18,7 +18,7 @@ export const PlansSection = forwardRef<
     onSubscribe: (tier: BillingTier) => void
     onTrial: () => void
   }
->(function PlansSection({ sub, neverSubscribed, busy, onSubscribe, onTrial }, ref) {
+>(function PlansSection({ sub, neverSubscribed: _neverSubscribed, busy, onSubscribe, onTrial: _onTrial }, ref) {
   const { t } = useT()
   const activeTier = sub && isLive(sub.status) ? sub.tier : null
   return (
@@ -45,33 +45,20 @@ export const PlansSection = forwardRef<
                 ))}
               </ul>
               <div className="mt-auto space-y-2">
-                {p.tier === 'creator' && neverSubscribed ? (
-                  <>
-                    <Button variant="primary" className="h-10 w-full" onClick={onTrial} disabled={busy !== null} data-testid="bill-trial">
-                      {busy === 'trial' ? <Loader2 size={14} className="animate-spin" aria-hidden /> : null}
-                      {busy === 'trial' ? t('acct.bill.opening') : t('acct.bill.trial')}
-                    </Button>
-                    <button
-                      type="button"
-                      onClick={() => onSubscribe(p.tier)}
-                      disabled={busy !== null}
-                      data-testid="bill-subscribe-creator"
-                      className="min-h-[28px] w-full text-center text-caption text-ink-3 underline decoration-dotted underline-offset-2 hover:text-ink-1 disabled:opacity-50"
-                    >
-                      {t('acct.bill.noTrial')}
-                    </button>
-                  </>
-                ) : (
-                  <Button
-                    variant={current ? 'secondary' : 'primary'}
-                    className="h-10 w-full"
-                    onClick={() => onSubscribe(p.tier)}
-                    disabled={current || busy !== null}
-                    data-testid={`bill-subscribe-${p.tier}`}
-                  >
-                    {busy === p.tier ? <Loader2 size={14} className="animate-spin" aria-hidden /> : null}
-                    {busy === p.tier ? t('acct.bill.opening') : current ? t('acct.bill.currentBadge') : t('acct.bill.subscribe')}
-                  </Button>
+                <Button
+                  variant={current ? 'secondary' : 'primary'}
+                  className="h-10 w-full"
+                  onClick={() => onSubscribe(p.tier)}
+                  disabled={current || busy !== null}
+                  data-testid={`bill-subscribe-${p.tier}`}
+                >
+                  {busy === p.tier ? <Loader2 size={14} className="animate-spin" aria-hidden /> : null}
+                  {busy === p.tier ? t('acct.bill.opening') : current ? t('acct.bill.currentBadge') : t('acct.bill.subscribe')}
+                </Button>
+                {!current && (
+                  <p className="text-center text-caption text-ink-3">
+                    {t('acct.bill.autopayNote')}
+                  </p>
                 )}
               </div>
             </div>

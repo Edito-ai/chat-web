@@ -34,6 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <head>
+        <link rel="preconnect" href="https://accounts.google.com" />
+        <link rel="dns-prefetch" href="https://accounts.google.com" />
+        <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
         <Script id="meta-pixel" strategy="afterInteractive">
           {`
             !function(f,b,e,v,n,t,s)
