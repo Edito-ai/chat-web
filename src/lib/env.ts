@@ -6,3 +6,6 @@ export const GOOGLE_CLIENT_ID: string = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_I
 
 /** Where the full editor lives; the "Open in editor" link is hidden when this is empty. */
 export const EDITOR_URL: string = (process.env.NEXT_PUBLIC_EDITOR_URL || '').trim()
+
+/** The public marketing site (where the DaVinci Resolve plugin is downloaded). Override with NEXT_PUBLIC_MARKETING_URL. */
+export const MARKETING_URL: string = (process.env.NEXT_PUBLIC_MARKETING_URL || 'https://www.trybroll.com').replace(/\/+$/, '')
