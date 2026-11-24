@@ -80,32 +80,40 @@ export function GoogleButton({ onCredential, width = 300, disabled = false }: { 
   }, [width])
 
   const real = GOOGLE_CLIENT_ID !== ''
+
+  /** Click the hidden Google-rendered button so the real OAuth popup opens. */
+  const handleClick = () => {
+    if (real && state === 'ready') {
+      const inner = box.current?.querySelector('[role="button"]') as HTMLElement | null
+      inner?.click()
+    } else {
+      setSaid(t(real && state === 'failed' ? 'auth.google.blocked' : 'auth.google.notSetUp'))
+    }
+  }
+
   return (
     <div data-testid="auth-google" className="space-y-2">
+      {/* Google's own rendered button: always hidden, only used for its OAuth click handler */}
       {real && (
-        <div className={`flex justify-center transition-opacity ${state === 'ready' ? 'opacity-100' : 'hidden'} ${disabled ? 'pointer-events-none opacity-50' : ''}`}>
+        <div className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0" aria-hidden>
           <div ref={box} />
         </div>
       )}
-      {(!real || state !== 'ready') && (
-        <>
-          <button
-            type="button"
-            data-testid="auth-google-button"
-            disabled={disabled}
-            aria-busy={real && state === 'loading'}
-            onClick={() => setSaid(t(real && state === 'failed' ? 'auth.google.blocked' : 'auth.google.notSetUp'))}
-            className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-full border border-white/15 bg-white/[0.06] px-4 text-body font-semibold text-ink-0 transition-colors hover:bg-white/[0.11] disabled:opacity-50"
-          >
-            <GoogleLogo />
-            {t('auth.google')}
-          </button>
-          {said && (
-            <p role="status" data-testid="auth-google-note" className="text-center text-label text-ink-3">
-              {said}
-            </p>
-          )}
-        </>
+      <button
+        type="button"
+        data-testid="auth-google-button"
+        disabled={disabled}
+        aria-busy={real && state === 'loading'}
+        onClick={handleClick}
+        className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-full border border-white/15 bg-white/[0.06] px-4 text-body font-semibold text-ink-0 transition-colors hover:bg-white/[0.11] disabled:opacity-50"
+      >
+        <GoogleLogo />
+        {t('auth.google')}
+      </button>
+      {said && (
+        <p role="status" data-testid="auth-google-note" className="text-center text-label text-ink-3">
+          {said}
+        </p>
       )}
     </div>
   )
