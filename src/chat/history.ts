@@ -1,7 +1,7 @@
 import { apiClient } from '@/lib/apiClient'
 import { newAssistant } from './chatState'
 import { turnResult } from './versions'
-import { toSnapshot, type ChatJobWire, toSuggestions } from './chatApi'
+import { toActivity, toSnapshot, type ChatJobWire, toSuggestions } from './chatApi'
 import type { ChatAssistantMessage, ChatMessage } from './chatTypes'
 
 export type HistoryStatus = 'running' | 'complete' | 'failed'
@@ -93,7 +93,10 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
   const current = w.turn ?? 1
   const out: ChatMessage[] = []
   for (const t of w.turns ?? []) {
-    out.push({ id: `${w.id}:${t.turn}:u`, role: 'user', text: t.prompt, attachments: t.attachments ?? [] })
+    out.push({
+      id: `${w.id}:${t.turn}:u`, role: 'user', text: t.prompt, attachments: t.attachments ?? [],
+      ...((t.edits?.length ?? 0) > 0 ? { edited: true } : {}),
+    })
     out.push({
       ...newAssistant(`${w.id}:${t.turn}:a`, w.id, t.turn),
       status: t.state === 'complete' ? 'complete' : t.state === 'cancelled' ? 'cancelled' : 'failed',
@@ -102,6 +105,9 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
       durationSec: t.durationSec ?? null,
       kind: t.kind,
       suggestions: toSuggestions(t.suggestions),
+      // each turn keeps its own steps ("thinking") and its error, so an earlier turn reads as it did while it ran
+      ...(t.activity?.length ? { activity: toActivity(t.activity) } : {}),
+      ...(t.state === 'failed' && t.error ? { error: t.error } : {}),
     })
   }
   const last = out[out.length - 1]
@@ -111,6 +117,8 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
     if (prompt) out.push({ id: `${w.id}:${current}:u`, role: 'user', text: prompt, attachments: [] })
     out.push(newAssistant(`${w.id}:${current}:a`, w.id, current))
   }
+  // an open question (asked before the work started, or while it runs) stays on the newest turn after a reload
+  const question = w.remote ? null : (snap.question ?? null)
   return out.map((m): ChatMessage => {
     // an earlier finished turn plays its own video (the newest result tells where the chat's videos are)
     if (m.role === 'assistant' && m.turn !== current && m.status === 'complete' && m.kind !== 'chat' && m.kind !== 'clips' && snap.result) {
@@ -118,7 +126,7 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
       return result ? { ...m, result } : m
     }
     if (m.role !== 'assistant' || m.turn !== current) return m
-    const a: ChatAssistantMessage = m
+    const a: ChatAssistantMessage = { ...m, question }
     if (snap.status === 'complete' && (snap.result || snap.kind === 'chat' || snap.kind === 'clips')) {
       return {
         ...a, status: 'complete', result: snap.result ?? null, reply: snap.reply ?? a.reply,

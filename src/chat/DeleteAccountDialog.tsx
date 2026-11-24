@@ -6,6 +6,7 @@ import { useT } from '@/i18n'
 import { Dialog } from '@/components/Dialog'
 import { Button } from '@/components/ui'
 import { ApiError } from '@/lib/apiClient'
+import { userMessage } from '@/lib/friendlyError'
 import { accountApi } from '@/account/accountApi'
 
 /** What a refused deletion says, by the status the server answered with (the server's own sentence for the rest). */
@@ -13,9 +14,9 @@ export function deleteProblem(e: unknown): 'wrong' | 'tooMany' | { text: string 
   if (e instanceof ApiError) {
     if (e.status === 400) return 'wrong'
     if (e.status === 429) return 'tooMany'
-    return { text: e.message.replace(/^\d{3}\s+/, '') }
+    return { text: userMessage(e) }
   }
-  return { text: e instanceof Error ? e.message : String(e) }
+  return { text: userMessage(e) }
 }
 
 /**

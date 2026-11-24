@@ -95,7 +95,7 @@ describe('tour store', () => {
     useTour.getState().finish('skip')
     useTour.getState().finish('skip')
     expect(onEnd).toHaveBeenCalledTimes(1)
-    expect(useTour.getState().ui).toEqual({ drawer: false, sidebar: false, attachMenu: false, profileMenu: false })
+    expect(useTour.getState().ui).toEqual({ drawer: false, sidebar: false, profileMenu: false })
   })
 })
 

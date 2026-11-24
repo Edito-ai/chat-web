@@ -8,6 +8,7 @@ import { AlertCircle, ArrowLeft, Captions, Check, CheckCircle2, Download, Eye, F
 import { Button, InlineError } from '@/components/ui'
 import { useSession } from '@/auth/useSession'
 import { useT } from '@/i18n'
+import { shownServerText, userMessage } from '@/lib/friendlyError'
 import { uploadVideo } from './chatUploads'
 import { useChat } from './chatStore'
 import { clock, getClipsApi, sameLook, type CaptionTemplate, type ClipCaptions, type StudioLook, type StudioState } from './clips'
@@ -110,7 +111,7 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
       .catch((e) => {
         if (ctl.signal.aborted) return
         setCaptionsState('none')
-        if (captionLang !== 'original') setCaptionsProblem(e instanceof Error ? e.message : String(e))
+        if (captionLang !== 'original') setCaptionsProblem(userMessage(e))
       })
     return () => ctl.abort()
   }, [jobId, clipId, clipVersion, clipReady, captionLang])
@@ -200,7 +201,7 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
     try {
       take(await getClipsApi().setLook(jobId, clipId, draft), false)
     } catch (e) {
-      setProblem(e instanceof Error ? e.message : String(e))
+      setProblem(userMessage(e))
     } finally {
       setApplying(false)
     }
@@ -234,7 +235,7 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
       setState((s) => (s ? { ...s, uploads: [{ id: uploadId, name: file.name, durationSec: duration }, ...s.uploads] } : s))
       set((d) => ({ ...d, music: { ...d.music, source: 'upload', uploadId, trackId: undefined } }))
     } catch (e) {
-      setProblem(e instanceof Error ? e.message : String(e))
+      setProblem(userMessage(e))
     } finally {
       setUploading(false)
     }
@@ -245,7 +246,7 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
   const bar = cutting
     ? { tone: 'working' as const, title: t('chat.studio.bar.cutting'), sub: t('chat.studio.bar.cuttingSub') }
     : styled?.state === 'failed' && !working
-      ? { tone: 'failed' as const, title: t('chat.studio.failed'), sub: styled.error ?? '' }
+      ? { tone: 'failed' as const, title: t('chat.studio.failed'), sub: shownServerText(styled.error) ?? '' }
       : working
         ? { tone: 'working' as const, title: t('chat.studio.bar.rendering'), sub: t('chat.studio.bar.renderingSub') }
         : dirty

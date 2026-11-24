@@ -8,6 +8,7 @@ import { Button } from '@/components/ui'
 import { useT } from '@/i18n'
 import { useChat } from './chatStore'
 import { ShareButton } from './ShareButton'
+import { shownServerText } from '@/lib/friendlyError'
 import { clock, getClipsApi, type ClipLine } from './clips'
 import type { ChatAssistantMessage, ClipItem } from './chatTypes'
 
@@ -26,6 +27,14 @@ export function ClipsBoard({ msg }: { msg: ChatAssistantMessage }) {
         <p className="text-label text-ink-3">
           {clips.length === 1 ? t('chat.clips.foundOne') : t('chat.clips.found', { n: clips.length })}
           {source?.title ? ` · ${t('chat.clips.from', { title: source.title })}` : ''}
+          {source?.url && (
+            <>
+              {' · '}
+              <a href={source.url} target="_blank" rel="noreferrer" className="underline decoration-dotted hover:text-ink-0">
+                {source.title ? t('chat.clips.openSource') : source.url.replace(/^https?:\/\/(www\.)?/i, '').slice(0, 48)}
+              </a>
+            </>
+          )}
           {source?.durationSec ? ` · ${clock(source.durationSec)}` : ''}
         </p>
       </div>
@@ -167,7 +176,7 @@ function ClipCard({ jobId, clip, rank, sourceSec }: { jobId: string; clip: ClipI
         )}
         {(captionProblem || styled?.state === 'failed') && (
           <p role="alert" className="text-label text-danger">
-            {captionProblem ?? styled?.error ?? t('chat.clips.styleFailed')}
+            {captionProblem ?? shownServerText(styled?.error) ?? t('chat.clips.styleFailed')}
           </p>
         )}
         {styled?.state === 'ready' && styled.noWords && styled.captions === false && (

@@ -1,13 +1,20 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { GOOGLE_CLIENT_ID } from '@/lib/env'
 
 /** The slice of Google Identity Services this app uses (https://accounts.google.com/gsi/client). */
 interface GoogleId {
-  initialize: (cfg: { client_id: string; callback: (r: { credential?: string }) => void; use_fedcm_for_prompt?: boolean }) => void
+  initialize: (cfg: {
+    client_id: string
+    callback: (r: { credential?: string }) => void
+    use_fedcm_for_prompt?: boolean
+    auto_select?: boolean
+  }) => void
   renderButton: (el: HTMLElement, opts: Record<string, unknown>) => void
+  prompt?: (momentListener?: (notification: { isNotDisplayed: () => boolean; isSkippedMoment: () => boolean }) => void) => void
 }
 declare global {
   interface Window {
@@ -23,6 +30,16 @@ export function loadGoogleScript(): Promise<void> {
   if (typeof window === 'undefined') return Promise.reject(new Error('no window'))
   if (window.google?.accounts?.id) return Promise.resolve()
   loading ??= new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${SRC}"]`) as HTMLScriptElement | null
+    if (existing) {
+      if (window.google?.accounts?.id) return resolve()
+      existing.addEventListener('load', () => resolve(), { once: true })
+      existing.addEventListener('error', () => {
+        loading = null
+        reject(new Error('Google could not be loaded'))
+      }, { once: true })
+      return
+    }
     const el = document.createElement('script')
     el.src = SRC
     el.async = true
@@ -59,6 +76,7 @@ export function GoogleButton({ onCredential, width = 300, disabled = false }: { 
   const box = useRef<HTMLDivElement | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading')
   const [said, setSaid] = useState<string | null>(null)
+  const [isPrompting, setIsPrompting] = useState(false)
   const cb = useRef(onCredential)
   cb.current = onCredential
 
@@ -69,8 +87,24 @@ export function GoogleButton({ onCredential, width = 300, disabled = false }: { 
       .then(() => {
         const id = window.google?.accounts?.id
         if (!alive || !id || !box.current) return
-        id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: (r) => r.credential && cb.current(r.credential) })
-        id.renderButton(box.current, { type: 'standard', theme: 'filled_black', size: 'large', shape: 'pill', text: 'continue_with', logo_alignment: 'left', width })
+        id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (r) => {
+            setIsPrompting(false)
+            if (r.credential) cb.current(r.credential)
+          },
+          use_fedcm_for_prompt: false,
+          auto_select: false,
+        })
+        id.renderButton(box.current, {
+          type: 'standard',
+          theme: 'filled_black',
+          size: 'large',
+          shape: 'pill',
+          text: 'continue_with',
+          logo_alignment: 'left',
+          width,
+        })
         setState('ready')
       })
       .catch(() => alive && setState('failed'))
@@ -80,10 +114,50 @@ export function GoogleButton({ onCredential, width = 300, disabled = false }: { 
   }, [width])
 
   const real = GOOGLE_CLIENT_ID !== ''
+
+  const handleClickFallback = async () => {
+    if (!real) {
+      setSaid(t('auth.google.notSetUp'))
+      return
+    }
+    if (state === 'failed') {
+      setSaid(t('auth.google.blocked'))
+      return
+    }
+    setIsPrompting(true)
+    try {
+      await loadGoogleScript()
+      const id = window.google?.accounts?.id
+      if (id) {
+        id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (r) => {
+            setIsPrompting(false)
+            if (r.credential) cb.current(r.credential)
+          },
+          use_fedcm_for_prompt: false,
+          auto_select: false,
+        })
+        id.prompt?.((notification) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            setIsPrompting(false)
+          }
+        })
+      }
+    } catch {
+      setSaid(t('auth.google.blocked'))
+      setIsPrompting(false)
+    }
+  }
+
   return (
-    <div data-testid="auth-google" className="space-y-2">
+    <div data-testid="auth-google" className="relative space-y-2">
       {real && (
-        <div className={`flex justify-center transition-opacity ${state === 'ready' ? 'opacity-100' : 'hidden'} ${disabled ? 'pointer-events-none opacity-50' : ''}`}>
+        <div
+          className={`flex justify-center transition-opacity duration-150 ${
+            state === 'ready' ? 'opacity-100' : 'pointer-events-none absolute inset-0 opacity-0'
+          } ${disabled || isPrompting ? 'pointer-events-none opacity-50' : ''}`}
+        >
           <div ref={box} />
         </div>
       )}
@@ -92,12 +166,12 @@ export function GoogleButton({ onCredential, width = 300, disabled = false }: { 
           <button
             type="button"
             data-testid="auth-google-button"
-            disabled={disabled}
-            aria-busy={real && state === 'loading'}
-            onClick={() => setSaid(t(real && state === 'failed' ? 'auth.google.blocked' : 'auth.google.notSetUp'))}
+            disabled={disabled || isPrompting}
+            aria-busy={real && (state === 'loading' || isPrompting)}
+            onClick={handleClickFallback}
             className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-full border border-white/15 bg-white/[0.06] px-4 text-body font-semibold text-ink-0 transition-colors hover:bg-white/[0.11] disabled:opacity-50"
           >
-            <GoogleLogo />
+            {isPrompting ? <Loader2 size={18} className="animate-spin text-ink-2" /> : <GoogleLogo />}
             {t('auth.google')}
           </button>
           {said && (

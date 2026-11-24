@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import { Search } from 'lucide-react'
 import { useId, useMemo, useState, type FormEvent } from 'react'
 import { useT, type MessageKey } from '@/i18n'
+import { userMessage } from '@/lib/friendlyError'
 import { Button, InlineError } from '@/components/ui'
 import { Dialog } from '@/components/Dialog'
 import { accountApi } from '../accountApi'
@@ -72,7 +73,7 @@ function ContactForm() {
       const ticket = await accountApi().createTicket({ category, severity, subject: subject.trim(), message: message.trim() })
       setRef(ticket.reference)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(userMessage(err))
     } finally {
       setSending(false)
     }

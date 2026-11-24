@@ -34,7 +34,7 @@ describe('clips: wire mapping and helpers', () => {
     expect(snap.status).toBe('complete')
     expect(snap.result).toBeNull()
     expect(snap.clips?.map((c) => [c.id, c.score, c.durationSec])).toEqual([['c01', 90, 30], ['c02', 50, 30]])
-    expect(snap.source).toEqual({ kind: 'upload', title: 'my stream', durationSec: 7200 })
+    expect(snap.source).toEqual({ kind: 'upload', title: 'my stream', durationSec: 7200, url: null })
   })
 
   it('drops malformed clips and fills safe defaults', () => {
@@ -57,8 +57,9 @@ describe('clips: wire mapping and helpers', () => {
 
   it('formats times and clamps options', () => {
     expect([clock(0), clock(75), clock(3725)]).toEqual(['0:00', '1:15', '1:02:05'])
-    expect(clampOptions({ count: 99, minSec: 300, maxSec: 2 })).toEqual({ count: 20, minSec: 10, maxSec: 15 })
-    expect(clampOptions({})).toEqual({ count: 12, minSec: 20, maxSec: 75 })
+    expect(clampOptions({ count: 99, minSec: 300, maxSec: 2 })).toEqual({ count: 20, minSec: 10, maxSec: 15, liveMin: 30 })
+    expect(clampOptions({})).toEqual({ count: 12, minSec: 20, maxSec: 75, liveMin: 30 })
+    expect(clampOptions({ liveMin: 500 }).liveMin).toBe(60)
   })
 })
 
@@ -86,62 +87,20 @@ afterEach(() => {
 })
 
 describe('chat store: clipping', () => {
-  it('sends an uploaded stream as a clips job with the options, then shows the clips when done', async () => {
+  it('a prompt starts the chat; when the backend makes it a clips chat the clips show once done (no clips fields are sent)', async () => {
     let polls = 0
     const api = fakeChatApi(async () => toSnapshot((++polls < 2 ? clipsWire('analyzing') : clipsWire('complete', [wireClip('c01', 10, 40)])) as never))
     setChatApi(api)
     useChat.setState({
-      clipsMode: true, projectId: 'proj-1',
+      projectId: 'proj-1',
       attachments: [{ id: 'a1', name: 'stream.mp4', state: 'ready', progress: 1, videoId: 'v1', error: null }],
     })
-    useChat.getState().setClipsOptions({ count: 8 })
     expect(await useChat.getState().send('only the funny moments')).toBeNull()
-    expect(api.createJob).toHaveBeenCalledWith(expect.objectContaining({
-      kind: 'clips', videoIds: ['v1'], prompt: 'only the funny moments', clips: { count: 8, minSec: 20, maxSec: 75 },
-    }))
-    expect(api.createJob.mock.calls[0]![0].sourceUrl).toBeUndefined()
-    expect(useChat.getState().clipsMode).toBe(false) // one run per switch-on
-    expect(useChat.getState().attachments).toEqual([])
+    expect(api.createJob).toHaveBeenCalledWith({ projectId: 'proj-1', videoIds: ['v1'], prompt: 'only the funny moments' })
     await vi.advanceTimersByTimeAsync(POLL_MS * 3)
     const a = useChat.getState().messages.find((m) => m.role === 'assistant') as ChatAssistantMessage
     expect(a).toMatchObject({ status: 'complete', kind: 'clips' })
     expect(a.clips?.map((c) => c.id)).toEqual(['c01'])
-  })
-
-  it('takes a link from the text when nothing is uploaded, and asks for the stream when there is neither', async () => {
-    const api = fakeChatApi(async () => toSnapshot(clipsWire('analyzing') as never))
-    setChatApi(api)
-    useChat.setState({ clipsMode: true, projectId: 'proj-1' })
-    expect(await useChat.getState().send('funny bits')).toBe('noStream')
-    expect(api.createJob).not.toHaveBeenCalled()
-    expect(await useChat.getState().send('https://www.twitch.tv/videos/123 funny bits')).toBeNull()
-    expect(api.createJob).toHaveBeenCalledWith(expect.objectContaining({
-      kind: 'clips', videoIds: [], sourceUrl: 'https://www.twitch.tv/videos/123', prompt: 'funny bits',
-    }))
-  })
-
-  it('waits for an upload, and a clipping run starts its own chat (the old transcript is not mixed in)', async () => {
-    setChatApi(fakeChatApi(async () => toSnapshot(clipsWire('analyzing') as never)))
-    useChat.setState({
-      clipsMode: true, projectId: 'proj-1', jobId: 'old-edit', canFollowUp: true,
-      messages: [{ id: 'u0', role: 'user', text: 'old', attachments: [] }],
-      attachments: [{ id: 'a1', name: 's.mp4', state: 'uploading', progress: 0.3, videoId: null, error: null }],
-    })
-    expect(await useChat.getState().send('')).toBe('uploading')
-    useChat.setState({ attachments: [{ id: 'a1', name: 's.mp4', state: 'ready', progress: 1, videoId: 'v1', error: null }] })
-    expect(await useChat.getState().send('')).toBeNull()
-    const msgs = useChat.getState().messages
-    expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant'])
-    expect(msgs[0]).toMatchObject({ text: 'Find the best clips', attachments: ['s.mp4'] })
-    expect(useChat.getState().jobId).toBe('clip-job')
-  })
-
-  it('switches to clip mode by itself for a stream-length video from the library (new chat only)', () => {
-    useChat.getState().attachFromLibrary([{ id: 'v9', name: 'stream.mp4', durationSec: 3 * 3600, projectId: 'p9', createdAt: 'x' }])
-    expect(useChat.getState().clipsMode).toBe(true)
-    useChat.getState().reset()
-    useChat.getState().attachFromLibrary([{ id: 'v8', name: 'short.mp4', durationSec: 40, projectId: 'p9', createdAt: 'x' }])
-    expect(useChat.getState().clipsMode).toBe(false)
   })
 
   it('trims a clip: shows it cutting, then the new clip; a refusal puts the old one back and says why', async () => {

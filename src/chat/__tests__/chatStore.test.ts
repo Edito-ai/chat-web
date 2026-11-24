@@ -262,6 +262,44 @@ describe('chat store: polling, cancel, failure', () => {
     expect(useChat.getState().messages.at(-1)).toMatchObject({ status: 'failed', error: 'No speech found' })
   })
 
+  it('a message after a failed job starts the new job in the SAME chat (chatId), not a new one', async () => {
+    const api = fakeApi(async (id) => ({ ...running(id), status: 'failed' as const, error: 'The edit stopped responding.' }))
+    await started(api)
+    await tick(0)
+    expect(useChat.getState().canFollowUp).toBe(false)
+    api.createJob.mockResolvedValueOnce(running('job-1', 0.1, 2))
+    expect(await useChat.getState().send('try again')).toBeNull()
+    expect(api.followUp).not.toHaveBeenCalled()
+    expect(api.createJob).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: 'try again', chatId: 'job-1', videoIds: ['remote-a.mp4'] }))
+    const msgs = useChat.getState().messages
+    expect(msgs.filter((m) => m.role === 'user').map((m) => (m.role === 'user' ? m.text : ''))).toEqual(['go', 'try again'])
+    expect(msgs.at(-1)).toMatchObject({ role: 'assistant', jobId: 'job-1', turn: 2 })
+  })
+
+  it('a reply that takes no follow-up (canFollowUp false) also keeps the next message in the same chat', async () => {
+    const reply: ChatJobSnapshot = {
+      ...base, videoIds: [], jobId: 'job-1', status: 'complete', stage: null, progress: 1, result: null, canFollowUp: false, kind: 'chat',
+      reply: 'Hi!',
+    }
+    const api = fakeApi(async () => reply)
+    setChatApi(api)
+    await useChat.getState().send('hi')
+    await tick(2500)
+    await useChat.getState().send('make a promo')
+    expect(api.createJob).toHaveBeenCalledTimes(2)
+    expect(api.createJob.mock.calls[0]![0]).not.toHaveProperty('chatId')
+    expect(api.createJob.mock.calls[1]![0]).toMatchObject({ prompt: 'make a promo', chatId: 'job-1' })
+  })
+
+  it('a new chat never carries the old chat id', async () => {
+    const api = fakeApi(async (id) => ({ ...running(id), status: 'failed' as const, error: 'x' }))
+    await started(api)
+    await tick(0)
+    await useChat.getState().newChat()
+    await useChat.getState().send('hello')
+    expect(api.createJob.mock.calls.at(-1)![0]).not.toHaveProperty('chatId')
+  })
+
   it('tolerates a few failed polls, then reports lost contact and Retry resumes', async () => {
     let healthy = false
     const api = fakeApi(async (id) => {
@@ -385,5 +423,141 @@ describe('chat store: new chat', () => {
     await useChat.getState().newChat()
     expect(api.cancelJob).toHaveBeenCalledWith('job-1')
     expect(useChat.getState()).toMatchObject({ messages: [], projectId: null, attachments: [] })
+  })
+})
+
+describe('chat store: edit, retry, queue, stop and send', () => {
+  async function runningJob(api: ReturnType<typeof fakeApi>) {
+    setChatApi(api)
+    await useChat.getState().attach([file('a.mp4')])
+    await tick(0)
+    await useChat.getState().send('make it punchy')
+    await tick(0)
+  }
+
+  it('editing the last message while it runs replaces that turn and keeps watching the job', async () => {
+    const api = { ...fakeApi(async (id) => running(id)), editTurn: vi.fn(async (id: string) => ({ ...running(id, 0), message: 'Stopping' })) }
+    await runningJob(api)
+    const userId = useChat.getState().messages[0]!.id
+    expect(await useChat.getState().editMessage(userId, 'make it calm')).toBeNull()
+    expect(api.editTurn).toHaveBeenCalledWith('job-1', 1, 'make it calm')
+    const msgs = useChat.getState().messages
+    expect(msgs).toHaveLength(2)
+    expect(msgs[0]).toMatchObject({ role: 'user', text: 'make it calm', edited: true })
+    expect(msgs[1]).toMatchObject({ role: 'assistant', jobId: 'job-1', turn: 1, status: 'running' })
+  })
+
+  it('only the last message can be edited', async () => {
+    const api = { ...fakeApi(async (id) => complete(id)), editTurn: vi.fn(async (id: string) => running(id)) }
+    await runningJob(api)
+    await useChat.getState().send('captions bigger')
+    await tick(0)
+    const first = useChat.getState().messages[0]!.id
+    expect(await useChat.getState().editMessage(first, 'x')).toMatch(/last message/)
+    expect(api.editTurn).not.toHaveBeenCalled()
+  })
+
+  it('a run on another server is stopped first, then the edit is sent again', async () => {
+    let stopped = false
+    const api = {
+      ...fakeApi(async (id) => (stopped ? { ...running(id), status: 'cancelled' as const } : running(id))),
+      editTurn: vi.fn(async (id: string) => {
+        if (!stopped) {
+          const e = new ApiError(409, '409 stop first')
+          e.code = 'stop_first'
+          throw e
+        }
+        return running(id, 0)
+      }),
+    }
+    api.cancelJob.mockImplementation(async (id: string) => {
+      stopped = true
+      return { ...running(id), status: 'cancelled' as const }
+    })
+    await runningJob(api)
+    const userId = useChat.getState().messages[0]!.id
+    const done = useChat.getState().editMessage(userId, 'make it calm')
+    await tick(POLL_MS * 2)
+    expect(await done).toBeNull()
+    expect(api.cancelJob).toHaveBeenCalledWith('job-1')
+    expect(api.editTurn).toHaveBeenCalledTimes(2)
+  })
+
+  it('retry replaces a failed answer and polls the new run', async () => {
+    const api = {
+      ...fakeApi(async (id) => ({ ...running(id), status: 'failed' as const, error: 'boom' })),
+      retryTurn: vi.fn(async (id: string) => running(id, 0.1)),
+    }
+    await runningJob(api)
+    const failed = useChat.getState().messages[1]!
+    expect(failed).toMatchObject({ status: 'failed' })
+    api.getJob.mockImplementation(async (id: string) => running(id, 0.2))
+    await useChat.getState().retryTurn(failed.id)
+    const now = useChat.getState().messages[1]!
+    expect(api.retryTurn).toHaveBeenCalledWith('job-1')
+    expect(now.id).not.toBe(failed.id)
+    expect(now).toMatchObject({ role: 'assistant', status: 'running' })
+  })
+
+  it('a message typed while a turn runs waits in the queue and goes out when the turn completes', async () => {
+    const polls = [running('job-1', 0.5), complete('job-1')]
+    const api = fakeApi(async (id) => polls.shift() ?? complete(id))
+    await runningJob(api)
+    expect(await useChat.getState().send('captions bigger')).toBeNull() // no mode while busy: nothing happens
+    expect(useChat.getState().queue).toEqual([])
+    expect(await useChat.getState().send('captions bigger', 'queue')).toBeNull()
+    expect(useChat.getState().queue.map((q) => q.text)).toEqual(['captions bigger'])
+    await tick(POLL_MS)
+    await tick(POLL_MS)
+    await tick(0)
+    expect(api.followUp).toHaveBeenCalledWith('job-1', 'captions bigger', undefined, [])
+    expect(useChat.getState().queue).toEqual([])
+  })
+
+  it('Stop drops the waiting messages', async () => {
+    const api = fakeApi(async (id) => running(id))
+    await runningJob(api)
+    await useChat.getState().send('later', 'queue')
+    await useChat.getState().cancel()
+    expect(useChat.getState().queue).toEqual([])
+  })
+
+  it('stop and send: the running turn shows stopped and the new message is the next turn', async () => {
+    const api = { ...fakeApi(async (id) => running(id)), interrupt: vi.fn(async (id: string) => ({ ...running(id, 0), status: 'queued' as const })) }
+    await runningJob(api)
+    expect(await useChat.getState().send('and make it 30 seconds', 'interrupt')).toBeNull()
+    expect(api.interrupt).toHaveBeenCalledWith('job-1', 'and make it 30 seconds')
+    const msgs = useChat.getState().messages
+    expect(msgs.map((m) => (m.role === 'user' ? m.text : `${m.status}:${m.turn}`))).toEqual([
+      'make it punchy', 'cancelled:1', 'and make it 30 seconds', 'queued:2',
+    ])
+  })
+})
+
+describe('chat store: the message shows at once', () => {
+  it('the message and a typing bubble show while the server reads it; the bubble becomes the answer', async () => {
+    let answer!: (s: ChatJobSnapshot) => void
+    const api = fakeApi(async (id) => running(id))
+    api.createJob.mockImplementationOnce(() => new Promise<ChatJobSnapshot>((r) => { answer = r }))
+    setChatApi(api)
+    const sent = useChat.getState().send('hi')
+    await tick(0)
+    const during = useChat.getState().messages
+    expect(during.map((m) => m.role)).toEqual(['user', 'assistant'])
+    expect(during[1]).toMatchObject({ kind: 'chat', status: 'queued', jobId: '' })
+    answer({ ...running('job-1'), kind: 'chat', videoIds: [] })
+    await sent
+    const after = useChat.getState().messages
+    expect(after).toHaveLength(2)
+    expect(after[0]).toMatchObject({ role: 'user', text: 'hi' })
+    expect(after[1]).toMatchObject({ role: 'assistant', jobId: 'job-1' })
+  })
+
+  it('a refused send takes the message and the typing bubble away again', async () => {
+    const api = fakeApi(async (id) => running(id))
+    api.createJob.mockRejectedValueOnce(new ApiError(500, '500 boom'))
+    setChatApi(api)
+    await useChat.getState().send('hi')
+    expect(useChat.getState().messages).toEqual([])
   })
 })

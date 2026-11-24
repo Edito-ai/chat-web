@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { turnResult } from './versions'
 import { useAuth } from '@/auth/authStore'
 import { ApiError } from '@/lib/apiClient'
+import { userMessage } from '@/lib/friendlyError'
 import { getChatApi, toSnapshot, type LibraryVideo } from './chatApi'
 import { createChatProject, deleteAsset, uploadPicture, uploadVideo } from './chatUploads'
 import { looksLikeVideo, probeVideo, type VideoProbe } from './probe'
@@ -10,14 +11,13 @@ import { shapeFor } from './projectShape'
 import {
   activeAssistant, applySnapshot, capMessages, finishLocally, isTerminal, lastCompleted, newAssistant,
 } from './chatState'
-import type { ChatJobSnapshot, ChatMessage, ClipItem, ClipOptions } from './chatTypes'
-import { clampOptions, DEFAULT_CLIP_OPTIONS, getClipsApi, LONG_STREAM_SEC, splitLink, type ClipPatch } from './clips'
+import type { ChatAssistantMessage, ChatJobSnapshot, ChatMessage, ChatQuestion, ClipItem, QuestionAnswer, QueuedMessage } from './chatTypes'
+import { getClipsApi, type ClipPatch } from './clips'
 
 /** How often a clip's render (captions / music / effects) is checked, and for how long at most. */
 export const STYLE_POLL_MS = 2000
 const STYLE_MAX_POLLS = 150
 import { getHistoryApi, rebuildMessages, toHistoryItem, type HistoryItem } from './history'
-import { useStyles } from './styles'
 import { getMusicApi, type MusicChoice } from './music'
 
 /** Time between polls; a failing poll backs off (x2 per miss) up to MAX_BACKOFF_MS. */
@@ -37,8 +37,6 @@ export interface ChatAttachment {
   error: string | null
   /** Picked from the library. (Uploads stay in the library too: removing a chip only detaches it.) */
   fromLibrary?: boolean
-  /** Not footage to edit: a video whose look is read into a saved style (backend2). */
-  reference?: boolean
 }
 
 /** A picture (a logo, a photo) the message places in the video. One per message. */
@@ -52,7 +50,7 @@ export interface ChatPicture {
 }
 
 /** Why a send could not start; the screen maps the code to copy. */
-export type ChatSendProblem = 'noVideo' | 'noPrompt' | 'uploading' | 'uploadFailed' | 'twoReferences' | 'noStream'
+export type ChatSendProblem = 'noVideo' | 'noPrompt' | 'uploading' | 'uploadFailed'
 
 const PICTURE_NAME = /\.(jpe?g|png|webp)$/i
 /** A still picture (not a video): it goes to the placement, never to the footage list. */
@@ -70,6 +68,8 @@ interface ChatState {
   jobId: string | null
   /** Latest `canFollowUp` from the backend. */
   canFollowUp: boolean
+  /** The open chat was made on the other server (`prod` / `dev`): read only. */
+  remote: string | null
   /** Videos the job edits, so a retry after a failed first turn does not need a re-upload. */
   videoIds: string[]
   messages: ChatMessage[]
@@ -78,13 +78,6 @@ interface ChatState {
   pictures: ChatPicture[]
   /** The job that is waiting for the answer about where a picture goes (the next message is that answer); null = none. */
   placementJobId: string | null
-  /** A link (Instagram reel, YouTube short ...) whose look the next message copies; null = none. */
-  referenceLink: string | null
-  /** The next message cuts the best clips out of a long stream (the attached video, or a link in the text) instead of editing. */
-  clipsMode: boolean
-  clipsOptions: ClipOptions
-  setClipsMode: (on: boolean) => void
-  setClipsOptions: (o: Partial<ClipOptions>) => void
   /** New bounds / title for one clip of a clipping chat. Resolves with the reason when it fails. */
   trimClip: (jobId: string, clipId: string, patch: ClipPatch) => Promise<string | null>
   /** One click: burn captions into a clip (default style) and follow the render. Resolves with the reason when it fails. */
@@ -115,15 +108,28 @@ interface ChatState {
   /** Adds library videos to the next message. They all belong to one project; the chat moves there if it has no footage yet. */
   attachFromLibrary: (items: LibraryVideo[]) => void
   removeAttachment: (id: string) => void
-  /** Mark / unmark an attached video as a style reference. */
-  toggleReference: (id: string) => void
-  /** Attach videos that are style references from the start (the "new style from a reference" entry). */
-  attachReference: (files: File[]) => Promise<void>
-  send: (prompt: string) => Promise<ChatSendProblem | null>
+  /**
+   * Send a message. While a turn runs, `whenBusy` says what the message does: 'queue' = sent by itself when the turn
+   * finishes, 'interrupt' = stop the turn and do this instead (the work done so far is reused). Without it nothing is sent.
+   */
+  send: (prompt: string, whenBusy?: 'queue' | 'interrupt') => Promise<ChatSendProblem | null>
+  /** Messages typed while a turn ran, sent one by one as turns finish (persisted with the chat). */
+  queue: QueuedMessage[]
+  removeQueued: (id: string) => void
+  /** Change the last message the person sent (also while it runs). Resolves with the reason when it could not be changed. */
+  editMessage: (messageId: string, text: string) => Promise<string | null>
+  /** Run the last message again (its turn failed or was stopped). */
+  retryTurn: (assistantId: string) => Promise<void>
   /** Changes the music of the finished video (backend2): a new turn that only re-mixes the sound. `label` is the line shown as the person's message. */
   changeMusic: (choice: MusicChoice, label: string) => Promise<void>
   cancel: () => Promise<void>
-  setReferenceLink: (url: string | null) => void
+  /**
+   * Answer the question the backend asked (the card under the assistant's message). Resolves `null` when it was taken,
+   * `'stale'` when the question was no longer open (the chat is refreshed), or the reason when it failed (the card stays).
+   */
+  answerQuestion: (jobId: string, body: QuestionAnswer, label?: string) => Promise<string | null>
+  /** Upload the video / photo that answers a question; resolves with its asset id (`videoId` of the answer). Rejects with the reason. */
+  uploadForAnswer: (file: File, onProgress?: (fraction: number) => void) => Promise<string>
   /** The user picked a template on offer (or `null` = none of them): it leaves the screen at once, the server carries on. */
   chooseLook: (jobId: string, lookId: string | null) => Promise<void>
   /** The final frames are fine: render the video (a change is typed in the composer instead). */
@@ -182,6 +188,7 @@ function absorb(snap: ChatJobSnapshot): void {
   useChat.setState((s) => ({
     jobId: snap.jobId,
     canFollowUp: snap.canFollowUp,
+    remote: snap.remote ?? null,
     videoIds: snap.videoIds.length > 0 ? snap.videoIds : s.videoIds,
     projectId: snap.projectId ?? s.projectId,
     // the job waits for a typed answer: where a picture goes, or what to change on the final frames
@@ -208,7 +215,7 @@ async function attachPicture(file: File): Promise<void> {
     const assetId = await uploadPicture(projectId, file)
     setPicture(id, { state: 'ready', assetId })
   } catch (e) {
-    setPicture(id, { state: 'failed', error: e instanceof Error ? e.message : String(e) })
+    setPicture(id, { state: 'failed', error: userMessage(e) })
   }
 }
 
@@ -252,7 +259,7 @@ async function runUpload(id: string, projectId: string, file: File, probe: Video
     if (ctl.signal.aborted) return void deleteAsset(videoId)
     patchAttachment(id, { state: 'ready', progress: 1, videoId, error: null })
   } catch (e) {
-    if (!ctl.signal.aborted) patchAttachment(id, { state: 'failed', error: e instanceof Error ? e.message : String(e) })
+    if (!ctl.signal.aborted) patchAttachment(id, { state: 'failed', error: userMessage(e) })
   } finally {
     if (uploads.get(id) === ctl) uploads.delete(id)
   }
@@ -274,14 +281,14 @@ async function pollJob(jobId: string): Promise<void> {
       absorb(snap)
       if (isTerminal(snap.status)) {
         void useChat.getState().loadHistory()
-        void useStyles.getState().load() // a reference may have just become a saved style
+        if (snap.status === 'complete') queueMicrotask(() => void drainQueue())
         break
       }
     } catch (e) {
       if (ctl.signal.aborted) return
       // The server answered "no such job / not yours": retrying cannot help.
       if (e instanceof ApiError && (e.status === 404 || e.status === 403)) {
-        useChat.setState((s) => ({ messages: finishLocally(s.messages, jobId, 'failed', e.message) }))
+        useChat.setState((s) => ({ messages: finishLocally(s.messages, jobId, 'failed', userMessage(e)) }))
         break
       }
       misses++
@@ -295,52 +302,51 @@ async function pollJob(jobId: string): Promise<void> {
   if (pollCtl === ctl) pollCtl = null
 }
 
-/**
- * Clipping a stream (backend2): the attached video, else the first link in the text, becomes a NEW chat of kind `clips`
- * (never a turn of the chat on screen). The rest of the text is the focus ("only the funny moments").
- */
-async function sendClips(rawPrompt: string): Promise<ChatSendProblem | null> {
-  const s0 = useChat.getState()
-  if (s0.busy || activeAssistant(s0.messages)) return null
-  const { url, rest } = splitLink(rawPrompt)
-  const videos = s0.attachments.filter((a) => !a.reference)
-  if (videos.some((a) => a.state === 'uploading')) return 'uploading'
-  if (videos.some((a) => a.state === 'failed' || !a.videoId)) return 'uploadFailed'
-  if (videos.length === 0 && !url) return 'noStream'
-  useChat.setState({ busy: true, actionError: null })
-  try {
-    let projectId = s0.projectId
-    if (!projectId) {
-      projectId = await createChatProject(shapeFor(null, null))
-      useChat.setState({ projectId, userId: currentUserId() })
+/** The next queued message goes out once nothing runs (a turn completed). A refused one goes back to the front of the line. */
+async function drainQueue(): Promise<void> {
+  const s = useChat.getState()
+  const next = s.queue[0]
+  if (!next || s.busy || activeAssistant(s.messages)) return
+  useChat.setState({ queue: s.queue.slice(1) })
+  const problem = await s.send(next.text)
+  if (problem) useChat.setState((cur) => ({ queue: [next, ...cur.queue] }))
+}
+
+/** The server's code for "that run is not on this server: stop it, then ask again". */
+const stopFirst = (e: unknown): boolean => e instanceof ApiError && e.status === 409 && (e.code === 'stop_first' || e.code === 'unsupported')
+
+/** Stop the running turn and wait (up to ~90 s) until the server says it has ended. */
+async function stopAndWait(jobId: string): Promise<void> {
+  await useChat.getState().cancel()
+  const ctl = new AbortController()
+  for (let i = 0; i < 45; i++) {
+    try {
+      const snap = await getChatApi().getJob(jobId)
+      if (isTerminal(snap.status)) {
+        absorb(snap)
+        return
+      }
+    } catch {
+      // try again
     }
-    const snap = await getChatApi().createJob({
-      projectId, videoIds: videos.length > 0 ? [videos[0]!.videoId!] : [], prompt: rest, kind: 'clips',
-      ...(videos.length === 0 && url ? { sourceUrl: url } : {}), clips: s0.clipsOptions,
-    })
-    const user: ChatMessage = {
-      id: newId(), role: 'user', text: rawPrompt.trim() || 'Find the best clips', attachments: videos.slice(0, 1).map((a) => a.name),
-    }
-    const fresh = s0.jobId !== null && s0.jobId !== snap.jobId
-    useChat.setState((s) => ({
-      messages: applySnapshot(capMessages([...(fresh ? [] : s.messages), user, newAssistant(newId(), snap.jobId, snap.turn)]), snap),
-      attachments: [], referenceLink: null, clipsMode: false, userId: currentUserId(),
-    }))
-    absorb(snap)
-    if (!isTerminal(snap.status)) void pollJob(snap.jobId)
-    void useChat.getState().loadHistory()
-  } catch (e) {
-    useChat.setState({ actionError: e })
-  } finally {
-    useChat.setState({ busy: false })
+    await sleep(POLL_MS, ctl.signal)
+  }
+}
+
+/** The newest assistant message that carries an open question (the one the card is under). */
+export function openQuestion(messages: readonly ChatMessage[]): { jobId: string; question: ChatQuestion } | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!
+    if (m.role === 'assistant' && m.question) return { jobId: m.jobId, question: m.question }
   }
   return null
 }
 
 const EMPTY_CHAT = {
   messages: [] as ChatMessage[], attachments: [] as ChatAttachment[], pictures: [] as ChatPicture[], placementJobId: null as string | null,
-  referenceLink: null as string | null, projectId: null, jobId: null,
-  canFollowUp: false, videoIds: [] as string[], actionError: null, pollLostJobId: null, clipsMode: false,
+  projectId: null, jobId: null,
+  canFollowUp: false, remote: null as string | null, videoIds: [] as string[], actionError: null, pollLostJobId: null,
+  queue: [] as QueuedMessage[],
 }
 
 export const useChat = create<ChatState>()(
@@ -350,22 +356,18 @@ export const useChat = create<ChatState>()(
       projectId: null,
       jobId: null,
       canFollowUp: false,
+      remote: null,
       videoIds: [],
       messages: [],
       attachments: [],
       pictures: [],
       placementJobId: null,
-      referenceLink: null,
-      clipsMode: false,
-      clipsOptions: DEFAULT_CLIP_OPTIONS,
+      queue: [],
       busy: false,
       actionError: null,
       pollLostJobId: null,
       history: [],
       historyState: 'idle',
-
-      setClipsMode: (on) => set({ clipsMode: on, actionError: null }),
-      setClipsOptions: (o) => set((s) => ({ clipsOptions: clampOptions({ ...s.clipsOptions, ...o }) })),
 
       trimClip: async (jobId, clipId, patch) => {
         const before = get().messages.find((m) => m.role === 'assistant' && m.jobId === jobId && m.kind === 'clips')
@@ -377,7 +379,7 @@ export const useChat = create<ChatState>()(
           return null
         } catch (e) {
           if (old) setClips(jobId, old)
-          return e instanceof Error ? e.message : String(e)
+          return userMessage(e)
         }
       },
 
@@ -394,7 +396,7 @@ export const useChat = create<ChatState>()(
           if (st.clip.styled?.state === 'failed') return st.clip.styled.error ?? 'failed'
           return null
         } catch (e) {
-          return e instanceof Error ? e.message : String(e)
+          return userMessage(e)
         }
       },
 
@@ -448,7 +450,7 @@ export const useChat = create<ChatState>()(
           const snap = toSnapshot(wire)
           set({
             ...EMPTY_CHAT, messages, jobId: wire.id, projectId: wire.projectId ?? null, userId: currentUserId(),
-            canFollowUp: snap.canFollowUp, videoIds: snap.videoIds,
+            canFollowUp: snap.canFollowUp, remote: snap.remote ?? null, videoIds: snap.videoIds,
           })
           if (!isTerminal(snap.status)) void pollJob(wire.id)
         } catch (e) {
@@ -497,8 +499,6 @@ export const useChat = create<ChatState>()(
                 })),
               ],
             }))
-            // A stream-length video in a new chat: cutting clips is almost surely what is wanted (one tap turns it off).
-            if (!get().jobId && probed.some((p) => (p.probe.duration ?? 0) >= LONG_STREAM_SEC)) set({ clipsMode: true })
             // Uploads run in the background; the screen shows each chip's progress and Send waits for them.
             for (const i of items) void runUpload(i.id, projectId, i.file, i.probe)
           }
@@ -521,9 +521,7 @@ export const useChat = create<ChatState>()(
         set((s) => {
           const have = new Set(s.attachments.map((a) => a.videoId))
           const fresh = items.filter((i) => !have.has(i.id))
-          const long = !s.jobId && fresh.some((i) => i.durationSec >= LONG_STREAM_SEC)
           return {
-            ...(long ? { clipsMode: true } : {}),
             // A chat with no footage yet has nothing tied to its project, so it moves to the picked videos' project.
             projectId: s.videoIds.length === 0 && s.attachments.length === 0 ? items[0]!.projectId : s.projectId,
             actionError: null,
@@ -548,23 +546,17 @@ export const useChat = create<ChatState>()(
         void att
       },
 
-      attachReference: async (files) => {
-        const before = new Set(get().attachments.map((a) => a.id))
-        await get().attach(files.slice(0, 1))
-        set((s) => ({ attachments: s.attachments.map((a) => (before.has(a.id) ? a : { ...a, reference: true })) }))
-      },
-
-      toggleReference: (id) =>
-        set((s) => ({ attachments: s.attachments.map((a) => (a.id === id ? { ...a, reference: !a.reference } : a)) })),
-
-      send: async (rawPrompt) => {
+      send: async (rawPrompt, whenBusy) => {
         const s0 = get()
-        if (s0.clipsMode) return sendClips(rawPrompt)
-        const refs = s0.attachments.filter((a) => a.reference)
-        const refLink = s0.referenceLink?.trim() || null
-        // A reference on its own is a request to save its style: no words needed.
-        const prompt =
-          rawPrompt.trim() || ((refs.length > 0 || refLink) && s0.attachments.length === refs.length ? 'Save this style' : '')
+        const prompt = rawPrompt.trim()
+        // The backend asked a question: a typed line (nothing attached) is its answer, not a new turn.
+        const asked = openQuestion(s0.messages)
+        if (asked && !s0.remote && prompt && s0.attachments.length === 0 && s0.pictures.length === 0) {
+          const problem = await get().answerQuestion(
+            asked.jobId, { questionId: asked.question.id, optionIds: [], text: prompt, videoId: null, link: null }, prompt,
+          )
+          return problem === null || problem === 'stale' ? null : 'noPrompt'
+        }
         // The job is waiting for where a picture goes: this message is the answer, not a new turn.
         if (s0.placementJobId && rawPrompt.trim() && s0.attachments.length === 0 && s0.pictures.length === 0) {
           const answer = rawPrompt.trim()
@@ -581,9 +573,43 @@ export const useChat = create<ChatState>()(
           }
           return null
         }
-        if (s0.busy || activeAssistant(s0.messages)) return null
+        const running = activeAssistant(s0.messages)
+        if (running && whenBusy && !s0.busy) {
+          if (!prompt) return 'noPrompt'
+          if (whenBusy === 'queue') {
+            set((s) => ({ queue: [...s.queue, { id: newId(), text: prompt }] }))
+            return null
+          }
+          const api = getChatApi()
+          const withFiles = s0.attachments.length > 0 || s0.pictures.length > 0
+          if (api.interrupt && !withFiles && !s0.remote) {
+            set({ busy: true, actionError: null })
+            try {
+              const snap = await api.interrupt(running.jobId, prompt)
+              const user: ChatMessage = { id: newId(), role: 'user', text: prompt, attachments: [] }
+              set((s) => ({
+                messages: capMessages([
+                  ...finishLocally(s.messages, running.jobId, 'cancelled'), user, newAssistant(newId(), running.jobId, running.turn + 1),
+                ]),
+              }))
+              absorb(snap)
+              if (!pollCtl) void pollJob(running.jobId)
+              return null
+            } catch (e) {
+              if (!stopFirst(e)) {
+                set({ actionError: e })
+                return null
+              }
+            } finally {
+              set({ busy: false })
+            }
+          }
+          // files ride along, or the run is not on this server: stop it, wait for the end, then send as usual
+          await stopAndWait(running.jobId)
+          return get().send(prompt)
+        }
+        if (s0.busy || running) return null
         if (!prompt) return 'noPrompt'
-        if (refs.length + (refLink ? 1 : 0) > 1) return 'twoReferences'
         // The conversation goes on when its last turn finished (an edit, or just a reply); new files ride along with it.
         const followUp = s0.jobId !== null && s0.canFollowUp
         if (s0.attachments.some((a) => a.state === 'uploading')) return 'uploading'
@@ -592,23 +618,21 @@ export const useChat = create<ChatState>()(
         if (s0.pictures.some((p) => p.state === 'failed')) return 'uploadFailed'
         const overlayIds = s0.pictures.flatMap((p) => (p.assetId ? [p.assetId] : []))
 
-        set({ busy: true, actionError: null })
+        // The message shows at once with the assistant "typing" while the server reads it (a model call, a few seconds),
+        // like any chat. The typing bubble becomes the real answer when the server replies; both go if the send fails.
+        const user: ChatMessage = {
+          id: newId(), role: 'user', text: prompt,
+          attachments: [...s0.attachments.map((a) => a.name), ...s0.pictures.map((p) => `${p.name} (picture)`)],
+        }
+        const typing: ChatAssistantMessage = { ...newAssistant(newId(), '', 0), kind: 'chat' }
+        set((s) => ({ busy: true, actionError: null, messages: capMessages([...s.messages, user, typing]) }))
         try {
           const api = getChatApi()
-          const attached = s0.attachments.filter((a) => !a.reference).map((a) => a.videoId!)
-          const referenceVideoId = refs[0]?.videoId ?? undefined
-          const referenceUrl = refLink ?? undefined
-          const styleId =
-            referenceVideoId || referenceUrl ? undefined : (useStyles.getState().items ? useStyles.getState().selected : null) ?? undefined
-          const style = {
-            ...(styleId ? { styleId } : {}), ...(referenceVideoId ? { referenceVideoId } : {}), ...(referenceUrl ? { referenceUrl } : {}),
-          }
-          const withStyle = Object.keys(style).length > 0
+          const attached = s0.attachments.map((a) => a.videoId!)
           let snap: ChatJobSnapshot
           if (followUp) {
             // the old call shapes stay as they were when nothing new is attached (a picture is the last argument)
-            if (overlayIds.length > 0) snap = await api.followUp(s0.jobId!, prompt, undefined, attached, withStyle ? style : undefined, overlayIds)
-            else if (withStyle) snap = await api.followUp(s0.jobId!, prompt, undefined, attached, style)
+            if (overlayIds.length > 0) snap = await api.followUp(s0.jobId!, prompt, undefined, attached, overlayIds)
             else snap = await api.followUp(s0.jobId!, prompt, undefined, attached)
           } else {
             // Words only is fine: a conversation needs a home, not footage. Footage can come with a later message.
@@ -618,30 +642,27 @@ export const useChat = create<ChatState>()(
               set({ projectId, userId: currentUserId() })
             }
             snap = await api.createJob({
-              projectId, videoIds: attached.length > 0 || referenceVideoId || referenceUrl ? attached : s0.videoIds, prompt, ...style,
+              projectId, videoIds: attached.length > 0 ? attached : s0.videoIds, prompt,
               ...(overlayIds.length > 0 ? { overlayIds } : {}),
+              // this chat's last job is over but takes no follow-up (a reply, a failed edit, clips): the new job is its next
+              // turn, so the conversation stays one chat (a chat copied from another server cannot run anything here)
+              ...(s0.jobId && !s0.remote ? { chatId: s0.jobId } : {}),
             })
           }
-          const user: ChatMessage = {
-            id: newId(), role: 'user', text: prompt,
-            attachments: [
-              ...s0.attachments.map((a) => (a.reference ? `${a.name} (style reference)` : a.name)),
-              ...(refLink ? [`${refLink} (style reference)`] : []),
-              ...s0.pictures.map((p) => `${p.name} (picture)`),
-            ],
-          }
           set((s) => ({
-            messages: applySnapshot(capMessages([...s.messages, user, newAssistant(newId(), snap.jobId, snap.turn)]), snap),
+            messages: applySnapshot(
+              s.messages.map((m): ChatMessage => (m.id === typing.id ? newAssistant(newId(), snap.jobId, snap.turn) : m)),
+              snap,
+            ),
             attachments: [],
             pictures: [],
-            referenceLink: null,
             userId: currentUserId(),
           }))
           absorb(snap)
           if (!isTerminal(snap.status)) void pollJob(snap.jobId)
           void get().loadHistory()
         } catch (e) {
-          set({ actionError: e })
+          set((s) => ({ actionError: e, messages: s.messages.filter((m) => m.id !== user.id && m.id !== typing.id) }))
         } finally {
           set({ busy: false })
         }
@@ -673,7 +694,59 @@ export const useChat = create<ChatState>()(
         }
       },
 
-      setReferenceLink: (url) => set({ referenceLink: url && url.trim() ? url.trim() : null, actionError: null }),
+      uploadForAnswer: async (file, onProgress) => {
+        const isPicture = looksLikePicture(file)
+        if (!isPicture && !looksLikeVideo(file)) throw new Error(`Not a photo or video: ${file.name}`)
+        const probe = isPicture ? null : await probeVideo(file)
+        let projectId = get().projectId
+        if (!projectId) {
+          projectId = await createChatProject(shapeFor(probe?.width ?? null, probe?.height ?? null))
+          set({ projectId, userId: currentUserId() })
+        }
+        return probe ? uploadVideo(projectId, file, probe, { onProgress }) : uploadPicture(projectId, file, { onProgress })
+      },
+
+      answerQuestion: async (jobId, body, label) => {
+        const api = getChatApi()
+        if (!api.answer) return 'unsupported'
+        set({ actionError: null })
+        const clearCard = (): void => {
+          useChat.setState((s) => ({
+            messages: s.messages.map((m): ChatMessage => (m.role === 'assistant' && m.jobId === jobId ? { ...m, question: null } : m)),
+          }))
+        }
+        try {
+          const snap = await api.answer(jobId, body)
+          clearCard()
+          // a typed answer shows as the person's message
+          if (label) set((s) => ({ messages: [...s.messages, { id: newId(), role: 'user', text: label, attachments: [] }] }))
+          set((s) => {
+            // A question asked before anything ran is answered by starting the work as the chat's NEXT turn (or a new chat
+            // for a different kind of job): give that turn its own assistant message, or its progress would have nowhere to go.
+            const has = s.messages.some((m) => m.role === 'assistant' && m.jobId === snap.jobId && m.turn === snap.turn)
+            const messages = has ? s.messages : capMessages([...s.messages, newAssistant(newId(), snap.jobId, snap.turn)])
+            return { messages: applySnapshot(messages, snap) }
+          })
+          absorb(snap)
+          if (!isTerminal(snap.status) && !pollCtl) void pollJob(snap.jobId)
+          return null
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 409) {
+            // The question is no longer open (answered elsewhere, or the job moved on): show the chat as it is now.
+            clearCard()
+            try {
+              const snap = await api.getJob(jobId)
+              set((s) => ({ messages: applySnapshot(s.messages, snap) }))
+              absorb(snap)
+              if (!isTerminal(snap.status) && !pollCtl) void pollJob(jobId)
+            } catch {
+              // the next poll shows it
+            }
+            return 'stale'
+          }
+          return e instanceof Error ? e.message : String(e)
+        }
+      },
 
       holdLook: async (jobId) => {
         await getChatApi().answerLook?.(jobId, { hold: true })?.catch(() => undefined)
@@ -684,7 +757,7 @@ export const useChat = create<ChatState>()(
           // The server fetches the video before it answers, so a link that does not work comes back as an error here.
           await getChatApi().answerLook?.(jobId, { url: url.trim() })
         } catch (e) {
-          return e instanceof Error ? e.message : String(e)
+          return userMessage(e)
         }
         closeLook(jobId)
         return null
@@ -710,7 +783,7 @@ export const useChat = create<ChatState>()(
           })
           await api.answerLook?.(jobId, { referenceVideoId: videoId })
         } catch (e) {
-          return e instanceof Error ? e.message : String(e)
+          return userMessage(e)
         }
         closeLook(jobId)
         return null
@@ -740,9 +813,9 @@ export const useChat = create<ChatState>()(
 
       cancel: async () => {
         const active = activeAssistant(get().messages)
-        if (!active) return
+        if (!active || !active.jobId) return
         stopPolling()
-        set((s) => ({ messages: finishLocally(s.messages, active.jobId, 'cancelled'), pollLostJobId: null }))
+        set((s) => ({ messages: finishLocally(s.messages, active.jobId, 'cancelled'), pollLostJobId: null, queue: [] }))
         try {
           absorb(await getChatApi().cancelJob(active.jobId))
         } catch (e) {
@@ -815,12 +888,76 @@ export const useChat = create<ChatState>()(
       },
 
       clearActionError: () => set({ actionError: null }),
+
+      removeQueued: (id) => set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
+
+      editMessage: async (messageId, rawText) => {
+        const text = rawText.trim()
+        const s0 = get()
+        const i = s0.messages.findIndex((m) => m.id === messageId)
+        const lastUser = s0.messages.map((m) => m.role).lastIndexOf('user')
+        if (i < 0 || i !== lastUser || s0.remote) return 'Only your last message can be changed.'
+        const target = s0.messages[i]!
+        if (!text) return 'Say what you want done.'
+        if (target.role === 'user' && target.text === text) return null
+        const reply = s0.messages.slice(i + 1).find((m): m is ChatAssistantMessage => m.role === 'assistant')
+        const api = getChatApi()
+        if (!reply || !api.editTurn) return 'This message cannot be changed.'
+        set({ busy: true, actionError: null })
+        try {
+          let snap: ChatJobSnapshot
+          try {
+            snap = await api.editTurn(reply.jobId, reply.turn, text)
+          } catch (e) {
+            if (!stopFirst(e) || isTerminal(reply.status)) throw e
+            await stopAndWait(reply.jobId)
+            snap = await api.editTurn(reply.jobId, reply.turn, text)
+          }
+          set((s) => ({
+            messages: applySnapshot(
+              s.messages.map((m): ChatMessage =>
+                m.id === messageId && m.role === 'user' ? { ...m, text, edited: true }
+                  : m.id === reply.id ? newAssistant(newId(), snap.jobId, snap.turn) : m,
+              ),
+              snap,
+            ),
+          }))
+          absorb(snap)
+          if (!isTerminal(snap.status)) void pollJob(snap.jobId)
+          void get().loadHistory()
+          return null
+        } catch (e) {
+          return userMessage(e)
+        } finally {
+          set({ busy: false })
+        }
+      },
+
+      retryTurn: async (assistantId) => {
+        const s0 = get()
+        const msg = s0.messages.find((m): m is ChatAssistantMessage => m.role === 'assistant' && m.id === assistantId)
+        const api = getChatApi()
+        if (!msg || !api.retryTurn || s0.busy || s0.remote || activeAssistant(s0.messages)) return
+        set({ busy: true, actionError: null })
+        try {
+          const snap = await api.retryTurn(msg.jobId)
+          set((s) => ({
+            messages: applySnapshot(s.messages.map((m): ChatMessage => (m.id === assistantId ? newAssistant(newId(), snap.jobId, snap.turn) : m)), snap),
+          }))
+          absorb(snap)
+          if (!isTerminal(snap.status)) void pollJob(snap.jobId)
+        } catch (e) {
+          set({ actionError: e })
+        } finally {
+          set({ busy: false })
+        }
+      },
     }),
     {
       name: 'edito.chat-web.chat.v1',
       partialize: (s) => ({
         userId: s.userId, projectId: s.projectId, jobId: s.jobId, canFollowUp: s.canFollowUp,
-        videoIds: s.videoIds, messages: capMessages(s.messages),
+        videoIds: s.videoIds, messages: capMessages(s.messages), queue: s.queue,
       }),
     },
   ),

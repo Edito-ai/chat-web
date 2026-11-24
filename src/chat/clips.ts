@@ -10,7 +10,9 @@ import type { ChatJobSnapshot, ClipItem, ClipOptions, ClipsSource, ClipStyled } 
 /** A video at least this long is treated as a stream: the composer switches to clipping by itself. */
 export const LONG_STREAM_SEC = 20 * 60
 
-export const DEFAULT_CLIP_OPTIONS: ClipOptions = { count: 12, minSec: 20, maxSec: 75 }
+export const DEFAULT_CLIP_OPTIONS: ClipOptions = { count: 12, minSec: 20, maxSec: 75, liveMin: 30 }
+/** Choices for a live stream: record and clip its last N minutes. */
+export const LIVE_MINUTES = [10, 30, 60] as const
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
@@ -52,9 +54,10 @@ export function toStyled(raw: unknown): ClipStyled | null {
 }
 
 export function toClipsSource(raw: unknown): ClipsSource | null {
-  const r = raw as { kind?: unknown; title?: unknown; durationSec?: unknown } | null
+  const r = raw as { kind?: unknown; title?: unknown; durationSec?: unknown; url?: unknown } | null
   if (!r || (r.kind !== 'upload' && r.kind !== 'link')) return null
-  return { kind: r.kind, title: str(r.title), durationSec: num(r.durationSec) }
+  const url = typeof r.url === 'string' && /^https?:\/\//i.test(r.url) ? r.url : null
+  return { kind: r.kind, title: str(r.title), durationSec: num(r.durationSec), url }
 }
 
 /** 75 -> "1:15", 3725 -> "1:02:05". */
@@ -84,7 +87,7 @@ export function clampOptions(o: Partial<ClipOptions>): ClipOptions {
   }
   const maxSec = n(o.maxSec, DEFAULT_CLIP_OPTIONS.maxSec, 15, 180)
   const minSec = Math.min(n(o.minSec, DEFAULT_CLIP_OPTIONS.minSec, 10, 120), maxSec - 5)
-  return { count: n(o.count, DEFAULT_CLIP_OPTIONS.count, 3, 20), minSec, maxSec }
+  return { count: n(o.count, DEFAULT_CLIP_OPTIONS.count, 3, 20), minSec, maxSec, liveMin: n(o.liveMin, DEFAULT_CLIP_OPTIONS.liveMin, 5, 60) }
 }
 
 export interface ClipLine {
