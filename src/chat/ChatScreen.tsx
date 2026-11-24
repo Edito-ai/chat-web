@@ -22,6 +22,7 @@ import { takeFreshStart } from './freshStart'
 import { TID } from './testIds'
 import { isSubscriptionRequired } from '@/account/lib/freeCredit'
 import { ProductTour } from '@/tour/ProductTour'
+import { PluginAnnouncement } from '@/announce/PluginAnnouncement'
 import { useAutoStartTour } from '@/tour/useAutoStartTour'
 import { useTour, useTourWants } from '@/tour/tourStore'
 
@@ -479,6 +480,7 @@ export function ChatScreen() {
       {!user && <AccountDialogs />}
 
       <ProductTour />
+      <PluginAnnouncement />
 
       {dragging && (
         <div className="pointer-events-none absolute inset-0 z-50 grid place-items-center bg-surface-0/80 font-display text-heading text-ink-0 backdrop-blur-sm">
