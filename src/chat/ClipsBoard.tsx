@@ -7,6 +7,7 @@ import { Captions, Download, Loader2, Minus, Play, Plus, Scissors, Sparkles } fr
 import { Button } from '@/components/ui'
 import { useT } from '@/i18n'
 import { useChat } from './chatStore'
+import { ShareButton } from './ShareButton'
 import { clock, getClipsApi, type ClipLine } from './clips'
 import type { ChatAssistantMessage, ClipItem } from './chatTypes'
 
@@ -19,7 +20,7 @@ export function ClipsBoard({ msg }: { msg: ChatAssistantMessage }) {
   const clips = msg.clips ?? []
   const source = msg.source ?? null
   return (
-    <div data-testid="chat-clips" className="w-full max-w-2xl space-y-3">
+    <div data-testid="chat-clips" className="w-full space-y-3">
       <div className="space-y-1">
         {msg.reply && <p className="text-prose text-ink-0">{msg.reply}</p>}
         <p className="text-label text-ink-3">
@@ -57,9 +58,9 @@ function ClipCard({ jobId, clip, rank, sourceSec }: { jobId: string; clip: ClipI
   return (
     <li
       data-testid={`chat-clip-${clip.id}`}
-      className="overflow-hidden rounded-2xl border border-line-strong bg-surface-1 shadow-lift animate-rise"
+      className="rounded-2xl border border-line-strong bg-surface-1 shadow-lift animate-rise"
     >
-      <div className="relative bg-black">
+      <div className="relative overflow-hidden rounded-t-2xl bg-black">
         {clip.videoUrl ? (
           <Link
             href={studioHref}
@@ -141,6 +142,7 @@ function ClipCard({ jobId, clip, rank, sourceSec }: { jobId: string; clip: ClipI
               {styling ? t('chat.clips.captioning') : t('chat.clips.captions')}
             </Button>
           ) : null}
+          {clip.state === 'ready' && <ShareButton compact jobId={jobId} clipId={clip.id} testId={`chat-clip-share-${clip.id}`} />}
           {clip.state !== 'failed' && (
             <Button
               variant="secondary"

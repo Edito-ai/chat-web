@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import clsx from 'clsx'
 import { useRouter } from 'next/navigation'
 import { Menu, PanelLeftOpen, SquarePen, X } from 'lucide-react'
@@ -10,6 +10,9 @@ import { useChat, type ChatSendProblem } from './chatStore'
 import type { ChatSuggestion } from './chatTypes'
 import { activeAssistant, lastCompleted } from './chatState'
 import { Bubble } from './Messages'
+import { ArtifactPanel } from './ArtifactPanel'
+import { useArtifactPanel } from './artifactStore'
+import { listArtifacts, opensByItself } from './artifacts'
 import { Composer } from './Composer'
 import { useStyles } from './styles'
 import { LibraryPage } from './LibraryPage'
@@ -109,6 +112,28 @@ export function ChatScreen() {
   const drawerOpen = drawer || tourDrawer
 
   const running = activeAssistant(messages) !== null
+  // What the chat made lives in the side panel; the chat keeps a small button for each.
+  const artifacts = useMemo(() => listArtifacts(messages), [messages])
+  const artifactById = useMemo(() => new Map(artifacts.map((a) => [a.id, a])), [artifacts])
+  const openId = useArtifactPanel((s) => s.openId)
+  const latest = artifacts[artifacts.length - 1] ?? null
+  const latestKey = latest ? `${latest.id}:${latest.kind}` : ''
+  const seenKey = useRef<{ job: string | null; key: string }>({ job: null, key: '' })
+  // A new thing (a finished video, a look or frames waiting for a choice) opens by itself. Switching to another chat does not
+  // open its old things, and closes the panel.
+  useEffect(() => {
+    const prev = seenKey.current
+    seenKey.current = { job: currentJobId, key: latestKey }
+    if (prev.job !== currentJobId) {
+      useArtifactPanel.getState().close()
+      return
+    }
+    if (latest && latestKey !== prev.key && opensByItself(latest.kind)) useArtifactPanel.getState().open(latest.id)
+  }, [currentJobId, latestKey, latest])
+  // the open thing went away (a new chat, a delete): shut the panel
+  useEffect(() => {
+    if (openId && !artifactById.has(openId)) useArtifactPanel.getState().close()
+  }, [openId, artifactById])
   const empty = messages.length === 0
   const library = view === 'library'
   const hasVideo = lastCompleted(messages) !== null
@@ -352,7 +377,7 @@ export function ChatScreen() {
             <div className="mx-auto min-h-full w-full max-w-3xl px-4 py-4">
               <ol data-testid="chat-log" role="log" aria-label={t('chat.log.aria')} className="space-y-6 pb-4">
                 {messages.map((m, i) => (
-                  <Bubble key={m.id} msg={m} chips={i === messages.length - 1 && !running} onSuggest={onSuggest} />
+                  <Bubble key={m.id} msg={m} artifact={artifactById.get(m.id) ?? null} chips={i === messages.length - 1 && !running} onSuggest={onSuggest} />
                 ))}
               </ol>
               <div ref={endRef} />
@@ -435,6 +460,8 @@ export function ChatScreen() {
           </div>
         </div>
       </div>
+
+      <ArtifactPanel artifacts={artifacts} />
 
       {/* Signed-in users get the dialogs from the profile menu. */}
       {!user && <AccountDialogs />}

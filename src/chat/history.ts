@@ -1,5 +1,6 @@
 import { apiClient } from '@/lib/apiClient'
 import { newAssistant } from './chatState'
+import { turnResult } from './versions'
 import { toSnapshot, type ChatJobWire, toSuggestions } from './chatApi'
 import type { ChatAssistantMessage, ChatMessage } from './chatTypes'
 
@@ -85,7 +86,7 @@ export function groupHistory(
 
 /**
  * Rebuilds a conversation from one full job: a user + assistant message per recorded turn, then the turn still
- * running (if any). Only the newest turn gets a playable link; older turns stay as text.
+ * running (if any). Every finished turn gets its own video, when the backend keeps one per turn.
  */
 export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
   const snap = toSnapshot(w)
@@ -111,6 +112,11 @@ export function rebuildMessages(w: ChatJobWire): ChatMessage[] {
     out.push(newAssistant(`${w.id}:${current}:a`, w.id, current))
   }
   return out.map((m): ChatMessage => {
+    // an earlier finished turn plays its own video (the newest result tells where the chat's videos are)
+    if (m.role === 'assistant' && m.turn !== current && m.status === 'complete' && m.kind !== 'chat' && m.kind !== 'clips' && snap.result) {
+      const result = turnResult(snap.result, current, m.turn)
+      return result ? { ...m, result } : m
+    }
     if (m.role !== 'assistant' || m.turn !== current) return m
     const a: ChatAssistantMessage = m
     if (snap.status === 'complete' && (snap.result || snap.kind === 'chat' || snap.kind === 'clips')) {

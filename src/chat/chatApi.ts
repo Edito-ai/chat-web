@@ -276,3 +276,31 @@ export function getChatApi(): ChatApi {
 export function setChatApi(api: ChatApi | null): void {
   current = api
 }
+
+/** A link anyone can open to watch a finished video, or one clip of a clipping chat (30 days). */
+export async function shareChat(jobId: string, clipId?: string, turn?: number): Promise<{ url: string; expiresAt: number }> {
+  const origin = typeof window !== 'undefined' ? window.location.origin : undefined
+  const raw = (await apiClient.post(`${jobPath(jobId)}/share`, { ...(clipId ? { clipId } : {}), ...(turn ? { turn } : {}), ...(origin ? { origin } : {}) })) as {
+    url?: string
+    expiresAt?: number
+  }
+  if (!raw.url) throw new Error('no link')
+  return { url: raw.url, expiresAt: raw.expiresAt ?? 0 }
+}
+
+/** What a share link plays (public: no sign-in). */
+export interface SharedVideo {
+  kind: 'video' | 'clip'
+  title: string
+  videoUrl: string
+  downloadUrl: string
+  fileName: string | null
+}
+
+export async function fetchShared(token: string, signal?: AbortSignal): Promise<SharedVideo | null> {
+  try {
+    return (await apiClient.get(`/share/chat/${encodeURIComponent(token)}`, { signal })) as SharedVideo
+  } catch {
+    return null
+  }
+}

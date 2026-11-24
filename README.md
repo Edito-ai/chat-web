@@ -125,3 +125,10 @@ src/i18n/    en / hi strings and the tiny useT hook
 src/components/ui.tsx  Button, IconButton, Logo, InlineError; Dialog.tsx modal with focus trap
 src/account/ account menu: services/, lib/, components/ (dialogs), store, __tests__/
 ```
+
+## Preview panel and sharing
+
+Whatever a chat makes (finished video per version, clips, the look and frames to choose, what was seen) opens in a side panel
+(`src/chat/ArtifactPanel.tsx`; a full-screen sheet on a phone). The chat keeps one small button per thing (`ArtifactChip.tsx`).
+Share (`ShareButton.tsx`) calls `POST /chat/jobs/{id}/share` (backend2 `b2/api/share.py`) and shows a link `/s/<token>`; that page
+(`src/app/s/[token]`) plays the video with no sign-in. Links are signed and last 30 days; they cannot be revoked one by one.

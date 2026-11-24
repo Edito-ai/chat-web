@@ -8,6 +8,7 @@ import { formatElapsed, splitReply } from './activity'
 import { activeAssistant, lastCompleted } from './chatState'
 import { useChat } from './chatStore'
 import { MusicPanel } from './MusicPanel'
+import { ShareButton } from './ShareButton'
 import { boldRuns, replyBlocks } from './replyText'
 import type { ChatAnalysis, ChatAssistantMessage } from './chatTypes'
 
@@ -93,16 +94,16 @@ export function SeenFrames({ analysis }: { analysis: ChatAnalysis }) {
   )
 }
 
-/** The finished video, flat in the chat: the player, then the assistant's words, what was left out, and Download. */
+/** The finished video as the side panel shows it: the player, what was left out, Download and Share. (The assistant's words stay in the chat.) */
 export function ResultCard({ msg }: { msg: ChatAssistantMessage & { result: NonNullable<ChatAssistantMessage['result']> } }) {
   const { t } = useT()
   const { result } = msg
-  const { text, notIncluded } = splitReply(msg.reply)
+  const { notIncluded } = splitReply(msg.reply)
   const [duration, setDuration] = useState<number | null>(null)
   // The music card belongs to the newest finished video of the open chat, and only while nothing else is running.
   const musicOn = useChat((s) => s.canFollowUp && s.jobId === msg.jobId && lastCompleted(s.messages)?.id === msg.id && !activeAssistant(s.messages))
   return (
-    <div className="w-full max-w-xl animate-rise space-y-4">
+    <div className="w-full animate-rise space-y-4">
       <video
         data-testid="chat-video"
         aria-label={t('chat.result.aria')}
@@ -116,8 +117,6 @@ export function ResultCard({ msg }: { msg: ChatAssistantMessage & { result: NonN
         }}
         className="max-h-[62vh] w-auto max-w-full rounded-xl bg-black"
       />
-
-      <ReplyText text={text || t('chat.result.ready')} />
 
       {notIncluded.length > 0 && (
         <div data-testid="chat-not-included" className="space-y-1.5">
@@ -143,6 +142,7 @@ export function ResultCard({ msg }: { msg: ChatAssistantMessage & { result: NonN
         >
           <Download size={14} strokeWidth={2} aria-hidden /> {t('chat.download')}
         </a>
+        <ShareButton jobId={msg.jobId} turn={msg.turn} />
         {(duration !== null || result.fileName) && (
           <span className="font-mono text-caption tabular-nums text-ink-4">
             {[result.fileName, duration !== null ? t('chat.result.duration', { time: formatElapsed(duration * 1000) }) : null].filter(Boolean).join(' · ')}

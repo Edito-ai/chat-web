@@ -8,11 +8,11 @@ import { ORB_ENABLED } from '@/lib/features'
 import { Presence } from './Presence'
 import { boldRuns, replyBlocks } from './replyText'
 import { useChat } from './chatStore'
-import { ResultCard, SeenFrames } from './ResultCard'
-import { ClipsBoard } from './ClipsBoard'
+import { ReplyText } from './ResultCard'
+import { splitReply } from './activity'
+import { ArtifactChip } from './ArtifactChip'
+import { kindOf, type Artifact } from './artifacts'
 import { ThinkingTrail } from './Thinking'
-import { FramesReview } from './FramesReview'
-import { LookChoice } from './LookChoice'
 import type { ChatAssistantMessage, ChatMessage, ChatSuggestion } from './chatTypes'
 
 function ErrorCard({ msg }: { msg: ChatAssistantMessage }) {
@@ -97,7 +97,7 @@ function ChatReply({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; chips
   )
 }
 
-function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; chips: boolean; onSuggest?: (s: ChatSuggestion) => void }) {
+function AssistantBody({ msg, artifact, chips, onSuggest }: { msg: ChatAssistantMessage; artifact: Artifact | null; chips: boolean; onSuggest?: (s: ChatSuggestion) => void }) {
   const { t } = useT()
   const lostJobId = useChat((s) => s.pollLostJobId)
   const retryPolling = useChat((s) => s.retryPolling)
@@ -112,7 +112,8 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
     return (
       <div className="space-y-3">
         <ThinkingTrail msg={msg} />
-        <ClipsBoard msg={msg} />
+        {msg.reply && <ReplyText text={msg.reply} />}
+        {artifact && <ArtifactChip artifact={artifact} />}
       </div>
     )
   }
@@ -121,7 +122,10 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
       <div className="space-y-3">
         <ThinkingTrail msg={msg} />
         {msg.result ? (
-          <ResultCard msg={{ ...msg, result: msg.result }} />
+          <div className="w-full max-w-xl animate-rise space-y-3">
+            <ReplyText text={splitReply(msg.reply).text || t('chat.result.ready')} />
+            {artifact && <ArtifactChip artifact={artifact} />}
+          </div>
         ) : (
           <div className="max-w-lg space-y-1">
             <p className="text-prose text-ink-0">{msg.reply ?? t('chat.result.ready')}</p>
@@ -158,18 +162,12 @@ function AssistantBody({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; c
   return (
     <div className="space-y-3">
       <ThinkingTrail msg={msg} />
-      <LookChoice msg={msg} />
-      <FramesReview msg={msg} />
-      {msg.analysis && (
-        <div className="w-full max-w-xl">
-          <SeenFrames analysis={msg.analysis} />
-        </div>
-      )}
+      {artifact && <ArtifactChip artifact={artifact} />}
     </div>
   )
 }
 
-export function Bubble({ msg, chips = false, onSuggest }: { msg: ChatMessage; chips?: boolean; onSuggest?: (s: ChatSuggestion) => void }) {
+export function Bubble({ msg, artifact, chips = false, onSuggest }: { msg: ChatMessage; artifact?: Artifact | null; chips?: boolean; onSuggest?: (s: ChatSuggestion) => void }) {
   const { t } = useT()
   if (msg.role === 'user') {
     return (
@@ -202,7 +200,7 @@ export function Bubble({ msg, chips = false, onSuggest }: { msg: ChatMessage; ch
             {msg.placementQuestion}
           </p>
         )}
-        <AssistantBody msg={msg} chips={chips} onSuggest={onSuggest} />
+        <AssistantBody msg={msg} artifact={artifact !== undefined ? artifact : (kindOf(msg) ? { id: msg.id, kind: kindOf(msg)!, version: 1, msg } : null)} chips={chips} onSuggest={onSuggest} />
       </div>
     </li>
   )

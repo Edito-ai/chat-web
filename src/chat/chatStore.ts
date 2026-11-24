@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { turnResult } from './versions'
 import { useAuth } from '@/auth/authStore'
 import { ApiError } from '@/lib/apiClient'
 import { getChatApi, toSnapshot, type LibraryVideo } from './chatApi'
@@ -771,9 +772,14 @@ export const useChat = create<ChatState>()(
           if (snap.status === 'complete' && snap.result && snap.turn === done.turn) {
             const result = snap.result
             set((cur) => ({
-              messages: cur.messages.map((m) =>
-                m.role === 'assistant' && m.jobId === done.jobId && m.turn === done.turn ? { ...m, result } : m,
-              ),
+              messages: cur.messages.map((m) => {
+                if (m.role !== 'assistant' || m.jobId !== done.jobId) return m
+                if (m.turn === done.turn) return { ...m, result }
+                // an earlier turn (also one saved with the old shared address) plays its own video
+                if (m.status !== 'complete' || m.kind === 'chat' || m.kind === 'clips') return m
+                const own = turnResult(result, done.turn, m.turn)
+                return own ? { ...m, result: own } : m
+              }),
             }))
             absorb(snap)
           }
