@@ -12,14 +12,18 @@ import { ServerWaking } from '@/components/ServerWaking'
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site'
 
 const TITLE = `${SITE_NAME}: edit your video by chatting`
+// Link-preview copy (WhatsApp, X, LinkedIn).
+const SHARE_TITLE = 'Broll Chat — Just say the edit. Get the video.'
+const SHARE_DESCRIPTION = 'Upload a video and type what you want. Captions, B-roll, colour grade and cuts, all done by chat.'
+const SHARE_IMAGE = '/brand/og-v2.png'
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: TITLE, template: `%s | ${SITE_NAME}` },
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
-  openGraph: { type: 'website', siteName: SITE_NAME, title: TITLE, description: SITE_DESCRIPTION, url: '/', images: [{ url: '/brand/og.png', width: 1200, height: 628, alt: 'Broll' }] },
-  twitter: { card: 'summary_large_image', title: TITLE, description: SITE_DESCRIPTION, images: ['/brand/og.png'] },
+  openGraph: { type: 'website', siteName: SITE_NAME, title: SHARE_TITLE, description: SHARE_DESCRIPTION, url: '/', images: [{ url: SHARE_IMAGE, width: 1200, height: 630, alt: SHARE_TITLE }] },
+  twitter: { card: 'summary_large_image', title: SHARE_TITLE, description: SHARE_DESCRIPTION, images: [SHARE_IMAGE] },
 }
 
 export const viewport: Viewport = {
