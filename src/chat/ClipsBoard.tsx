@@ -126,7 +126,7 @@ function ClipCard({ jobId, clip, rank, sourceSec }: { jobId: string; clip: ClipI
               href={clip.downloadUrl}
               download={clip.downloadFilename}
               data-testid={`chat-clip-download-${clip.id}`}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] px-3 text-label font-semibold text-white transition-all hover:brightness-110"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-label font-semibold text-black transition-all"
             >
               <Download size={14} aria-hidden /> {t('chat.clips.download')}
             </a>
@@ -280,7 +280,7 @@ export function ClipTrim({ jobId, clip, sourceSec, onDone }: { jobId: string; cl
           step={0.1}
           value={value}
           onChange={(e) => put(which, Number(e.target.value))}
-          className="h-1.5 w-full cursor-pointer accent-[#FF7A5C]"
+          className="h-1.5 w-full cursor-pointer accent-white"
         />
       </div>
     )

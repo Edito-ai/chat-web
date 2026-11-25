@@ -22,7 +22,7 @@ export function NeedPlanNotice({ show }: { show: boolean }) {
         role="region"
         aria-label={t('plan.need.region')}
         data-testid={TID.needCredit}
-        className="border-b border-accent-line bg-gradient-to-r from-accent/45 via-accent/15 to-warning/40 px-3 py-2.5 sm:px-4"
+        className="border-b border-accent-line bg-surface-2 px-3 py-2.5 sm:px-4"
       >
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2">
           <p className="min-w-0 flex-1 basis-56 text-body font-semibold text-ink-0">{t('plan.need')}</p>
@@ -37,7 +37,7 @@ export function NeedPlanNotice({ show }: { show: boolean }) {
               href={whatsappLink(contact.phone, t('plan.need.whatsappText', { email }))}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] px-3 text-label font-semibold text-white hover:brightness-110"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white px-3 text-label font-semibold text-black"
             >
               <MessageSquare size={14} aria-hidden /> {t('access.message')}
             </a>

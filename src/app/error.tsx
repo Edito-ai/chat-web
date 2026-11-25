@@ -36,7 +36,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
           <button
             type="button"
             onClick={() => (stale ? window.location.reload() : reset())}
-            className="inline-flex h-10 items-center rounded-xl bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] px-4 text-body font-semibold text-white hover:brightness-110"
+            className="inline-flex h-10 items-center rounded-xl bg-white px-4 text-body font-semibold text-black"
           >
             {translate('en', 'err.page.reload')}
           </button>

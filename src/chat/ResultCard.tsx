@@ -115,7 +115,7 @@ export function ResultCard({ msg }: { msg: ChatAssistantMessage & { result: NonN
           const d = e.currentTarget.duration
           setDuration(Number.isFinite(d) && d > 0 ? d : null)
         }}
-        className="max-h-[62vh] w-auto max-w-full rounded-xl bg-black"
+        className="mx-auto block max-h-[70vh] w-auto max-w-full rounded-xl bg-black"
       />
 
       {notIncluded.length > 0 && (

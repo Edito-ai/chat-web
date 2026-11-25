@@ -26,7 +26,7 @@ function ErrorCard({ msg }: { msg: ChatAssistantMessage }) {
   const dev = isDevMode()
   const detail = raw && (dev || isHumanText(raw)) ? raw : undefined
   return (
-    <div role="alert" className="w-full max-w-lg">
+    <div role="alert" className="w-full max-w-3xl">
       <p className="flex items-center gap-2 text-prose font-medium text-ink-0"><AlertTriangle size={15} className="shrink-0 text-danger" aria-hidden />{t('chat.error.title')}</p>
       {detail && <p className={dev && !isHumanText(detail) ? 'mt-1.5 break-words font-mono text-label text-danger' : 'mt-1.5 break-words text-label text-ink-2'}>{detail}</p>}
       <p className="mt-2 text-label text-ink-3">{t('chat.error.next')}</p>
@@ -62,7 +62,7 @@ const CHIP_ICON = { upload: Upload, library: FolderOpen, send: Sparkles } as con
 function ChatReply({ msg, chips, onSuggest }: { msg: ChatAssistantMessage; chips: boolean; onSuggest?: (s: ChatSuggestion) => void }) {
   const blocks = replyBlocks(msg.reply)
   return (
-    <div data-testid="chat-reply" className="max-w-lg space-y-3">
+    <div data-testid="chat-reply" className="max-w-3xl space-y-3">
       <div className="space-y-2.5">
         {blocks.map((b, i) =>
           b.type === 'ul' ? (
@@ -147,7 +147,7 @@ function AssistantBody({ msg, artifact, chips, onSuggest, onRetry }: {
       <div className="space-y-3">
         <ThinkingTrail msg={msg} />
         {msg.result ? (
-          <div className="w-full max-w-xl animate-rise space-y-3">
+          <div className="w-full max-w-3xl animate-rise space-y-3">
             <ReplyText text={splitReply(msg.reply).text || t('chat.result.ready')} />
             {artifact && <ArtifactChip artifact={artifact} />}
           </div>
@@ -183,7 +183,7 @@ function AssistantBody({ msg, artifact, chips, onSuggest, onRetry }: {
   }
   if (lostJobId === msg.jobId) {
     return (
-      <div className="w-full max-w-lg space-y-1 rounded-2xl border border-warning/25 bg-warning-soft p-4">
+      <div className="w-full max-w-3xl space-y-1 rounded-2xl border border-warning/25 bg-warning-soft p-4">
         <p className="text-body text-ink-0">{t('chat.lost')}</p>
         <InlineError error={actionError} onRetry={retryPolling} />
       </div>
@@ -258,7 +258,7 @@ function UserBubble({ msg, onEdit }: { msg: ChatMessage & { role: 'user' }; onEd
               type="submit"
               data-testid="chat-edit-save"
               disabled={saving || !draft.trim()}
-              className="min-h-[34px] rounded-full bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] px-3.5 text-label font-semibold text-white disabled:opacity-40"
+              className="min-h-[34px] rounded-full bg-white px-3.5 text-label font-semibold text-black disabled:opacity-40"
             >
               {t('chat.edit.save')}
             </button>
@@ -281,7 +281,7 @@ function UserBubble({ msg, onEdit }: { msg: ChatMessage & { role: 'user' }; onEd
           <Pencil size={14} aria-hidden />
         </button>
       )}
-      <div className="max-w-[min(88%,34rem)] space-y-1.5 rounded-2xl rounded-br-md bg-white/[0.07] px-4 py-2.5 ring-1 ring-white/10">
+      <div className="max-w-[min(88%,48rem)] space-y-1.5 rounded-2xl rounded-br-md bg-white/[0.07] px-4 py-2.5 ring-1 ring-white/10">
         <span className="sr-only">{t('chat.you')}: </span>
         {msg.attachments.length > 0 && (
           <p className="break-words font-mono text-caption text-ink-3">{msg.attachments.join(', ')}</p>
@@ -308,7 +308,7 @@ export function Bubble({ msg, artifact, chips = false, onSuggest, onEdit, onRetr
         {ORB_ENABLED ? (
           <Presence active={msg.status === 'queued' || msg.status === 'running'} idle={chips} />
         ) : (
-          <span aria-hidden className="grid h-[52px] w-[52px] place-items-center rounded-xl border border-white/[0.12] bg-gradient-to-br from-[#D8264A]/30 to-[#FF7A5C]/10">
+          <span aria-hidden className="grid h-[52px] w-[52px] place-items-center rounded-xl border border-white/[0.12] bg-white/[0.06]">
             <LogoMark size={16} />
           </span>
         )}

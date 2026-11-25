@@ -476,7 +476,7 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
                     const volume = Number(e.target.value)
                     set((d) => ({ ...d, music: { ...d.music, volume } }))
                   }}
-                  className="h-1.5 w-full cursor-pointer accent-[#FF7A5C]"
+                  className="h-1.5 w-full cursor-pointer accent-white"
                 />
               </div>
             )}
@@ -499,7 +499,7 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
       <div
         data-testid="studio-bar"
         data-tone={bar.tone}
-        className="sticky bottom-3 z-30 rounded-2xl border border-line-strong bg-[linear-gradient(160deg,rgb(30_34_70/0.92),rgb(14_16_34/0.95))] p-3 shadow-[0_24px_60px_-20px_rgb(0_0_0/0.9)] backdrop-blur-xl sm:p-4"
+        className="sticky bottom-3 z-30 rounded-2xl border border-line-strong bg-surface-2 p-3 shadow-[0_24px_60px_-20px_rgb(0_0_0/0.9)] backdrop-blur-xl sm:p-4"
         style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
@@ -555,7 +555,7 @@ export function ClipStudio({ jobId, clipId }: { jobId: string; clipId: string })
                 data-testid="studio-download-styled"
                 className={clsx(
                   'inline-flex h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-body font-semibold md:flex-none',
-                  dirty ? 'border border-line bg-surface-3 text-ink-0 hover:bg-surface-4' : 'bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white hover:brightness-110',
+                  dirty ? 'border border-line bg-surface-3 text-ink-0 hover:bg-surface-4' : 'bg-white text-black',
                 )}
               >
                 <Download size={15} aria-hidden /> {t('chat.studio.download')}

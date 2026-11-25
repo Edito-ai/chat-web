@@ -108,7 +108,7 @@ function Ring({ p }: { p: number }) {
 function Chip({ show, accent, children }: { show: number; accent?: boolean; children: ReactNode }) {
   return (
     <li
-      className={clsx('flex max-w-full items-center gap-2 rounded-xl border bg-surface-2 py-1 pl-2 pr-2.5 text-label transition-[border-color,box-shadow] duration-300', accent ? 'border-accent-line shadow-[0_0_0_3px_rgb(255_158_140/0.12)]' : 'border-line')}
+      className={clsx('flex max-w-full items-center gap-2 rounded-xl border bg-surface-2 py-1 pl-2 pr-2.5 text-label transition-[border-color,box-shadow] duration-300', accent ? 'border-accent-line shadow-[0_0_0_3px_rgb(255_255_255/0.08)]' : 'border-line')}
       style={{ opacity: show, transform: `translateY(${(1 - show) * 8}px) scale(${0.94 + show * 0.06})` }}
     >
       {children}
@@ -148,7 +148,7 @@ export function ComposerDemo({ anchor, radius }: { anchor: Box; radius: number }
       className="pointer-events-none fixed"
       style={{ left: anchor.left, width: anchor.width, top: anchor.top + anchor.height, transform: 'translateY(-100%)' }}
     >
-      <div ref={box} className="relative border border-white/15 bg-[linear-gradient(180deg,#121633,#0c0f24)] shadow-composer" style={{ borderRadius: Math.max(16, radius) }}>
+      <div ref={box} className="relative border border-white/15 bg-surface-1 shadow-composer" style={{ borderRadius: Math.max(16, radius) }}>
         {now >= T.drag1[0] && now < T.drag1[1] + 120 && <DragCard name={VIDEO} meta="2:14 · 84 MB" p={span(now, T.drag1)} />}
 
         {hasChips && (
@@ -182,7 +182,7 @@ export function ComposerDemo({ anchor, radius }: { anchor: Box; radius: number }
             ref={sendBtn}
             className={clsx(
               'grid h-10 w-10 shrink-0 place-items-center rounded-full transition-all duration-300',
-              typed >= prompt.length && fade > 0.5 ? 'bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white shadow-[0_8px_22px_-8px_rgb(255_90_80/0.9)]' : 'bg-white/[0.08] text-ink-3',
+              typed >= prompt.length && fade > 0.5 ? 'bg-white text-black' : 'bg-white/[0.08] text-ink-3',
               sent && 'scale-90',
             )}
           >
@@ -250,7 +250,7 @@ export function SendDemo({ anchor, radius }: { anchor: Box; radius: number }) {
       className="pointer-events-none fixed"
       style={{ left: anchor.left, width: anchor.width, top: anchor.top + anchor.height, transform: 'translateY(-100%)' }}
     >
-      <div ref={box} className="relative border border-white/15 bg-[linear-gradient(180deg,#121633,#0c0f24)] shadow-composer" style={{ borderRadius: Math.max(16, radius) }}>
+      <div ref={box} className="relative border border-white/15 bg-surface-1 shadow-composer" style={{ borderRadius: Math.max(16, radius) }}>
         {!empty && (
           <ul className="flex flex-wrap gap-2 px-3 pt-3" style={{ opacity: show }}>
             <Chip show={1}>
@@ -273,8 +273,8 @@ export function SendDemo({ anchor, radius }: { anchor: Box; radius: number }) {
             {callout && (
               // Below the box, so it never covers the chips: an arrow bouncing up at the send button.
               <span className="absolute right-0 top-[calc(100%+14px)] flex flex-col items-end" style={{ opacity: show }}>
-                <ArrowUp size={18} strokeWidth={2.5} className="tour-bounce-up mb-0.5 mr-2.5 text-[#FF9E8C]" />
-                <span className="whitespace-nowrap rounded-full bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] px-2.5 py-1 text-caption font-semibold text-white shadow-[0_8px_20px_-8px_rgb(255_90_80/0.9)]">
+                <ArrowUp size={18} strokeWidth={2.5} className="tour-bounce-up mb-0.5 mr-2.5 text-white" />
+                <span className="whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-caption font-semibold text-black">
                   {t('tour.demo.clickSend')}
                 </span>
               </span>
@@ -283,7 +283,7 @@ export function SendDemo({ anchor, radius }: { anchor: Box; radius: number }) {
               ref={sendBtn}
               className={clsx(
                 'grid h-10 w-10 place-items-center rounded-full transition-all duration-200',
-                !empty ? 'bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white shadow-[0_8px_22px_-8px_rgb(255_90_80/0.9)]' : 'bg-white/[0.08] text-ink-3',
+                !empty ? 'bg-white text-black' : 'bg-white/[0.08] text-ink-3',
                 callout && 'tour-send-pulse',
                 pressed && 'scale-90',
               )}

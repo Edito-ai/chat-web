@@ -95,7 +95,7 @@ export function Onboarding() {
           data-testid="onboarding-banner"
           className="flex items-center gap-3 rounded-2xl border border-accent-line bg-accent/10 px-3.5 py-2.5"
         >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white shadow-[0_8px_22px_-10px_rgb(255_90_80/0.8)]">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-black">
             <Gift size={17} aria-hidden />
           </span>
           <span className="min-w-0">
@@ -107,7 +107,7 @@ export function Onboarding() {
         <div>
           <div className="flex gap-1.5" role="progressbar" aria-valuemin={1} aria-valuemax={3} aria-valuenow={step} aria-label={t('onb.progress', { n: step })}>
             {[1, 2, 3].map((n) => (
-              <span key={n} className={clsx('h-1 flex-1 rounded-full transition-colors duration-300', n <= step ? 'bg-gradient-to-r from-[#D8264A] to-[#FF7A5C]' : 'bg-white/10')} />
+              <span key={n} className={clsx('h-1 flex-1 rounded-full transition-colors duration-300', n <= step ? 'bg-white' : 'bg-white/10')} />
             ))}
           </div>
           <p className="mt-2 text-caption text-ink-3">{t('onb.progress', { n: step })}</p>
@@ -226,7 +226,7 @@ export function Onboarding() {
               </Field>
               {consentNeeded && (
                 <label className="flex items-start gap-2 text-label text-ink-2">
-                  <input type="checkbox" name="agree" className="mt-0.5 h-4 w-4 accent-[#FF7A5C]" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+                  <input type="checkbox" name="agree" className="mt-0.5 h-4 w-4 accent-white" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
                   <span>
                     {t('auth.consent')}{' '}
                     <a href={TERMS_URL} target="_blank" rel="noopener noreferrer" className="underline decoration-white/30 underline-offset-2 hover:text-ink-0">
@@ -324,7 +324,7 @@ function Celebration({ credit }: { credit: OnboardingCredit }) {
     <AuthShell wide>
       <Confetti />
       <div data-testid="onboarding-done" className="animate-rise space-y-5 py-2 text-center">
-        <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white shadow-[0_18px_40px_-14px_rgb(255_90_80/0.9)]">
+        <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-white text-black">
           <PartyPopper size={30} aria-hidden />
         </span>
         <div className="space-y-2">

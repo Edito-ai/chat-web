@@ -5,12 +5,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        surface: { 0: '#070914', 1: '#0C1022', 2: '#121832', 3: '#192042', 4: '#222A56' },
+        surface: { 0: '#000000', 1: '#0A0A0A', 2: '#111111', 3: '#181818', 4: '#222222' },
         ink: { 0: '#F6F6F4', 1: '#C9C9CE', 2: '#9B9BA3', 3: '#8E8E97', 4: '#80808A', disabled: '#4C4C54' },
         line: { DEFAULT: 'rgb(255 255 255 / 0.07)', strong: 'rgb(255 255 255 / 0.14)' },
         danger: { DEFAULT: '#E0565C', soft: 'rgb(224 86 92 / 0.12)' },
         warning: { DEFAULT: '#D8A64B', soft: 'rgb(216 166 75 / 0.12)' },
-        accent: { DEFAULT: '#FF9E8C', soft: 'rgb(255 158 140 / 0.12)', line: 'rgb(255 158 140 / 0.38)' },
+        accent: { DEFAULT: '#FFFFFF', soft: 'rgb(255 255 255 / 0.08)', line: 'rgb(255 255 255 / 0.26)' },
         success: { DEFAULT: '#5CA97A', soft: 'rgb(92 169 122 / 0.12)' },
       },
       fontSize: {

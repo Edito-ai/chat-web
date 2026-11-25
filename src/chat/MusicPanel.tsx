@@ -235,7 +235,7 @@ export function MusicPanel({ jobId, turn }: { jobId: string; turn: number }) {
                 value={volume}
                 disabled={disabled || !state.current.enabled}
                 onChange={(e) => setVolume(Number(e.target.value))}
-                className="h-1.5 min-w-0 flex-1 cursor-pointer accent-[#FF7A5C] disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-1.5 min-w-0 flex-1 cursor-pointer accent-white disabled:cursor-not-allowed disabled:opacity-40"
               />
               {dirty && (
                 <Button

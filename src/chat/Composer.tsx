@@ -104,7 +104,7 @@ export function Composer(p: ComposerProps) {
   const canSend = !p.sendDisabled && (p.text.trim().length > 0 || p.attachments.length > 0 || p.pictures.length > 0)
   const typedWhileRunning = p.running && p.text.trim().length > 0
   return (
-    <div data-tour="composer" className="rounded-[1.75rem] border border-white/15 bg-surface-1/75 backdrop-blur-xl shadow-composer transition-[border-color,box-shadow] duration-200 focus-within:border-accent-line focus-within:shadow-[0_0_0_4px_rgb(255_158_140/0.10),0_20px_50px_-20px_rgb(0_0_0/0.9)]">
+    <div data-tour="composer" className="rounded-[1.75rem] border border-white/10 bg-surface-1 shadow-[0_24px_60px_-24px_rgb(0_0_0/1)] hover:border-white/20 transition-[border-color,box-shadow] duration-200 focus-within:border-white/30 focus-within:shadow-[0_0_0_4px_rgb(255_255_255/0.06),0_20px_50px_-20px_rgb(0_0_0/0.9)]">
       {(p.queued?.length ?? 0) > 0 && (
         <ul data-testid="chat-queue" aria-label={t('chat.queued')} className="flex flex-col gap-1.5 px-3 pt-3">
           {p.queued!.map((q) => (
@@ -180,7 +180,7 @@ export function Composer(p: ComposerProps) {
               data-testid="chat-stop-send"
               title={t('chat.stopAndSend.hint')}
               onClick={p.onInterrupt}
-              className="inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] px-3.5 text-label font-semibold text-white shadow-[0_8px_22px_-8px_rgb(255_90_80/0.8)] transition-all hover:brightness-110"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-3.5 text-label font-semibold text-black transition-all"
             >
               <Square size={11} fill="currentColor" aria-hidden /> {t('chat.stopAndSend')}
             </button>
@@ -203,7 +203,7 @@ export function Composer(p: ComposerProps) {
             onClick={p.onSend}
             className={clsx(
               'ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 disabled:pointer-events-none disabled:opacity-30 sm:ml-0',
-              canSend ? 'bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white shadow-[0_8px_22px_-8px_rgb(255_90_80/0.8)] hover:-translate-y-px hover:brightness-110' : 'bg-white/[0.08] text-ink-3',
+              canSend ? 'bg-white text-black hover:-translate-y-px' : 'bg-white/[0.08] text-ink-3',
             )}
           >
             <ArrowUp size={18} strokeWidth={2.25} aria-hidden />

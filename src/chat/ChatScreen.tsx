@@ -281,7 +281,7 @@ export function ChatScreen() {
       onDrop={onDrop}
     >
       {/* Desktop rail */}
-      <aside className={clsx('hidden w-[17.5rem] shrink-0 border-r border-white/[0.08] bg-gradient-to-b from-white/[0.02] to-black/25 backdrop-blur-md md:block', railHidden && 'md:hidden')}>
+      <aside className={clsx('hidden w-[17.5rem] shrink-0 border-r border-white/[0.06] bg-[#050505] md:block', railHidden && 'md:hidden')}>
         {renderSidebar(false)}
       </aside>
 
@@ -307,7 +307,7 @@ export function ChatScreen() {
               swipeX.current = null
               if (start !== null && end !== undefined && start - end > 70) setDrawer(false)
             }}
-            className="absolute inset-y-0 left-0 w-[min(21rem,88vw)] animate-drawer-in overflow-hidden rounded-r-3xl border-r border-white/15 bg-[linear-gradient(to_bottom,#0e0f12,#141519)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-[0_0_80px_rgb(0_0_0/0.75)]"
+            className="absolute inset-y-0 left-0 w-[min(21rem,88vw)] animate-drawer-in overflow-hidden rounded-r-3xl border-r border-white/15 bg-surface-1 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-[0_0_80px_rgb(0_0_0/0.75)]"
           >
             {renderSidebar(true)}
           </aside>
@@ -317,7 +317,7 @@ export function ChatScreen() {
       <div className="flex min-w-0 flex-1 flex-col">
         <NeedPlanNotice show={needCredit} />
 
-        <header className="flex h-14 shrink-0 items-center gap-1 px-3 sm:gap-2 sm:px-4">
+        <header className="flex h-14 shrink-0 items-center gap-1 border-b border-white/[0.06] px-3 sm:gap-2 sm:px-5">
           <IconButton
             data-testid="chat-menu"
             icon={Menu}
@@ -378,7 +378,7 @@ export function ChatScreen() {
 
         {!library && !empty && (
           <div ref={logRef} onScroll={onLogScroll} className="scroll-thin min-h-0 flex-1 overflow-y-auto">
-            <div className="mx-auto min-h-full w-full max-w-3xl px-4 py-4">
+            <div className="mx-auto min-h-full w-full max-w-4xl px-4 py-6 sm:px-6">
               <ol data-testid="chat-log" role="log" aria-label={t('chat.log.aria')} className="space-y-6 pb-4">
                 {messages.map((m, i) => (
                   <Bubble
@@ -406,7 +406,15 @@ export function ChatScreen() {
             library ? 'hidden' : empty ? 'flex flex-1 flex-col justify-center pb-[14vh]' : 'shrink-0',
           )}
         >
-          <div className="mx-auto w-full max-w-3xl space-y-2">
+          <div className="mx-auto w-full max-w-4xl space-y-2">
+            {empty && (
+              <div className="animate-rise pb-6 text-center">
+                <h2 className="bg-gradient-to-b from-white to-white/55 bg-clip-text font-display text-[clamp(1.6rem,4vw,2.75rem)] font-semibold leading-tight tracking-tight text-transparent">
+                  {t('chat.empty.title')}
+                </h2>
+                <p className="mx-auto mt-3 max-w-xl text-prose text-ink-3">{t('chat.empty.sub')}</p>
+              </div>
+            )}
             {showTopError && (
               <div className="flex items-start justify-between gap-2">
                 {needCredit ? (
@@ -433,7 +441,7 @@ export function ChatScreen() {
               }}
             />
             {remote && !running && (
-              <p className="mx-auto mb-2 max-w-3xl rounded-lg border border-white/10 px-3 py-2 text-xs opacity-80" role="note">
+              <p className="mx-auto mb-2 max-w-6xl rounded-lg border border-white/10 px-3 py-2 text-xs opacity-80" role="note">
                 {t('chat.remote', { server: remote })}
               </p>
             )}

@@ -330,7 +330,7 @@ export function ProductTour() {
         data-testid="tour-card"
         data-step={step.id}
         className={clsx(
-          'pointer-events-auto absolute z-10 overflow-visible rounded-[1.4rem] border border-white/[0.14] bg-[linear-gradient(160deg,rgb(30_34_70/0.94),rgb(14_16_34/0.96))] text-ink-1 shadow-[0_30px_80px_-20px_rgb(0_0_0/0.85),0_0_0_1px_rgb(255_158_140/0.06)_inset] backdrop-blur-2xl',
+          'pointer-events-auto absolute z-10 overflow-visible rounded-[1.4rem] border border-white/[0.14] bg-surface-2 text-ink-1 shadow-[0_30px_80px_-20px_rgb(0_0_0/0.85),0_0_0_1px_rgb(255_158_140/0.06)_inset]',
           'transition-[top,left,bottom,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
           small && !centred ? '' : 'w-[min(23rem,calc(100vw-2rem))]',
           ready ? 'opacity-100' : 'pointer-events-none opacity-0',
@@ -345,7 +345,7 @@ export function ProductTour() {
 
         <div key={step.id} className="relative animate-rise p-4 sm:p-6">
           <div className="mb-3 flex items-center gap-3 sm:mb-4">
-            <span className={clsx('grid shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white shadow-[0_10px_26px_-10px_rgb(255_90_80/0.9)]', centred ? 'h-12 w-12' : 'h-10 w-10')}>
+            <span className={clsx('grid shrink-0 place-items-center rounded-2xl bg-white text-black', centred ? 'h-12 w-12' : 'h-10 w-10')}>
               <Icon size={centred ? 22 : 18} strokeWidth={1.9} aria-hidden />
             </span>
             <span className="min-w-0 flex-1 font-mono text-caption uppercase tracking-[0.14em] text-accent">
@@ -398,7 +398,7 @@ export function ProductTour() {
             <div className="mt-4 flex gap-1 sm:mt-5" aria-hidden>
               {steps.slice(1, -1).map((s, i) => (
                 <span key={s.id} className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
-                  <span className={clsx('block h-full rounded-full bg-gradient-to-r from-[#D8264A] to-[#FF7A5C] transition-[width] duration-500', i + 1 <= index ? 'w-full' : 'w-0')} />
+                  <span className={clsx('block h-full rounded-full bg-white transition-[width] duration-500', i + 1 <= index ? 'w-full' : 'w-0')} />
                 </span>
               ))}
             </div>
@@ -425,7 +425,7 @@ export function ProductTour() {
               type="button"
               data-testid="tour-next"
               onClick={() => next(steps.length)}
-              className="group ml-auto inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] px-4 text-body font-semibold text-white shadow-[0_10px_26px_-10px_rgb(255_90_80/0.9)] transition-[filter,transform] hover:brightness-110 active:scale-[0.98]"
+              className="group ml-auto inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-body font-semibold text-black transition-[filter,transform] active:scale-[0.98]"
             >
               {t(first ? 'tour.start' : last ? 'tour.finish' : index === steps.length - 2 ? 'tour.lastNext' : 'tour.next')}
               <ArrowRight size={16} aria-hidden className="transition-transform group-hover:translate-x-0.5" />

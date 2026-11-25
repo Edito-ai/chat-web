@@ -46,7 +46,7 @@ export function Button({ variant = 'secondary', icon: Icon, className, children,
       type={type}
       className={clsx(
         'inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg px-3.5 text-body font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40',
-        variant === 'primary' && 'bg-gradient-to-br from-[#D8264A] to-[#FF7A5C] text-white shadow-[0_8px_22px_-10px_rgb(255_90_80/0.8)] hover:brightness-110',
+        variant === 'primary' && 'bg-white text-black',
         variant === 'secondary' && 'border border-line bg-surface-3 text-ink-0 hover:bg-surface-4',
         variant === 'ghost' && 'text-ink-1 hover:bg-white/[0.06] hover:text-ink-0',
         className,

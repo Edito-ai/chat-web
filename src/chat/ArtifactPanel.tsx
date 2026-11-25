@@ -1,6 +1,7 @@
 'use client'
 
 import clsx from 'clsx'
+import { useCallback, useEffect, useState, type PointerEvent as RPointerEvent } from 'react'
 import { X } from 'lucide-react'
 import { useT, type MessageKey } from '@/i18n'
 import { IconButton } from '@/components/ui'
@@ -39,23 +40,89 @@ function Body({ artifact }: { artifact: Artifact }) {
  * The preview panel beside the chat: whatever the chat made (finished video, clips, the look and frames to choose from, what was
  * seen), one version at a time, with a switcher between versions. A column on a wide screen, the whole screen on a phone.
  */
+const W_KEY = 'edito.chat.panelWidth'
+const W_MIN = 320
+const clampW = (w: number) => Math.round(Math.min(Math.max(w, W_MIN), Math.max(W_MIN, window.innerWidth * 0.75)))
+
+/** The width of the side panel: drag its left edge (or use the arrow keys on it); remembered between visits. */
+function usePanelWidth() {
+  const [w, setW] = useState(560)
+  useEffect(() => {
+    try {
+      const v = Number(localStorage.getItem(W_KEY))
+      if (v > 0) setW(clampW(v))
+    } catch {
+      // not remembered
+    }
+  }, [])
+  const save = useCallback((v: number) => {
+    try {
+      localStorage.setItem(W_KEY, String(v))
+    } catch {
+      // not remembered
+    }
+  }, [])
+  const onPointerDown = (e: RPointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = w
+    let last = w
+    const move = (ev: PointerEvent) => {
+      last = clampW(startW + (startX - ev.clientX))
+      setW(last)
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      document.body.style.userSelect = ''
+      save(last)
+    }
+    document.body.style.userSelect = 'none'
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    e.preventDefault()
+    const next = clampW(w + (e.key === 'ArrowLeft' ? 40 : -40))
+    setW(next)
+    save(next)
+  }
+  return { w, onPointerDown, onKeyDown, reset: () => { setW(560); save(560) } }
+}
+
 export function ArtifactPanel({ artifacts }: { artifacts: readonly Artifact[] }) {
   const { t } = useT()
   const openId = useArtifactPanel((s) => s.openId)
   const { open, close } = useArtifactPanel.getState()
+  const size = usePanelWidth()
   const current = artifacts.find((a) => a.id === openId)
   if (!current) return null
   const versions = versionsOf(artifacts, current.kind)
   return (
     <aside
+      style={{ ['--panel-w' as string]: `${size.w}px` }}
       data-testid="chat-artifact-panel"
       aria-label={t('artifact.panel')}
       className={clsx(
-        'z-30 flex min-h-0 flex-col bg-[#0c0d11] animate-fade-in',
+        'z-30 flex min-h-0 flex-col bg-surface-1 animate-fade-in',
         'fixed inset-0 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]',
-        'md:static md:inset-auto md:w-[min(34rem,45%)] md:shrink-0 md:border-l md:border-white/[0.08] md:p-0',
+        'md:relative md:inset-auto md:w-[var(--panel-w)] md:max-w-[75%] md:shrink-0 md:border-l md:border-white/[0.08] md:p-0',
       )}
     >
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize preview"
+        tabIndex={0}
+        data-testid="chat-artifact-resize"
+        onPointerDown={size.onPointerDown}
+        onKeyDown={size.onKeyDown}
+        onDoubleClick={size.reset}
+        className="group absolute inset-y-0 -left-1 z-40 hidden w-2 cursor-col-resize touch-none md:block"
+      >
+        <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-white/40 group-focus-visible:bg-white/60 group-active:bg-white/60" />
+      </div>
       <header className="flex h-14 shrink-0 items-center gap-2 border-b border-white/[0.08] px-3 sm:px-4">
         <h2 className="min-w-0 flex-1 truncate font-display text-body font-medium text-ink-0">{t(TITLE[current.kind])}</h2>
         {versions.length > 1 && (
