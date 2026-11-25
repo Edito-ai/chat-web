@@ -6,6 +6,7 @@ import { userMessage } from '@/lib/friendlyError'
 import type { CardVerifyStatus, Entitlement, FreeCreditStatus, TokenUsage } from './types'
 
 export type AccountDialog = 'usage' | 'billing' | 'help' | 'legal'
+export type HelpTab = 'faq' | 'bug' | 'feature' | 'call'
 
 /** The card / UPI verification claim: `done` carries the server's answer in `result`, `error` a sentence for the person. */
 export interface CardClaim {
@@ -25,6 +26,8 @@ interface AccountState {
   dialog: AccountDialog | null
   /** Scroll/focus target inside the billing dialog (the "Pricing / Upgrade" entry). */
   billingFocus: 'plans' | null
+  /** Which tab of the Help dialog opens first (the visible Help button picks one). */
+  helpTab: HelpTab
   /** Starter-credit offer, fetched once after login; never blocks anything. */
   credit: FreeCreditStatus | null
   creditLoad: CreditLoad
@@ -44,7 +47,7 @@ interface AccountState {
   /** Order -> Razorpay modal -> confirm. Closing the modal is not an error; a failure leaves a sentence in `cardClaim.error`. */
   claimWithCard: (email?: string | null) => Promise<void>
   clearCardClaim: () => void
-  openDialog: (d: AccountDialog, opts?: { focus?: 'plans' }) => void
+  openDialog: (d: AccountDialog, opts?: { focus?: 'plans'; tab?: HelpTab }) => void
   closeDialog: () => void
   reset: () => void
 }
@@ -55,6 +58,7 @@ export const useAccount = create<AccountState>()((set, get) => ({
   status: 'idle',
   dialog: null,
   billingFocus: null,
+  helpTab: 'faq',
   credit: null,
   creditLoad: 'idle',
   creditDismissed: false,
@@ -124,7 +128,7 @@ export const useAccount = create<AccountState>()((set, get) => ({
     void get().refresh()
     return credit
   },
-  openDialog: (dialog, opts) => set({ dialog, billingFocus: opts?.focus ?? null }),
+  openDialog: (dialog, opts) => set({ dialog, billingFocus: opts?.focus ?? null, helpTab: opts?.tab ?? 'faq' }),
   closeDialog: () => set({ dialog: null, billingFocus: null }),
   reset: () => set({ entitlement: null, tokenUsage: null, status: 'idle', dialog: null, billingFocus: null, credit: null, creditLoad: 'idle', creditDismissed: false, cardVerify: null, cardVerifyLoad: 'idle', cardClaim: NO_CLAIM }),
 }))

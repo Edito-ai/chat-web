@@ -6,6 +6,9 @@ import { useT, type MessageKey } from '@/i18n'
 import { Button, IconButton, InlineError, Logo } from '@/components/ui'
 import { useAuth } from '@/auth/authStore'
 import { AccountDialogs } from '@/account/components/AccountDialogs'
+import { HelpLauncher } from '@/account/components/HelpLauncher'
+import { StuckNudge } from './StuckNudge'
+import { progressSignature, useStuckNudge } from './useStuckNudge'
 import { openQuestion, useChat, type ChatSendProblem } from './chatStore'
 import type { ChatSuggestion } from './chatTypes'
 import { activeAssistant, lastCompleted } from './chatState'
@@ -129,6 +132,7 @@ export function ChatScreen() {
   // (the "typing" bubble shown while a message is being sent has no job yet: nothing is running)
   const active = activeAssistant(messages)
   const running = active !== null && active.jobId !== ''
+  const stuck = useStuckNudge(running, active ? progressSignature(active) : '')
   // What the chat made lives in the side panel; the chat keeps a small button for each.
   const artifacts = useMemo(() => listArtifacts(messages), [messages])
   const artifactById = useMemo(() => new Map(artifacts.map((a) => [a.id, a])), [artifacts])
@@ -535,6 +539,8 @@ export function ChatScreen() {
       {/* Signed-in users get the dialogs from the profile menu. */}
       {!user && <AccountDialogs />}
 
+      {stuck.show && active ? <StuckNudge message={active} onDismiss={stuck.dismiss} /> : null}
+      <HelpLauncher />
       <ProductTour />
       <PluginAnnouncement />
 

@@ -129,6 +129,8 @@ export interface CreateTicketInput {
   severity: TicketSeverity
   subject: string
   message: string
+  /** Free-form extras stored on the ticket (page, browser, a meeting request). Max 32 KB on the server. */
+  diagnostics?: Record<string, unknown>
 }
 
 export interface TicketReceipt {
