@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import clsx from 'clsx'
 import { useRouter } from 'next/navigation'
-import { Menu, PanelLeftOpen, SquarePen, X } from 'lucide-react'
+import { ArrowUpRight, AudioLines, Clapperboard, Menu, PanelLeftOpen, Scissors, SquarePen, X } from 'lucide-react'
 import { useT, type MessageKey } from '@/i18n'
 import { Button, IconButton, InlineError, Logo } from '@/components/ui'
 import { useAuth } from '@/auth/authStore'
@@ -11,6 +11,7 @@ import type { ChatSuggestion } from './chatTypes'
 import { activeAssistant, lastCompleted } from './chatState'
 import { Bubble } from './Messages'
 import { ArtifactPanel } from './ArtifactPanel'
+import { ShowcaseFan } from './ShowcaseFan'
 import { useArtifactPanel } from './artifactStore'
 import { listArtifacts, opensByItself } from './artifacts'
 import { Composer } from './Composer'
@@ -43,6 +44,25 @@ const EXAMPLES = [1, 2, 3, 4] as const
  * Chat-style edit screen: a left sidebar with recent chats, and the conversation. Add footage, describe the edit,
  * watch what it is doing, get the video back with a player and Download, then send follow-ups. No timeline.
  */
+/** Three one-click starting points on the empty screen: each fills the box with a prompt, the person can still change it. */
+/** Clips that play in the fan on the empty screen: put five vertical videos in public/showcase (1.mp4 ... 5.mp4). */
+const SHOWCASE = ['/showcase/1.mp4', '/showcase/2.mp4', '/showcase/3.mp4', '/showcase/4.mp4', '/showcase/5.mp4']
+
+const STARTERS = [
+  { id: '1', Icon: Clapperboard },
+  { id: '2', Icon: AudioLines },
+  { id: '3', Icon: Scissors },
+] as const
+
+/** Which greeting fits the hour on this device. */
+function greetKey(d = new Date()): MessageKey {
+  const h = d.getHours()
+  if (h >= 5 && h < 12) return 'chat.greet.morning'
+  if (h >= 12 && h < 17) return 'chat.greet.afternoon'
+  if (h >= 17 && h < 22) return 'chat.greet.evening'
+  return 'chat.greet.night'
+}
+
 export function ChatScreen() {
   const { t } = useT()
   const messages = useChat((s) => s.messages)
@@ -408,13 +428,15 @@ export function ChatScreen() {
         >
           <div className="mx-auto w-full max-w-4xl space-y-2">
             {empty && (
-              <div className="animate-rise pb-6 text-center">
-                <h2 className="bg-gradient-to-b from-white to-white/55 bg-clip-text font-display text-[clamp(1.6rem,4vw,2.75rem)] font-semibold leading-tight tracking-tight text-transparent">
-                  {t('chat.empty.title')}
+              <div className="animate-rise pb-8 text-center">
+                <h2 className="bg-gradient-to-b from-white to-white/60 bg-clip-text font-display text-[clamp(1.6rem,4vw,2.6rem)] font-semibold leading-tight tracking-tight text-transparent">
+                  {t(greetKey())}
+                  {user?.name ? `, ${user.name.trim().split(/\s+/)[0]}` : ''}
                 </h2>
-                <p className="mx-auto mt-3 max-w-xl text-prose text-ink-3">{t('chat.empty.sub')}</p>
+                <p className="mt-3 text-prose text-ink-3">{t('chat.greet.sub')}</p>
               </div>
             )}
+            {empty && <ShowcaseFan sources={SHOWCASE} />}
             {showTopError && (
               <div className="flex items-start justify-between gap-2">
                 {needCredit ? (
@@ -469,6 +491,32 @@ export function ChatScreen() {
               queued={queued}
               onRemoveQueued={removeQueued}
             />
+            {empty && (
+              <ul className="mt-5 grid animate-rise gap-2.5 sm:grid-cols-3" aria-label={t('chat.starter.aria')}>
+                {STARTERS.map(({ id, Icon }) => (
+                  <li key={id}>
+                    <button
+                      type="button"
+                      data-testid={`chat-starter-${id}`}
+                      onClick={() => {
+                        setText(t(`chat.starter.${id}.prompt` as MessageKey))
+                        requestAnimationFrame(() => textareaRef.current?.focus())
+                      }}
+                      className="group flex h-full w-full flex-col gap-2.5 rounded-2xl border border-white/10 bg-surface-1 p-3.5 text-left transition-all hover:-translate-y-0.5 hover:border-white/25 hover:bg-surface-2"
+                    >
+                      <span className="flex items-center justify-between">
+                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/[0.07] text-ink-0 transition-colors group-hover:bg-white group-hover:text-black">
+                          <Icon size={15} strokeWidth={1.9} aria-hidden />
+                        </span>
+                        <ArrowUpRight size={14} className="text-ink-4 transition-colors group-hover:text-ink-0" aria-hidden />
+                      </span>
+                      <span className="text-body font-semibold text-ink-0">{t(`chat.starter.${id}.title` as MessageKey)}</span>
+                      <span className="line-clamp-2 text-label text-ink-3">{t(`chat.starter.${id}.prompt` as MessageKey)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             {/* Disclaimer under the box: hidden for now. Bring it back with the link pointing at TERMS_URL (the website).
             <p data-testid="chat-disclaimer" className="px-3 pt-0.5 text-center text-caption leading-snug text-ink-4">
               {t('chat.disclaimer.pre')}
