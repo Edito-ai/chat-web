@@ -24,7 +24,7 @@ function FanCard({ i, src }: { i: number; src: string | null }) {
       onMouseLeave={() => setHover(false)}
     >
       <div
-        className="relative aspect-[9/16] w-[clamp(84px,14vw,148px)] overflow-hidden rounded-2xl border border-white/10 bg-surface-1 shadow-[0_24px_50px_-18px_rgb(0_0_0/1)] transition-[transform,border-color] duration-300 ease-out"
+        className="relative aspect-[9/16] w-[clamp(84px,min(14vw,15vh),148px)] overflow-hidden rounded-2xl border border-white/10 bg-surface-1 shadow-[0_24px_50px_-18px_rgb(0_0_0/1)] transition-[transform,border-color] duration-300 ease-out"
         style={{
           transform: hover ? `translateY(${DROP[i]! - 16}px) rotate(0deg) scale(1.07)` : `translateY(${DROP[i]}px) rotate(${TILT[i]}deg)`,
           borderColor: hover ? 'rgb(255 255 255 / 0.3)' : undefined,
@@ -55,7 +55,7 @@ function FanCard({ i, src }: { i: number; src: string | null }) {
 
 export function ShowcaseFan({ sources }: { sources: readonly string[] }) {
   return (
-    <div aria-hidden className="mx-auto mb-8 hidden h-[clamp(190px,30vh,270px)] w-full max-w-3xl items-start justify-center [@media(min-height:740px)]:flex">
+    <div aria-hidden className="mx-auto mb-2 hidden w-full max-w-3xl items-start justify-center pb-12 [@media(min-height:740px)]:flex">
       {TILT.map((_, i) => (
         <FanCard key={i} i={i} src={sources.length > 0 ? sources[i % sources.length]! : null} />
       ))}
